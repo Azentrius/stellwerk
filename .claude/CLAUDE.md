@@ -119,14 +119,19 @@ To look at the display without touching the real token and audit log, start a hu
 - The app shows its own permission card at once, in parallel to the held hook; the first decision
   counts. `allow` and `deny` from the hook work; `deny`'s message reaches Claude word for word. An empty
   answer leaves the app's card open.
-- Rejecting in the app (with interrupt) closes the held request; allowing in the app does not. That is
-  why `PostToolUse`, `Stop`, `UserPromptSubmit` and `SubagentStop` settle open cards ("decided in the
-  app").
+- Answering in the app closes the held request: rejecting (with interrupt) and, since the acceptance on
+  2026-10-15, allowing as well. In the first probe allowing kept it open, so `PostToolUse`, `Stop`,
+  `UserPromptSubmit` and `SubagentStop` still settle open cards. Either way the outcome is "decided in
+  the app"; the hub cannot tell how it was decided.
+- `AskUserQuestion` arrives as a `PermissionRequest`. It is a question, not a permission: the hub sends
+  it straight back (`QUESTION_TOOLS` in `board.ts`) and the session waits for the user.
+- With the hub down, the desktop app shows no hook errors at all; Claude Code just asks in the app.
 - A `Notification` with `permission_prompt` follows every request after about 6 s; it must not change
   anything while the card is open.
 - Sessions in auto mode report many `SubagentStop` with an empty `agent_type` and no `SubagentStart`
   (internal helpers); subagents are counted only in pairs by `agent_id`.
-- "Allow for this session" in the app switches the session to `acceptEdits`; later edits then fire no
-  `PermissionRequest` at all. Keep that in mind when testing.
+- After a file edit was allowed in the app, the session switched to `acceptEdits` (the request carries
+  that as a `permission_suggestions` entry); later edits then fire no `PermissionRequest` at all. The
+  app's card has no separate "for this session" option. Keep that in mind when testing.
 - `PermissionRequest` input: the common fields, `tool_name`, `tool_input`, `permission_suggestions`, and
   `mcp_server` for MCP tools; no `tool_use_id`.

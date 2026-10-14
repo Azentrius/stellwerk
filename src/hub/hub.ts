@@ -14,7 +14,7 @@ import { z } from 'zod';
 import type { Decision, DecisionResultMessage, PermissionOutcome, StateMessage } from '../shared/protocol.js';
 import { HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
-import { Board, projectName, type Permission } from './board.ts';
+import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
 import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
 import { loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
@@ -199,19 +199,26 @@ export async function startHub(options: HubOptions): Promise<Hub> {
 
   function holdPermission(event: PermissionRequestEvent, res: http.ServerResponse): void {
     const at = now();
+    if (QUESTION_TOOLS.has(event.tool_name)) {
+      // A question, not a permission: straight back to the app, which asks the user.
+      board.askUser(event, at);
+      scheduleBroadcast();
+      return send(res, 200);
+    }
     const tooMany = board.pendingCount() >= MAX_OPEN_PERMISSIONS;
     const id = randomUUID();
     board.addPermission(id, event, at, options.holdMs);
     const timer = setTimeout(() => finish(id, 'timed-out'), options.holdMs);
     held.set(id, { res, timer });
     res.on('close', () => {
-      // Closed before an answer: Claude Code gave up (Esc, rejected in the app, timeout).
+      // Closed before an answer: the request was answered in the app (allowed, rejected or cancelled with
+      // Esc). The hub cannot tell which; the app knows.
       const entry = held.get(id);
       if (!entry) return;
       clearTimeout(entry.timer);
       held.delete(id);
       const closedAt = now();
-      if (board.settle(id, 'aborted', closedAt)) report(board.permissions.get(id)!, 'aborted', closedAt);
+      if (board.settle(id, 'decided-in-app', closedAt)) report(board.permissions.get(id)!, 'decided-in-app', closedAt);
       scheduleBroadcast();
     });
     if (tooMany) finish(id, 'handed-to-app', 'too many open requests');

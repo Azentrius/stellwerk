@@ -407,15 +407,47 @@ describe('permission requests', () => {
     screen.close();
   });
 
-  test('when Claude Code closes the request (Esc, answered in the app) the card goes as cancelled', async () => {
+  test('when Claude Code closes the request (answered in the app, or Esc) the card goes as decided in the app', async () => {
     const { port, auditFile } = await startTestHub();
     const screen = await display(port);
     const pending = permissionRequest(port);
     pending.reply.catch(() => {});
     await openRequestId(screen);
     pending.abort();
-    await screen.state((s) => s.permissions[0]?.outcome === 'aborted');
+    await screen.state((s) => s.permissions[0]?.outcome === 'decided-in-app' && s.sessions[0]?.status === 'done');
+    await eventually(() => auditLines(auditFile)[0]?.result === 'decided-in-app');
+    screen.close();
+  });
+
+  test('a SessionEnd while a request is open cancels it', async () => {
+    const { port, auditFile } = await startTestHub();
+    const screen = await display(port);
+    const pending = permissionRequest(port);
+    await openRequestId(screen);
+    await hook(port, { hook_event_name: 'SessionEnd', reason: 'other' }).reply;
+    assert.equal((await pending.reply).body, '');
+    await screen.state((s) => s.permissions[0]?.outcome === 'aborted' && s.sessions[0]?.status === 'ended');
     await eventually(() => auditLines(auditFile)[0]?.result === 'aborted');
+    screen.close();
+  });
+
+  test('a question to the user (AskUserQuestion) goes straight back to the app: no card, no audit entry', async () => {
+    const { port, auditFile } = await startTestHub();
+    const screen = await display(port);
+    const started = Date.now();
+    const reply = await hook(port, {
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'Which one?', options: [{ label: 'A' }, { label: 'B' }] }] },
+    }).reply;
+    assert.equal(reply.status, 200);
+    assert.equal(reply.body, '');
+    assert.ok(Date.now() - started < 1000, 'answered at once');
+    const state = await screen.state((s) => s.sessions[0]?.status === 'waiting');
+    assert.equal(state.permissions.length, 0);
+    await hook(port, { hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: {} }).reply;
+    await screen.state((s) => s.sessions[0]?.status === 'working');
+    assert.deepEqual(auditLines(auditFile), []);
     screen.close();
   });
 

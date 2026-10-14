@@ -6,7 +6,9 @@ The first version: Claude Code sessions and their permission requests on a desk 
 
 - **Hub:** receives Claude Code's HTTP hooks on `127.0.0.1`, keeps the status of every session in
   memory and holds permission requests until the display decides or the hold time (60 s) is up. Writes
-  every request and its outcome to an audit log.
+  every request and its outcome to an audit log. A request answered in the app counts as "decided in the
+  app", whether it was allowed, rejected or cancelled there. Questions to the user (multiple choice) get
+  no card: the session waits for the answer in the app.
 - **Display:** three columns for 1920×720 in Azentrius dark: the open requests with the complete input
   and Allow, Deny and In the app; the sessions with status, subagents and last activity; clock and the
   hub's state. Buttons 64 px high, no text below 20 px, one scale factor, English and German.
