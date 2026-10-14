@@ -28,6 +28,8 @@ export const WS_SESSION_PREFIX = 'stellwerk.session.';
 const MAX_WS_MESSAGE_BYTES = 4096;
 const SWEEP_INTERVAL_MS = 1000;
 const BROADCAST_DELAY_MS = 50;
+/** A repeated rejection for the same reason is logged at most this often. */
+export const REJECTION_LOG_INTERVAL_MS = 60_000;
 
 export interface HubOptions {
   /** 0 picks a free port (tests). */
@@ -86,6 +88,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   let port = options.port;
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
+  const rejections = new Map<string, { loggedAt: number; repeats: number }>();
 
   const server = http.createServer((req, res) => {
     handle(req, res).catch((err: Error) => {
@@ -123,10 +126,16 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     setSecurityHeaders(res);
     // Only our own name: a page that points its domain at 127.0.0.1 (DNS rebinding) is turned away.
-    if (!allowedHost(req.headers.host)) return send(res, 403);
+    if (!allowedHost(req.headers.host)) {
+      reject('foreign host', `request with the Host header ${quote(req.headers.host)} (403)`);
+      return send(res, 403);
+    }
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (pathname === HOOK_PATH) {
-      if (req.method !== 'POST') return send(res, 405);
+      if (req.method !== 'POST') {
+        reject('hook method', `${quote(req.method)} request to the hook endpoint (405)`);
+        return send(res, 405);
+      }
       return onHook(req, res);
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
@@ -137,22 +146,46 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   }
 
   async function onHook(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    if (!authorized(req.headers.authorization)) return send(res, 401);
+    const authorization = req.headers.authorization ?? '';
+    // An unset STELLWERK_TOKEN arrives as "Bearer " with nothing after it.
+    if (authorization.replace(/^Bearer\b/i, '').trim() === '') {
+      reject(
+        'no token',
+        'hook request without a token (401). Run "stellwerk hooks install" and restart the Claude app, ' +
+          'so that it has STELLWERK_TOKEN.',
+      );
+      return send(res, 401);
+    }
+    if (!authorized(authorization)) {
+      reject(
+        'wrong token',
+        'hook request with a wrong token (401). If the token file was renewed, run "stellwerk hooks install" ' +
+          'again and restart the Claude app.',
+      );
+      return send(res, 401);
+    }
     // application/json makes a browser ask first (CORS preflight), which the hub never answers: no web page
     // can post events here.
-    if (!isJson(req.headers['content-type'])) return send(res, 415);
+    if (!isJson(req.headers['content-type'])) {
+      reject('content type', `hook request with the content type ${quote(req.headers['content-type'])} (415)`);
+      return send(res, 415);
+    }
     const raw = await readBody(req, MAX_BODY_BYTES);
-    if (raw === null) return send(res, 413);
+    if (raw === null) {
+      reject('too large', `hook request larger than ${MAX_BODY_BYTES / 1024 / 1024} MB (413)`);
+      return send(res, 413);
+    }
     let body: unknown;
     try {
       body = JSON.parse(raw.toString('utf8'));
     } catch {
+      reject('json', 'hook request that is not valid JSON (400)');
       return send(res, 400);
     }
     if (options.rawLogFile) appendRawLog(options.rawLogFile, body);
     const parsed = parseHookInput(body);
     if (!parsed.ok) {
-      log(`Hook input rejected: ${parsed.error}`);
+      reject('hook input', `hook data without the expected fields (400): ${parsed.error.replace(/\s*\n\s*/g, '; ')}`);
       return send(res, 400);
     }
     const event = parsed.event;
@@ -221,21 +254,44 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   function report(permission: Permission, outcome: PermissionOutcome, at: number, note?: string): void {
     const cwd = board.sessions.get(permission.sessionId)?.cwd ?? '';
     audit.write({ permission, cwd, outcome, at, ...(note ? { note } : {}) });
-    const time = new Date(at).toTimeString().slice(0, 8);
-    log(`${time}  ${projectName(cwd) || permission.sessionId.slice(0, 8)} · ${permission.tool}  ${outcome}`);
+    log(`${clockTime(at)}  ${projectName(cwd) || permission.sessionId.slice(0, 8)} · ${permission.tool}  ${outcome}`);
+  }
+
+  /**
+   * Tells the console why a request was turned away, so a missing token or a wrong address shows up.
+   * Never with the token. The same reason at most once a minute, with the number of repeats since.
+   */
+  function reject(key: string, message: string): void {
+    const at = now();
+    const last = rejections.get(key);
+    if (last && at - last.loggedAt < REJECTION_LOG_INTERVAL_MS) {
+      last.repeats++;
+      return;
+    }
+    const repeats = last?.repeats ? ` (${last.repeats} more since the last message)` : '';
+    rejections.set(key, { loggedAt: at, repeats: 0 });
+    log(`${clockTime(at)}  Rejected ${message}${repeats}`);
   }
 
   // ---------- WebSocket ----------
 
   function onUpgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer): void {
-    const reject = (status: number) => {
+    const refuse = (status: number, key: string, message: string) => {
+      reject(key, `${message} (${status})`);
       socket.write(`HTTP/1.1 ${status} ${http.STATUS_CODES[status]}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
     };
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-    if (!allowedHost(req.headers.host) || !allowedOrigin(req.headers.origin)) return reject(403);
-    if (pathname !== WS_PATH) return reject(404);
-    if (!hasSessionToken(req.headers['sec-websocket-protocol'])) return reject(403);
+    if (!allowedHost(req.headers.host)) {
+      return refuse(403, 'foreign host', `display connection with the Host header ${quote(req.headers.host)}`);
+    }
+    if (!allowedOrigin(req.headers.origin)) {
+      return refuse(403, 'foreign origin', `display connection from the origin ${quote(req.headers.origin)}`);
+    }
+    if (pathname !== WS_PATH) return refuse(404, 'display path', 'display connection to an unknown path');
+    if (!hasSessionToken(req.headers['sec-websocket-protocol'])) {
+      return refuse(403, 'page token', 'display connection without the right page token; reload the display');
+    }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   }
 
@@ -350,6 +406,15 @@ function send(res: http.ServerResponse, status: number, body?: Buffer | string, 
   const payload = body === undefined ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(body);
   res.writeHead(status, { ...(type ? { 'Content-Type': type } : {}), 'Content-Length': payload?.length ?? 0 });
   res.end(payload);
+}
+
+function clockTime(at: number): string {
+  return new Date(at).toTimeString().slice(0, 8);
+}
+
+/** A header value for the console: quoted, shortened, control characters escaped. */
+function quote(value: string | undefined): string {
+  return value === undefined ? '(none)' : JSON.stringify(value.length > 100 ? `${value.slice(0, 100)}…` : value);
 }
 
 function isJson(contentType: string | undefined): boolean {

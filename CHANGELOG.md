@@ -15,3 +15,5 @@ The first version: Claude Code sessions and their permission requests on a desk 
   `stellwerk install` and `uninstall` add and remove the firewall rule.
 - **Safety:** token for hook requests, `Host` and `Origin` checks, page token for the WebSocket, strict
   Content Security Policy, no outgoing connections, no automatic decisions.
+- **Rejections on the console:** the hub says why it turned a request away (no token, wrong token, wrong
+  content type, foreign host or origin), at most once a minute per reason and never with the token.

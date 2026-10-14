@@ -140,6 +140,21 @@ Restart the hub after a change.
 
 Details and how to report a problem: [SECURITY.md](SECURITY.md).
 
+## When nothing shows up
+
+The hub's console says why it turned a request away, at most once a minute per reason and never with
+the token:
+
+| Message | What to do |
+|---|---|
+| `hook request without a token (401)` | Claude Code has no `STELLWERK_TOKEN`: run `stellwerk hooks install`, then restart the Claude app. |
+| `hook request with a wrong token (401)` | The token file was renewed: run `stellwerk hooks install` again, then restart the Claude app. |
+| `request with the Host header … (403)` | Open the display at `http://127.0.0.1:4780` or `http://localhost:4780`, not under another name. |
+| `display connection without the right page token` | Reload the display. |
+
+If the console stays silent, Claude Code sends nothing: check that the hooks are in
+`%USERPROFILE%\.claude\settings.json` and that the session was started after `stellwerk hooks install`.
+
 ## Uninstall
 
 ```powershell

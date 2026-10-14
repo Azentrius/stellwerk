@@ -97,7 +97,8 @@ To look at the display without touching the real token and audit log, start a hu
    remote access of any kind, in any stage.
 2. **Every request is checked.** `Host` on every HTTP request and upgrade; hook requests need the bearer
    token and `application/json`; the WebSocket needs our `Origin` and the page token. Tokens are compared
-   in constant time and never logged, never put in URLs.
+   in constant time and never logged, never put in URLs. Every rejection is reported on the console
+   (`reject()` in `hub.ts`, throttled per reason), so a setup problem is visible.
 3. **No automatic decisions.** Only a person allows or denies: no rules, no "always allow".
 4. **The hub runs nothing.** It starts no programs and opens no outgoing connections. Only the setup
    commands run `icacls`, `powershell` and `netsh`, with fixed arguments, no shell, values on stdin.

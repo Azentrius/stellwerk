@@ -12,7 +12,14 @@ import { after, describe, test } from 'node:test';
 import { WebSocket } from 'ws';
 import type { ServerMessage, StateMessage } from '../src/shared/protocol.js';
 import { HOOK_PATH } from '../src/config.ts';
-import { DENY_MESSAGE, MAX_OPEN_PERMISSIONS, startHub, type Hub, type HubOptions } from '../src/hub/hub.ts';
+import {
+  DENY_MESSAGE,
+  MAX_OPEN_PERMISSIONS,
+  REJECTION_LOG_INTERVAL_MS,
+  startHub,
+  type Hub,
+  type HubOptions,
+} from '../src/hub/hub.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const TOKEN = 'a'.repeat(64);
@@ -245,6 +252,74 @@ describe('security checks', () => {
     assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${'0'.repeat(64)}`], own), 403);
     assert.equal(await attempt(url, ['stellwerk.v1'], own), 403);
     assert.equal(await attempt(`ws://127.0.0.1:${port}/other`, ['stellwerk.v1', `stellwerk.session.${token}`], own), 404);
+  });
+});
+
+describe('rejections on the console', () => {
+  const STOP = { hook_event_name: 'Stop', session_id: 'x' };
+  const WRONG = 'b'.repeat(64);
+
+  test('say why a request was turned away, and never show a token', async () => {
+    const lines: string[] = [];
+    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+    await call(port, { headers: { 'Content-Type': 'application/json' }, body: STOP }).reply;
+    await call(port, { headers: { ...AUTH, Authorization: `Bearer ${WRONG}` }, body: STOP }).reply;
+    await call(port, { headers: { ...AUTH, 'Content-Type': 'text/plain' }, body: STOP }).reply;
+    await call(port, { headers: AUTH, body: STOP, host: `evil.example:${port}` }).reply;
+    await call(port, { headers: AUTH, body: '{"hook_event_name":' }).reply;
+    await call(port, { headers: AUTH, body: { hook_event_name: 'Stop' } }).reply;
+    await call(port, { method: 'GET' }).reply;
+
+    const expected = [
+      /Rejected hook request without a token \(401\)\. Run "stellwerk hooks install"/,
+      /Rejected hook request with a wrong token \(401\)/,
+      /Rejected hook request with the content type "text\/plain" \(415\)/,
+      /Rejected request with the Host header "evil\.example:\d+" \(403\)/,
+      /Rejected hook request that is not valid JSON \(400\)/,
+      /Rejected hook data without the expected fields \(400\): .*session_id/,
+      /Rejected "GET" request to the hook endpoint \(405\)/,
+    ];
+    assert.equal(lines.length, expected.length, lines.join('\n'));
+    expected.forEach((pattern, i) => assert.match(lines[i]!, pattern));
+    for (const line of lines) {
+      assert.doesNotMatch(line, new RegExp(TOKEN));
+      assert.doesNotMatch(line, new RegExp(WRONG));
+      assert.match(line, /^\d\d:\d\d:\d\d {2}Rejected /);
+    }
+  });
+
+  test('an empty "Bearer " (STELLWERK_TOKEN not set for Claude Code) counts as no token', async () => {
+    const lines: string[] = [];
+    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+    const reply = await call(port, { headers: { ...AUTH, Authorization: 'Bearer ' }, body: STOP }).reply;
+    assert.equal(reply.status, 401);
+    assert.match(lines[0] ?? '', /without a token/);
+  });
+
+  test('the same reason is reported at most once a minute, with the number of repeats', async () => {
+    const lines: string[] = [];
+    let clock = 1_000_000;
+    const { port } = await startTestHub({ log: (line) => lines.push(line), now: () => clock });
+    const noToken = () => call(port, { headers: { 'Content-Type': 'application/json' }, body: STOP }).reply;
+    await noToken();
+    await noToken();
+    await noToken();
+    assert.equal(lines.length, 1);
+    clock += REJECTION_LOG_INTERVAL_MS;
+    await noToken();
+    assert.equal(lines.length, 2);
+    assert.match(lines[1]!, /\(2 more since the last message\)$/);
+  });
+
+  test('rejected display connections are reported too', async () => {
+    const lines: string[] = [];
+    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+    await new Promise<void>((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ['stellwerk.v1'], { origin: 'https://evil.example' });
+      ws.on('unexpected-response', () => resolve());
+      ws.on('error', () => {});
+    });
+    assert.match(lines[0] ?? '', /Rejected display connection from the origin "https:\/\/evil\.example" \(403\)/);
   });
 });
 
