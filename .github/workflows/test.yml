@@ -1,0 +1,35 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Windows, where Stellwerk runs: paths, the token file's permissions, the hub on 127.0.0.1.
+  test:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Typecheck (hub, tests, display)
+        run: npm run typecheck
+      - name: Build (hub and display)
+        run: npm run build
+      - name: Tests (status model, hook data, settings, configuration, the hub end to end)
+        run: npm test
+      - name: Known vulnerabilities in dependencies
+        run: npm audit
+      - name: Changelog has a section for the current version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          grep -q "^## $version " CHANGELOG.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }

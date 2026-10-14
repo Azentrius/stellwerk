@@ -1,0 +1,5 @@
+# LF everywhere, whatever the checkout platform.
+* text=auto eol=lf
+
+*.png   binary
+*.woff2 binary

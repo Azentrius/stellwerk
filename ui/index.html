@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- Stellwerk's display. The hub fills in {{session}} and {{scale}} when it serves the page.
+     SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en" class="pf-v6-theme-dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="stellwerk-session" content="{{session}}">
+    <meta name="stellwerk-scale" content="{{scale}}">
+    <title>Stellwerk</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/azentrius.css">
+    <link rel="stylesheet" href="/app.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="board">
+      <section class="col col--queue" aria-labelledby="queue-title">
+        <h1 class="col__title" id="queue-title"><span data-text="queueTitle"></span> <span class="count" id="queue-count"></span></h1>
+        <div class="queue" id="queue"></div>
+        <div class="all-clear" id="queue-empty" hidden>
+          <span class="signal signal--working" aria-hidden="true"></span>
+          <p data-text="allClear"></p>
+        </div>
+      </section>
+      <section class="col col--agents" aria-labelledby="agents-title">
+        <h2 class="col__title" id="agents-title"><span data-text="agentsTitle"></span> <span class="count" id="agents-count"></span></h2>
+        <ul class="agents" id="agents"></ul>
+        <p class="agents-empty" id="agents-empty" data-text="noSessions" hidden></p>
+      </section>
+      <aside class="col col--status">
+        <p class="wordmark">Stellwerk</p>
+        <p class="clock" id="clock"></p>
+        <p class="hub-state" id="hub-state"></p>
+        <p class="last-event" id="last-event"></p>
+      </aside>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

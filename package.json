@@ -1,0 +1,34 @@
+{
+  "name": "stellwerk",
+  "version": "0.1.0",
+  "description": "A signal box for your AI agents: a local dashboard for Claude Code sessions and their permission requests.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Azentrius/stellwerk.git"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "stellwerk": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc -p ui/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p ui/tsconfig.json --noEmit",
+    "serve": "node dist/cli.js serve",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "ws": "^8.22.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/ws": "^8.18.2",
+    "typescript": "^7.0.2"
+  }
+}

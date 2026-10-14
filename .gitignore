@@ -1,0 +1,5 @@
+# Internal planning notes, not part of the public repo
+notes/
+
+node_modules/
+dist/

@@ -1,0 +1,19 @@
+Stellwerk
+Copyright 2026 Azentrius
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This project includes third-party material under its own license:
+
+DM Sans (ui/DMSans.woff2, a Latin subset)
+  Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
+  SIL Open Font License 1.1, see ui/OFL.txt
+
+DM Serif Display (ui/DMSerifDisplay-Regular.woff2, subset to the Azentrius word mark)
+  Copyright 2014 - 2017 Adobe Systems Incorporated (http://www.adobe.com/), with
+  Reserved Font Name 'Source'. Copyright 2019 Google LLC.
+  SIL Open Font License 1.1, see ui/OFL.txt
+
+Red Hat Mono (ui/static/fonts/RedHatMono/RedHatMonoVF.woff2: RedHatMono-VF.woff2 from
+  https://github.com/RedHatOfficial/RedHatFont, commit 6bb1048a6402b0076ea04f42951ec66263cd1437)
+  Copyright 2021 The Red Hat Project Authors (https://github.com/RedHatOfficial/RedHatFont)
+  SIL Open Font License 1.1, see ui/static/fonts/RedHatMono/OFL.txt
