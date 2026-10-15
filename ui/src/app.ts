@@ -1,5 +1,6 @@
 // Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
-// requests, answers due in the app) and the hub's state, and sends decisions. Everything goes over the one
+// requests, answers due in the app, open pull requests), the hub's state and the hardware values, and
+// sends decisions. Everything goes over the one
 // WebSocket to the hub that served the page.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -8,6 +9,7 @@ import type { Decision, ServerMessage, StateMessage } from '../../src/shared/pro
 import { renderAgents } from './agents.ts';
 import { renderAnswers, waitingForAnswer } from './answers.ts';
 import { byId } from './dom.ts';
+import { hardwareLine, renderHardware } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { githubLine, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
@@ -40,6 +42,9 @@ const answersSection = byId('answers-section');
 const pulls = byId<HTMLUListElement>('pulls');
 const pullsSection = byId('pulls-section');
 const githubState = byId('github-state');
+const hardwareSection = byId('hardware');
+const gauges = byId('gauges');
+const hardwareState = byId('hardware-state');
 const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
@@ -128,6 +133,13 @@ function tick(): void {
   githubState.hidden = line === null;
   githubState.textContent = line?.text ?? '';
   githubState.classList.toggle('github-state--problem', line?.problem ?? false);
+  const hardware = state?.hardware ?? null;
+  hardwareSection.hidden = hardware === null;
+  renderHardware(gauges, hardware, texts);
+  const hardwareNote = hardwareLine(hardware, texts);
+  hardwareState.hidden = hardwareNote === null;
+  hardwareState.textContent = hardwareNote?.text ?? '';
+  hardwareState.classList.toggle('hardware-state--problem', hardwareNote?.problem ?? false);
 }
 
 function toast(text: string): void {

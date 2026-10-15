@@ -12,6 +12,7 @@ import { after, describe, test } from 'node:test';
 import { WebSocket } from 'ws';
 import type { ServerMessage, StateMessage } from '../src/shared/protocol.js';
 import { HOOK_PATH } from '../src/config.ts';
+import { appSettingsXml } from '../src/hub/hardware.ts';
 import {
   DENY_MESSAGE,
   MAX_OPEN_PERMISSIONS,
@@ -364,6 +365,45 @@ describe('open pull requests', () => {
     assert.ok(state.github?.syncedAt);
     assert.doesNotMatch(JSON.stringify(state), /github_pat_/, 'the token never reaches the display');
     assert.ok(calls.every((u) => u.startsWith('https://api.github.com/')));
+    screen.close();
+  });
+});
+
+describe('hardware values', () => {
+  test('without the hardware monitor the state has none', async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    assert.equal((await screen.state(() => true)).hardware, null);
+    screen.close();
+  });
+
+  test('with it the display gets the values picked from LibreHardwareMonitor, never its password', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-lhm-'));
+    const settingsFile = path.join(dir, 'LibreHardwareMonitor.config');
+    fs.writeFileSync(settingsFile, appSettingsXml(new Map([
+      ['authenticationEnabled', 'true'],
+      ['authenticationUserName', 'stellwerk'],
+      ['authenticationPassword', 'secret-password-1'],
+    ])));
+    const calls: string[] = [];
+    const leaf = (id: string, name: string, type: string, value: string) => ({ Text: name, SensorId: id, Type: type, RawValue: value, Children: [] });
+    const fakeFetch = (async (input: string | URL | Request) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({
+        Text: 'Sensor',
+        Children: [{ Text: 'PC', Children: [
+          leaf('/intelcpu/0/load/0', 'CPU Total', 'Load', '12,0 %'),
+          leaf('/intelcpu/0/temperature/1', 'CPU Package', 'Temperature', '55,0 °C'),
+        ] }],
+      }), { status: 200 });
+    }) as typeof fetch;
+    const { port } = await startTestHub({ hardware: { settingsFile, intervalMs: 60_000, fetch: fakeFetch } });
+    const screen = await display(port);
+    const state = await screen.state((s) => s.hardware?.values !== null && s.hardware?.values !== undefined);
+    assert.deepEqual(state.hardware?.values, { cpu: { load: 12, temperature: 55 }, gpu: null, memory: null });
+    assert.equal(state.hardware?.problem, null);
+    assert.doesNotMatch(JSON.stringify(state), /secret-password/);
+    assert.deepEqual(calls, ['http://127.0.0.1:8085/data.json']);
     screen.close();
   });
 });

@@ -24,18 +24,20 @@ the start with Windows, the release package and workflow. The acceptance tests p
 
 ---
 
-## In 0.2.0 – Four columns and open pull requests
+## In 0.2.0 – Four columns, open pull requests, hardware
 
 The display in four columns, full screen; sessions waiting for an answer in the app; the open pull
 requests of a GitHub owner with the state of their Actions runs. GitHub is the first data source outside
-the machine: read only, with a fine-grained token, nothing but `api.github.com`.
+the machine: read only, with a fine-grained token, nothing but `api.github.com`. Processor, graphics card
+and memory from LibreHardwareMonitor, which `stellwerk hardware install` sets up (the first part of
+stage 2).
 
 ---
 
 ## Stage 2 – System values and alerts
 
-CPU, memory and temperatures from LibreHardwareMonitor's web server (port 8085); server and app alerts
-from Uptime Kuma. Shown in the right-hand column.
+CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts
+from Uptime Kuma, in the column kept free.
 
 ---
 

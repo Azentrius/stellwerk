@@ -1,7 +1,7 @@
 // The changes to Windows that setting up Stellwerk makes: the user environment variable that gives Claude
-// Code the token, a firewall rule that blocks the port from outside, and the Task Scheduler tasks for the
-// start with Windows. Fixed programs and arguments, no shell; the token goes in on standard input, never
-// on a command line.
+// Code the token, firewall rules that block ports from outside, and the Task Scheduler tasks for the start
+// with Windows and the hardware monitor. Fixed programs and arguments, no shell; values go into PowerShell
+// on standard input, and the token never on a command line.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -90,6 +90,39 @@ export function deleteTask(name: string): void {
 export function startTask(name: string): void {
   requireWindows();
   run('schtasks', ['/Run', '/TN', name]);
+}
+
+/** Ends a running task; a task that does not run is left alone. */
+export function endTask(name: string): void {
+  requireWindows();
+  try {
+    run('schtasks', ['/End', '/TN', name]);
+  } catch {
+    // Not running.
+  }
+}
+
+/** True in a terminal opened as administrator. */
+export function isElevated(): boolean {
+  requireWindows();
+  const script =
+    '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)';
+  return powershell(script) === 'True';
+}
+
+/** Ends every process started from exactly this program file and waits for it (the path goes in on stdin). */
+export function stopProgram(exe: string): void {
+  requireWindows();
+  // No such process is no error (exit 0); a process that cannot be ended is one (exit 1).
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '$exe = [Console]::In.ReadLine()',
+    '$name = [IO.Path]::GetFileNameWithoutExtension($exe)',
+    '$found = @(Get-Process -Name $name -ErrorAction Ignore | Where-Object { $_.Path -eq $exe })',
+    'foreach ($p in $found) { $p.Kill(); [void]$p.WaitForExit(10000) }',
+    'exit 0',
+  ].join('; ');
+  powershell(script, `${exe}\n`);
 }
 
 function run(command: string, args: string[]): void {

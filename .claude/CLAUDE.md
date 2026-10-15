@@ -68,18 +68,20 @@ and sign the provenance, so it installs with `npm ci --ignore-scripts`. Every jo
 
 ```
 src/                       the hub and the command line (TypeScript, built to dist/)
-  cli.ts                   stellwerk serve | hooks install/uninstall | install/uninstall
+  cli.ts                   stellwerk serve | hooks | install/uninstall | autostart | github | hardware
   config.ts                paths (%APPDATA%, %LOCALAPPDATA%), config.json, fixed address 127.0.0.1
   token.ts                 the hook token and the GitHub token, readable by the current user only
   hub/hub.ts               HTTP endpoint, held requests, WebSocket, security checks
   hub/board.ts             the status model (pure): sessions, statuses, requests, what settles them
   hub/github.ts            open pull requests and their Actions runs from api.github.com
+  hub/hardware.ts          values from LibreHardwareMonitor's data.json; its settings file
   hub/hook-input.ts        zod schemas for the hook data; unknown fields are dropped
   hub/audit.ts             audit.jsonl
   hub/static-files.ts      the display's files, an explicit list read at start
   setup/claude-settings.ts Stellwerk's entries in Claude Code's settings, diff
   setup/windows.ts         user environment variable, firewall rule, screens, Task Scheduler
   setup/autostart.ts       the two logon tasks (pure): screen choice, command lines, task XML
+  setup/hardware.ts        LibreHardwareMonitor: pinned archive, unzip, its settings, its logon task
   shared/protocol.d.ts     types of the WebSocket messages, shared with the display
 ui/                        the display: index.html, app.css, shared design files and fonts
   src/                     the display's TypeScript (built to dist/ui/)
@@ -131,11 +133,14 @@ screenshot is taken from it:
    in constant time and never logged, never put in URLs. Every rejection is reported on the console
    (`reject()` in `hub.ts`, throttled per reason), so a setup problem is visible.
 3. **No automatic decisions.** Only a person allows or denies: no rules, no "always allow".
-4. **The hub runs nothing, and talks only to GitHub.** It starts no programs. Its one outgoing connection
-   is to `api.github.com` (`GITHUB_API` in `hub/github.ts`), only with a fine-grained read-only token,
-   without redirects, every answer checked with zod. Any other destination needs a decision and a review
-   first. Only the setup commands run `icacls`, `powershell`, `netsh` and `schtasks`, with fixed arguments,
-   no shell, values on stdin; PowerShell scripts go in with `-EncodedCommand`.
+4. **The hub runs nothing, and talks only to GitHub and LibreHardwareMonitor.** It starts no programs.
+   Its one connection to another machine is to `api.github.com` (`GITHUB_API` in `hub/github.ts`), only
+   with a fine-grained read-only token; locally it asks only `http://127.0.0.1:8085/data.json`
+   (`LHM_URL` in `hub/hardware.ts`), only when set up. No redirects, every answer checked with zod. Any
+   other destination needs a decision and a review first. Only the setup commands run `icacls`,
+   `powershell`, `netsh` and `schtasks`, with fixed arguments, no shell, values on stdin; PowerShell
+   scripts go in with `-EncodedCommand`. The only download is `stellwerk hardware install`: one archive,
+   pinned by URL, size and SHA-256 in `setup/hardware.ts`; a new version is a pull request.
 5. **Claude Code never waits on Stellwerk.** Status hooks answer at once; held requests end by the hold
    time, which stays at least 10 s below the hook timeout. Never `onFailure: "block"`.
 6. **Display without network.** Only the hub's own files, strict CSP, no inline scripts or styles, no
@@ -177,6 +182,23 @@ screenshot is taken from it:
   "Actions: Read"; code scanning's default setup and Dependabot show up there too.
 - `/orgs/{owner}/repos` answers 404 for a user; the watcher then asks `/users/{owner}/repos`.
 - `npm run demo` answers the hub's GitHub questions itself (a stand-in `fetch`), so it never goes online.
+
+## Useful knowledge (LibreHardwareMonitor 0.9.6, from its source)
+
+- The web server falls back to `http://+:8085/` (every interface) when `listenerIp` is not one of the
+  host's addresses; 127.0.0.1 never is. Hence the firewall rule for 8085.
+- Besides `data.json` it serves `/Sensor?action=Set&id=…&value=…` (also by GET) to set fan controls,
+  and answers `data.json` with `Access-Control-Allow-Origin: *`. Without the password any web page in a
+  local browser could read the values or set fans; that is why `stellwerk hardware install` turns the
+  password on.
+- It stores `authenticationPassword` as the SHA-256 of what it expects and hashes it again when it
+  starts, so it accepts the value that was in the file at its start, and writes the next one when it
+  ends (also at logoff). The hub reads the file again after a 401.
+- `data.json` values are strings formatted in LibreHardwareMonitor's language ("45,5 °C" on a German
+  Windows); `RawValue` keeps the base unit. Sensor ids are `/<part>/<n>/<type>/<n>`, e.g.
+  `/intelcpu/0/temperature/13`, `/ram/load/0`, `/gpu-nvidia/0/load/0`.
+- Settings live next to the program in `LibreHardwareMonitor.config` (appSettings XML), written when it
+  ends. It makes no outgoing connections of its own (no update check).
 
 ## Useful knowledge (start with Windows)
 

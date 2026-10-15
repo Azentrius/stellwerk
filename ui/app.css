@@ -280,6 +280,21 @@ button { font: inherit; }
 .last-event, .github-state { color: var(--text-subtle); }
 .github-state--problem { color: var(--danger-text); }
 
+/* Hardware at the foot of the status column: label, load bar and percent, temperature. */
+.hardware { margin-block-start: auto; }
+.gauges { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 0.7rem; row-gap: 0.35rem; margin: 0; }
+.gauge { display: contents; }
+.gauge dd { margin: 0; }
+.gauge__label { color: var(--text-subtle); font-weight: 600; }
+.gauge__load { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.gauge__bar { flex: 1; min-width: 2rem; height: 0.4rem; overflow: hidden; background: var(--line); border-radius: var(--radius-pill); }
+.gauge__fill { display: block; height: 100%; background: var(--signature); transform-origin: left center; transform: scaleX(0); }
+.gauge__percent, .gauge__extra { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.gauge__percent { min-width: 2.6rem; }
+.gauge--hot .gauge__extra { color: var(--danger-text); font-weight: 600; }
+.hardware-state { color: var(--text-subtle); }
+.hardware-state--problem { color: var(--danger-text); }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed;

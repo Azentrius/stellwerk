@@ -1,6 +1,7 @@
 // The hub: receives Claude Code's hook requests, holds permission requests until the display or the hold
-// time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only, starts no
-// programs and opens no outgoing connections.
+// time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
+// no programs. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
+// (when set up).
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,6 +17,7 @@ import { HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
 import { GitHubWatcher } from './github.ts';
+import { HardwareWatcher } from './hardware.ts';
 import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
 import { loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
@@ -51,6 +53,8 @@ export interface HubOptions {
   simulateHang?: boolean;
   /** Open pull requests from GitHub; the only outgoing connection, and only with a token. */
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
+  /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
+  hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch } | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -127,6 +131,10 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     ? new GitHubWatcher({ ...options.github, now, onChange: () => scheduleBroadcast(), log })
     : null;
   github?.start();
+  const hardware = options.hardware
+    ? new HardwareWatcher({ ...options.hardware, now, onChange: () => scheduleBroadcast(), log })
+    : null;
+  hardware?.start();
 
   // ---------- HTTP ----------
 
@@ -337,6 +345,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       pullRequests: github?.pullRequests ?? [],
       hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound },
       github: github?.view() ?? null,
+      hardware: hardware?.view() ?? null,
     };
   }
 
@@ -405,6 +414,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       closing = true;
       clearInterval(sweepTimer);
       github?.stop();
+      hardware?.stop();
       if (broadcastTimer) clearTimeout(broadcastTimer);
       // Whatever is still held goes back to the app's own card.
       for (const id of [...held.keys()]) finish(id, 'handed-to-app', 'hub stopped');

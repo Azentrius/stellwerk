@@ -2,7 +2,8 @@
 
 ## 0.2.0 – not released yet
 
-The display in four columns and truly full screen; what waits in the app is listed too.
+The display in four columns and truly full screen; what waits in the app, open pull requests and the
+hardware are shown too.
 
 - **Four columns:** the sessions on the left, what waits for you next to them, a column kept free for
   what comes next, and clock and hub on the right.
@@ -16,7 +17,12 @@ The display in four columns and truly full screen; what waits in the app is list
 - **Open pull requests:** with a fine-grained read-only token (`stellwerk github token --owner NAME`), the
   open pull requests of all the owner's repositories are listed under "Waiting for you", each with the
   state of its Actions runs; the status column says when the list was updated or why that failed. This
-  is the hub's only outgoing connection, to `api.github.com`, and it exists only with the token.
+  is the hub's only connection to another machine, to `api.github.com`, and it exists only with the token.
+- **Hardware values:** `stellwerk hardware install` (as administrator) sets up LibreHardwareMonitor 0.9.6
+  from its official release, checked by size and SHA-256, in Program Files, with its web server behind a
+  password and a firewall rule, started at logon by the task "Stellwerk hardware". The status column then
+  shows load and temperature of processor and graphics card and the memory in use. `stellwerk hardware
+  uninstall` removes it all.
 
 ## 0.1.0 – 2026-10-15
 

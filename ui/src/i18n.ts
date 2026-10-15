@@ -3,7 +3,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ChecksState, GitHubProblem, PermissionOutcome, SessionStatus, WaitingFor } from '../../src/shared/protocol.js';
+import type {
+  ChecksState,
+  GitHubProblem,
+  HardwareProblem,
+  PermissionOutcome,
+  SessionStatus,
+  WaitingFor,
+} from '../../src/shared/protocol.js';
 
 export type Lang = 'en' | 'de';
 export type TimeUnit = 's' | 'min' | 'h';
@@ -22,6 +29,11 @@ export interface Texts {
   draft: string;
   checks: Record<ChecksState, string>;
   github: { asking: string; synced: (ago: string) => string; problem: Record<GitHubProblem, string> };
+  hardwareTitle: string;
+  parts: { cpu: string; gpu: string; memory: string };
+  hardware: { asking: string; problem: Record<HardwareProblem, string> };
+  /** A number with the given decimals, in the language's way. */
+  number: (n: number, decimals: number) => string;
   allow: string;
   deny: string;
   inApp: string;
@@ -82,6 +94,17 @@ const en: Texts = {
       unexpected: 'GitHub: unexpected answer',
     },
   },
+  hardwareTitle: 'Hardware',
+  parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
+  hardware: {
+    asking: 'Hardware: asking',
+    problem: {
+      'not-running': 'Hardware: monitor not running',
+      rejected: 'Hardware: password rejected',
+      unexpected: 'Hardware: unexpected answer',
+    },
+  },
+  number: (n, decimals) => n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
   allow: 'Allow',
   deny: 'Deny',
   inApp: 'In the app',
@@ -149,6 +172,17 @@ const de: Texts = {
       unexpected: 'GitHub: unerwartete Antwort',
     },
   },
+  hardwareTitle: 'Hardware',
+  parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
+  hardware: {
+    asking: 'Hardware: wird abgefragt',
+    problem: {
+      'not-running': 'Hardware: Monitor läuft nicht',
+      rejected: 'Hardware: Passwort abgelehnt',
+      unexpected: 'Hardware: unerwartete Antwort',
+    },
+  },
+  number: (n, decimals) => n.toLocaleString('de', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
   allow: 'Erlauben',
   deny: 'Ablehnen',
   inApp: 'In der App',

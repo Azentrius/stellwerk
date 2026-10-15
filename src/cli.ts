@@ -1,15 +1,23 @@
 #!/usr/bin/env node
-// Stellwerk's command line: start the hub; add and remove the hooks, the firewall rule and the start
-// with Windows.
+// Stellwerk's command line: start the hub; add and remove the hooks, the firewall rule, the start with
+// Windows, the GitHub token and the hardware monitor.
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { format, parseArgs } from 'node:util';
 import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue } from './config.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
+import {
+  HARDWARE_INTERVAL_MS,
+  LHM_PORT,
+  LHM_SETTINGS_FILE,
+  appSettingsXml,
+  parseAppSettings,
+} from './hub/hardware.ts';
 import { startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -30,17 +38,36 @@ import {
   withoutStellwerkHooks,
 } from './setup/claude-settings.ts';
 import {
+  HARDWARE_TASK,
+  LHM_ARCHIVE_SHA256,
+  LHM_ARCHIVE_URL,
+  LHM_EXE,
+  LHM_USER,
+  LHM_VERSION,
+  checkArchive,
+  downloadArchive,
+  hardwareTask,
+  installFiles,
+  lhmSettings,
+  removeFiles,
+  unzip,
+} from './setup/hardware.ts';
+import {
   addFirewallRule,
   conhostPath,
   currentUser,
   deleteTask,
+  endTask,
   findEdge,
   firewallRuleName,
   getUserEnv,
+  isElevated,
   listScreens,
   registerTask,
   removeFirewallRule,
   setUserEnv,
+  startTask,
+  stopProgram,
   taskExists,
 } from './setup/windows.ts';
 import { ensureToken, isGitHubToken, readGitHubToken, removeGitHubToken, saveGitHubToken } from './token.ts';
@@ -79,6 +106,12 @@ Usage:
       (input hidden), tries it once against api.github.com and keeps it for the hub.
   stellwerk github remove
       Forget the GitHub token; the hub then opens no connection to GitHub.
+  stellwerk hardware install [--yes]
+      Show processor, graphics card and memory: set up LibreHardwareMonitor ${LHM_VERSION} from its
+      official release (checked by SHA-256) with a password, a firewall rule and a logon task
+      (as administrator).
+  stellwerk hardware uninstall [--yes]
+      Remove it again (as administrator).
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -114,6 +147,7 @@ async function main(): Promise<void> {
     return autostart(action, values.yes, values.screen);
   }
   if (command === 'github' && (action === 'token' || action === 'remove')) return githubToken(action, values.owner);
+  if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -134,6 +168,9 @@ async function serve(
     config.githubOwner && githubToken
       ? { owner: config.githubOwner, token: githubToken, intervalMs: config.githubIntervalSeconds * 1000 }
       : null;
+  const hardware = config.hardwareMonitor
+    ? { settingsFile: path.join(paths.hardwareDir, LHM_SETTINGS_FILE), intervalMs: HARDWARE_INTERVAL_MS }
+    : null;
   let hub;
   try {
     hub = await startHub({
@@ -148,6 +185,7 @@ async function serve(
       rawLogFile: rawLog ? paths.rawLogFile : null,
       simulateHang,
       github,
+      hardware,
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
@@ -168,6 +206,7 @@ async function serve(
   } else if (config.githubOwner) {
     console.log(`githubOwner is set, but there is no GitHub token. Run "stellwerk github token".`);
   }
+  if (hardware) console.log(`Hardware values from LibreHardwareMonitor on 127.0.0.1:${LHM_PORT}, every ${HARDWARE_INTERVAL_MS / 1000} s.`);
   console.log('Ctrl+C stops the hub.\n');
 
   const stop = () => void hub.close().then(() => process.exit(0));
@@ -327,6 +366,70 @@ async function githubToken(action: 'token' | 'remove', owner: string | undefined
   saveGitHubToken(paths.githubTokenFile, token);
   if (owner && owner !== config.githubOwner) setConfigValue(paths.configFile, 'githubOwner', owner);
   console.log(`Saved to ${paths.githubTokenFile} (readable by you only). Restart the hub to show the pull requests.`);
+}
+
+async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<void> {
+  if (process.platform !== 'win32') throw new Error('The hardware monitor is set up on Windows only.');
+  if (!isElevated()) throw new Error('Run this in a terminal opened as administrator, with your own account.');
+  const paths = defaultPaths();
+  const dir = paths.hardwareDir;
+  const exe = path.join(dir, LHM_EXE);
+  const rule = firewallRuleName(LHM_PORT);
+  const restartHub = () => {
+    console.log(`Restart the hub so that the display follows:\n  schtasks /End /TN "${HUB_TASK}"\n  schtasks /Run /TN "${HUB_TASK}"`);
+  };
+
+  if (action === 'uninstall') {
+    console.log(`Stop LibreHardwareMonitor and remove the task "${HARDWARE_TASK}", the firewall rule "${rule}" and ${dir}.\n`);
+    if (!(await confirm(yes))) return void console.log('Nothing changed.');
+    if (taskExists(HARDWARE_TASK)) {
+      endTask(HARDWARE_TASK);
+      deleteTask(HARDWARE_TASK);
+    }
+    stopProgram(exe);
+    removeFirewallRule(LHM_PORT, { quiet: true });
+    removeFiles(dir);
+    setConfigValue(paths.configFile, 'hardwareMonitor', false);
+    console.log('Removed.');
+    return restartHub();
+  }
+
+  const user = currentUser();
+  const task = hardwareTask({ exe, dir });
+  console.log(`LibreHardwareMonitor ${LHM_VERSION} for the hardware values:`);
+  console.log(`  download    ${LHM_ARCHIVE_URL}`);
+  console.log(`  check       SHA-256 ${LHM_ARCHIVE_SHA256}`);
+  console.log(`  unpack to   ${dir} (only administrators can change it)`);
+  console.log(`  web server  port ${LHM_PORT}, user "${LHM_USER}" with a new random password; the hub reads it from`);
+  console.log(`              LibreHardwareMonitor's settings and asks only for data.json`);
+  console.log(`  firewall    rule "${rule}": other machines cannot reach port ${LHM_PORT}`);
+  console.log(`              (LibreHardwareMonitor ${LHM_VERSION} listens on every network interface)`);
+  console.log(`  task        "${HARDWARE_TASK}" for ${user} at logon, minimized to the tray, with administrator`);
+  console.log('              rights: it reads the sensors');
+  console.log('Processor temperatures need the PawnIO driver, which you install yourself.\n');
+  if (!(await confirm(yes))) return void console.log('Nothing changed.');
+
+  process.stdout.write('Downloading … ');
+  const archive = await downloadArchive();
+  checkArchive(archive);
+  const files = unzip(archive);
+  if (!files.some((file) => file.name === LHM_EXE)) throw new Error(`${LHM_EXE} is missing in the archive. Nothing changed.`);
+  console.log(`size and SHA-256 match, ${files.length} files.`);
+
+  // A running copy keeps its files open.
+  if (taskExists(HARDWARE_TASK)) endTask(HARDWARE_TASK);
+  stopProgram(exe);
+  const settingsFile = path.join(dir, LHM_SETTINGS_FILE);
+  const existing = fs.existsSync(settingsFile) ? parseAppSettings(fs.readFileSync(settingsFile, 'utf8')) : new Map<string, string>();
+  installFiles(dir, files, appSettingsXml(lhmSettings(existing, randomBytes(32).toString('hex'))));
+  console.log(`Unpacked to ${dir}.`);
+  addFirewallRule(LHM_PORT);
+  console.log(`Firewall rule "${rule}" added.`);
+  registerTask(task.name, taskXml(task, user));
+  startTask(HARDWARE_TASK);
+  console.log(`Task "${HARDWARE_TASK}" registered and started.`);
+  setConfigValue(paths.configFile, 'hardwareMonitor', true);
+  restartHub();
 }
 
 /** Reads a secret from the terminal without showing it; from standard input when there is no terminal. */

@@ -6,7 +6,7 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code session and lets you answer their permission requests right there. Like a dispatcher who sees
 every train on the track diagram and sets the signals.
 
-![The display at 1920×720: the sessions on the left, what waits for you next to them, room for more, clock and hub on the right](docs/display.png)
+![The display at 1920×720: the sessions on the left, what waits for you next to them, room for more, clock, hub and hardware on the right](docs/display.png)
 
 ## What it does
 
@@ -25,9 +25,11 @@ every train on the track diagram and sets the signals.
   how long it has been waiting. You answer in the app; allow or deny would not answer a question.
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
   owner (all repositories) are listed too, each with the state of its Actions runs.
+- **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
+  from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else and needs a token for every hook
-  request. The display loads nothing from the internet. The only connection the hub opens is to
-  `api.github.com`, and only once you set up a GitHub token.
+  request. The display loads nothing from the internet. The only connection the hub opens to another
+  machine is to `api.github.com`, and only once you set up a GitHub token.
 - English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
   one). One factor scales every size.
 
@@ -128,7 +130,49 @@ left out), their open pull requests, and the Actions runs on each pull request's
 
 The status column says when the list was last brought up to date, or why that failed (token rejected,
 no access, not reachable). The token is never logged and never sent to the display.
-`stellwerk github remove` deletes it; the hub then opens no connection at all.
+`stellwerk github remove` deletes it; the hub then opens no connection to GitHub.
+
+## Hardware values
+
+Optional. Stellwerk reads the sensors through [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
+(MPL-2.0) and sets it up itself, in a terminal opened as administrator with your own account:
+
+```powershell
+stellwerk hardware install
+```
+
+It shows what it does and asks first:
+
+1. Downloads exactly `LibreHardwareMonitor.zip` of version 0.9.6 from LibreHardwareMonitor's release on
+   GitHub and checks its size and SHA-256 against the values in the code. Any other file is refused.
+2. Unpacks it to `C:\Program Files\Stellwerk\LibreHardwareMonitor`. Only administrators can change files
+   there, which matters because the program runs with administrator rights.
+3. Turns on its web server on port 8085 with the user `stellwerk` and a new random password, and starts
+   it minimized to the tray (closing its window keeps it running).
+4. Adds the firewall rule `Stellwerk-block-inbound-8085`: version 0.9.6 listens on every network
+   interface and cannot be limited to `127.0.0.1`.
+5. Registers the task **Stellwerk hardware**, which starts it at logon with your administrator rights
+   (reading the sensors needs them), and starts it.
+
+Restart the hub afterwards. Every 5 s it asks `http://127.0.0.1:8085/data.json`, with the password it
+reads from LibreHardwareMonitor's settings, and shows at the foot of the status column:
+
+| Row | Values |
+|---|---|
+| CPU | total load, package temperature (AMD: Tctl/Tdie) |
+| GPU | load and temperature of the graphics card; a separate card before the one built in |
+| RAM | memory in use, in percent and GB |
+
+Temperatures from 90 °C on turn red. Processor temperatures need the
+[PawnIO](https://pawnio.eu/) driver, which you install yourself; without it the row shows the load only.
+
+The password matters: LibreHardwareMonitor's web server can also set fan speeds and answers any web
+page in a browser on this machine. With the password, a page can neither read the values nor change
+anything. Do not open `http://127.0.0.1:8085` in a browser and let it remember the password.
+
+A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its version and hash. Run
+`stellwerk hardware install` again after updating. `stellwerk hardware uninstall` stops it and removes
+the task, the firewall rule and the folder.
 
 ## How a permission request goes
 
@@ -188,6 +232,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code. |
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
+| `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
 
 Restart the hub after a change.
 
@@ -206,6 +251,8 @@ Restart the hub after a change.
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
 | Firewall rule `Stellwerk-block-inbound-4780` | Blocks the port for other machines |
+| `C:\Program Files\Stellwerk\LibreHardwareMonitor\` | LibreHardwareMonitor with its settings, if set up |
+| Task `Stellwerk hardware`, firewall rule `Stellwerk-block-inbound-8085` | Its start at logon, and its port closed to other machines |
 
 ## Safety
 
@@ -217,10 +264,14 @@ Restart the hub after a change.
 - Decisions travel only over the display's WebSocket. The hub checks `Host` and `Origin` (against
   DNS rebinding and foreign pages) and a token it puts into the page it serves.
 - Nothing is allowed automatically: no rules, no "always allow".
-- The hub starts no programs. Its only outgoing connection is to `api.github.com`, for the list of
-  pull requests, and only with a fine-grained read-only token you set up. The display loads only the
-  hub's own files under a strict Content Security Policy and shows hook data and pull request titles as
-  text, never as HTML.
+- The hub starts no programs. Its only connection to another machine is to `api.github.com`, for the
+  list of pull requests, and only with a fine-grained read-only token you set up. Besides that it asks
+  LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
+  it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
+  data and pull request titles as text, never as HTML.
+- `stellwerk hardware install` downloads one file, pinned by size and SHA-256, and unpacks it only into
+  its own folder in Program Files. LibreHardwareMonitor runs with administrator rights; its web server
+  needs a password and is closed to other machines by a firewall rule.
 - Hook requests are limited to 1 MB, open requests to 20 at a time.
 
 Details and how to report a problem: [SECURITY.md](SECURITY.md).
@@ -246,6 +297,7 @@ If the console stays silent, Claude Code sends nothing: check that the hooks are
 stellwerk autostart uninstall
 stellwerk github remove
 stellwerk hooks uninstall
+stellwerk hardware uninstall # as administrator: LibreHardwareMonitor, its task and firewall rule
 stellwerk uninstall          # as administrator: removes the firewall rule
 npm rm -g stellwerk          # if you used npm link
 Remove-Item -Recurse "$env:LOCALAPPDATA\stellwerk", "$env:APPDATA\stellwerk"
