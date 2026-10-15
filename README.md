@@ -73,6 +73,25 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
    msedge --app=http://127.0.0.1:4780
    ```
 
+## Start with Windows
+
+```powershell
+stellwerk autostart install
+```
+
+It lists your screens, shows the two tasks it adds to the Task Scheduler for your user and asks before
+adding them. Both start at logon, without administrator rights:
+
+- **Stellwerk hub** starts the hub without a window. Its messages go to
+  `%LOCALAPPDATA%\stellwerk\hub.log` (moved to `hub.log.1` when it grows beyond 1 MB).
+- **Stellwerk display** opens the display 20 s later in an Edge app window, full screen on the 1920×720
+  screen, with an Edge profile of its own. `--screen <number>` picks another screen.
+
+The tasks start what is built in this folder. Run the command again after moving the folder, installing
+Node.js elsewhere or rearranging the screens. Stop or start a task in the Task Scheduler or with
+`schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
+its task. `stellwerk autostart uninstall` removes both tasks.
+
 ## How a permission request goes
 
 1. Claude Code wants to run a tool that needs your permission and sends the request to the hub.
@@ -140,6 +159,9 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\token` | The hook token; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\audit.jsonl` | Audit log: every permission request with time, session, project, tool, input and outcome |
 | `%LOCALAPPDATA%\stellwerk\debug-raw.jsonl` | Raw hook data, only in debug mode |
+| `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
+| `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |
+| Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
 | Firewall rule `Stellwerk-block-inbound-4780` | Blocks the port for other machines |
@@ -162,8 +184,8 @@ Details and how to report a problem: [SECURITY.md](SECURITY.md).
 
 ## When nothing shows up
 
-The hub's console says why it turned a request away, at most once a minute per reason and never with
-the token:
+The hub's console (or `hub.log`, when it started with Windows) says why it turned a request away, at most
+once a minute per reason and never with the token:
 
 | Message | What to do |
 |---|---|
@@ -178,6 +200,7 @@ If the console stays silent, Claude Code sends nothing: check that the hooks are
 ## Uninstall
 
 ```powershell
+stellwerk autostart uninstall
 stellwerk hooks uninstall
 stellwerk uninstall          # as administrator: removes the firewall rule
 npm rm -g stellwerk          # if you used npm link

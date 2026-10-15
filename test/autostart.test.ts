@@ -1,0 +1,126 @@
+// The start with Windows: which screen the display goes on, the command lines and the Task Scheduler XML.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import {
+  DISPLAY_DELAY_S,
+  DISPLAY_TASK,
+  HUB_TASK,
+  commandLine,
+  displayTask,
+  hubTask,
+  pickScreen,
+  taskXml,
+  type Screen,
+} from '../src/setup/autostart.ts';
+
+const SCREENS: Screen[] = [
+  { name: '\\\\.\\DISPLAY1', primary: false, x: -1920, y: 359, width: 1920, height: 1080 },
+  { name: '\\\\.\\DISPLAY5', primary: true, x: 0, y: 0, width: 3440, height: 1440 },
+  { name: '\\\\.\\DISPLAY6', primary: false, x: 0, y: 1440, width: 1920, height: 720 },
+];
+
+const HUB = hubTask({
+  node: 'C:\\Program Files\\nodejs\\node.exe',
+  cli: 'C:\\Users\\dev\\Projects\\stellwerk\\dist\\cli.js',
+  root: 'C:\\Users\\dev\\Projects\\stellwerk',
+  logFile: 'C:\\Users\\dev\\AppData\\Local\\stellwerk\\hub.log',
+  conhost: 'C:\\Windows\\System32\\conhost.exe',
+});
+const DISPLAY = displayTask({
+  edge: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  url: 'http://127.0.0.1:4780',
+  profileDir: 'C:\\Users\\dev\\AppData\\Local\\stellwerk\\edge-display',
+  screen: SCREENS[2]!,
+  root: 'C:\\Users\\dev\\Projects\\stellwerk',
+});
+
+describe('the screen for the display', () => {
+  test('is the only 1920×720 screen, or the one given by number', () => {
+    assert.equal(pickScreen(SCREENS).name, '\\\\.\\DISPLAY6');
+    assert.equal(pickScreen(SCREENS, 2).name, '\\\\.\\DISPLAY5');
+  });
+
+  test('must be chosen when no screen or several have 1920×720, with the list in the message', () => {
+    assert.throws(() => pickScreen(SCREENS.slice(0, 2)), /No screen has 1920×720.*--screen[\s\S]*1 {2}1920×1080 at -1920,359/);
+    assert.throws(() => pickScreen([...SCREENS, { ...SCREENS[2]!, x: 1920 }]), /Several screens/);
+    assert.throws(() => pickScreen(SCREENS, 4), /There is no screen 4/);
+  });
+});
+
+describe('command lines', () => {
+  test('quote arguments with spaces and quotes as Windows programs split them', () => {
+    assert.equal(commandLine(['plain', 'with space', '']), 'plain "with space" ""');
+    assert.equal(commandLine(['say "hi"']), '"say \\"hi\\""');
+    assert.equal(commandLine(['C:\\dir with space\\']), '"C:\\dir with space\\\\"');
+    assert.equal(commandLine(['C:\\no\\space\\']), 'C:\\no\\space\\');
+  });
+});
+
+describe('the tasks', () => {
+  test('the hub runs without a window and writes its messages to hub.log', () => {
+    assert.equal(HUB.name, HUB_TASK);
+    assert.equal(HUB.action.command, 'C:\\Windows\\System32\\conhost.exe');
+    assert.deepEqual(HUB.action.args, [
+      '--headless',
+      'C:\\Program Files\\nodejs\\node.exe',
+      'C:\\Users\\dev\\Projects\\stellwerk\\dist\\cli.js',
+      'serve',
+      '--log-file',
+      'C:\\Users\\dev\\AppData\\Local\\stellwerk\\hub.log',
+      '--exit-with-parent',
+    ]);
+    assert.equal(HUB.delaySeconds, 0);
+    assert.equal(HUB.restartOnFailure, true);
+  });
+
+  test('the display opens later as a full-screen app window on the chosen screen, with its own profile', () => {
+    assert.equal(DISPLAY.name, DISPLAY_TASK);
+    assert.deepEqual(DISPLAY.action.args, [
+      '--app=http://127.0.0.1:4780',
+      '--user-data-dir=C:\\Users\\dev\\AppData\\Local\\stellwerk\\edge-display',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--window-position=0,1440',
+      '--window-size=1920,720',
+      '--start-fullscreen',
+    ]);
+    assert.equal(DISPLAY.delaySeconds, DISPLAY_DELAY_S);
+    assert.equal(DISPLAY.restartOnFailure, false);
+  });
+});
+
+describe('the Task Scheduler XML', () => {
+  const hubXml = taskXml(HUB, 'LAPTOP\\dev');
+  const displayXml = taskXml(DISPLAY, 'LAPTOP\\dev');
+
+  test('starts at the logon of this user, as this user, without elevation', () => {
+    assert.match(hubXml, /<LogonTrigger>\s*<Enabled>true<\/Enabled>\s*<UserId>LAPTOP\\dev<\/UserId>\s*<\/LogonTrigger>/);
+    assert.match(hubXml, /<LogonType>InteractiveToken<\/LogonType>/);
+    assert.match(hubXml, /<RunLevel>LeastPrivilege<\/RunLevel>/);
+    assert.match(displayXml, new RegExp(`<Delay>PT${DISPLAY_DELAY_S}S</Delay>`));
+    assert.doesNotMatch(hubXml, /<Delay>/);
+  });
+
+  test('keeps the hub running: on battery, without a time limit, restarted after a failure', () => {
+    assert.match(hubXml, /<DisallowStartIfOnBatteries>false</);
+    assert.match(hubXml, /<StopIfGoingOnBatteries>false</);
+    assert.match(hubXml, /<ExecutionTimeLimit>PT0S</);
+    assert.match(hubXml, /<MultipleInstancesPolicy>IgnoreNew</);
+    assert.match(hubXml, /<RestartOnFailure>\s*<Interval>PT1M<\/Interval>\s*<Count>3<\/Count>/);
+    assert.doesNotMatch(displayXml, /<RestartOnFailure>/);
+  });
+
+  test('carries the command line, with every value escaped for XML', () => {
+    assert.match(
+      hubXml,
+      /<Arguments>--headless &quot;C:\\Program Files\\nodejs\\node.exe&quot; C:\\Users\\dev\\Projects\\stellwerk\\dist\\cli.js serve --log-file C:\\Users\\dev\\AppData\\Local\\stellwerk\\hub.log --exit-with-parent<\/Arguments>/,
+    );
+    const odd = taskXml({ ...HUB, description: 'a < b & "c"' }, 'DOM&AIN\\<user>');
+    assert.match(odd, /<Description>a &lt; b &amp; &quot;c&quot;<\/Description>/);
+    assert.match(odd, /<UserId>DOM&amp;AIN\\&lt;user&gt;<\/UserId>/);
+    assert.equal((odd.match(/<UserId>/g) ?? []).length, 2);
+  });
+});

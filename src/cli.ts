@@ -1,14 +1,25 @@
 #!/usr/bin/env node
-// Stellwerk's command line: start the hub; add and remove the hooks and the firewall rule.
+// Stellwerk's command line: start the hub; add and remove the hooks, the firewall rule and the start
+// with Windows.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { parseArgs } from 'node:util';
+import { format, parseArgs } from 'node:util';
 import { HOST, defaultPaths, loadConfig, readJsonFile } from './config.ts';
 import { startHub } from './hub/hub.ts';
+import {
+  DISPLAY_TASK,
+  HUB_TASK,
+  commandLine,
+  describeScreens,
+  displayTask,
+  hubTask,
+  pickScreen,
+  taskXml,
+} from './setup/autostart.ts';
 import {
   DEFAULT_SETTINGS_FILE,
   TOKEN_ENV,
@@ -17,8 +28,26 @@ import {
   withStellwerkHooks,
   withoutStellwerkHooks,
 } from './setup/claude-settings.ts';
-import { addFirewallRule, firewallRuleName, getUserEnv, removeFirewallRule, setUserEnv } from './setup/windows.ts';
+import {
+  addFirewallRule,
+  conhostPath,
+  currentUser,
+  deleteTask,
+  findEdge,
+  firewallRuleName,
+  getUserEnv,
+  listScreens,
+  registerTask,
+  removeFirewallRule,
+  setUserEnv,
+  taskExists,
+} from './setup/windows.ts';
 import { ensureToken } from './token.ts';
+
+/** hub.log is moved to hub.log.1 when it grows beyond this at a start. */
+const MAX_HUB_LOG_BYTES = 1024 * 1024;
+/** How often a hub started with --exit-with-parent looks whether its parent still runs. */
+const PARENT_CHECK_MS = 2000;
 
 /** The repository root: one level above src/ (running from source) or dist/ (built). */
 const ROOT = path.join(import.meta.dirname, '..');
@@ -27,7 +56,7 @@ const VERSION = (JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'ut
 const USAGE = `Stellwerk ${VERSION}: a signal box for your AI agents
 
 Usage:
-  stellwerk serve [--debug-raw] [--simulate-hang]
+  stellwerk serve [--debug-raw] [--simulate-hang] [--log-file <file>] [--exit-with-parent]
       Start the hub on ${HOST}. Then open the display:
       msedge --app=http://${HOST}:4780
   stellwerk hooks install [--yes] [--settings <file>]
@@ -39,6 +68,11 @@ Usage:
       Add a Windows Firewall rule that blocks the port for other machines (as administrator).
   stellwerk uninstall
       Remove that rule (as administrator).
+  stellwerk autostart install [--yes] [--screen <number>]
+      Start the hub (without a window) and the display (full screen on the 1920x720 screen,
+      or the one given) at logon, through two Task Scheduler tasks.
+  stellwerk autostart uninstall [--yes]
+      Remove these tasks.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -51,6 +85,9 @@ async function main(): Promise<void> {
       settings: { type: 'string', default: DEFAULT_SETTINGS_FILE },
       'debug-raw': { type: 'boolean', default: false },
       'simulate-hang': { type: 'boolean', default: false },
+      'log-file': { type: 'string' },
+      'exit-with-parent': { type: 'boolean', default: false },
+      screen: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', default: false },
     },
@@ -59,16 +96,27 @@ async function main(): Promise<void> {
 
   if (values.version) return void console.log(VERSION);
   if (values.help || !command) return void console.log(USAGE);
-  if (command === 'serve') return serve(values['debug-raw'], values['simulate-hang']);
+  if (command === 'serve') {
+    return serve(values['debug-raw'], values['simulate-hang'], values['log-file'], values['exit-with-parent']);
+  }
   if (command === 'hooks' && (action === 'install' || action === 'uninstall')) {
     return hooks(action, values.settings, values.yes);
   }
   if (command === 'install' || command === 'uninstall') return firewall(command);
+  if (command === 'autostart' && (action === 'install' || action === 'uninstall')) {
+    return autostart(action, values.yes, values.screen);
+  }
   console.error(USAGE);
   process.exitCode = 2;
 }
 
-async function serve(debugRaw: boolean, simulateHang: boolean): Promise<void> {
+async function serve(
+  debugRaw: boolean,
+  simulateHang: boolean,
+  logFile: string | undefined,
+  exitWithParent: boolean,
+): Promise<void> {
+  if (logFile) logToFile(logFile);
   const paths = defaultPaths();
   const config = loadConfig(paths.configFile);
   const { token, created } = ensureToken(paths.tokenFile);
@@ -106,6 +154,25 @@ async function serve(debugRaw: boolean, simulateHang: boolean): Promise<void> {
   const stop = () => void hub.close().then(() => process.exit(0));
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
+  if (exitWithParent) watchParent(stop);
+}
+
+/**
+ * Stops the hub when the process that started it ends. The task at logon runs the hub under a console
+ * host without a window; ending the task ends only that host, so the hub has to notice by itself.
+ */
+function watchParent(stop: () => void): void {
+  const parent = process.ppid;
+  const timer = setInterval(() => {
+    try {
+      process.kill(parent, 0);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ESRCH') return;
+      clearInterval(timer);
+      console.log(`${new Date().toTimeString().slice(0, 8)}  The process that started the hub has ended; stopping.`);
+      stop();
+    }
+  }, PARENT_CHECK_MS);
 }
 
 async function hooks(action: 'install' | 'uninstall', file: string, yes: boolean): Promise<void> {
@@ -175,6 +242,63 @@ function firewall(command: 'install' | 'uninstall'): void {
       ? `Firewall rule "${name}" added: inbound connections to TCP ${config.port} from other machines are blocked.`
       : `Firewall rule "${name}" removed.`,
   );
+}
+
+async function autostart(action: 'install' | 'uninstall', yes: boolean, screenNumber: string | undefined): Promise<void> {
+  const paths = defaultPaths();
+  const config = loadConfig(paths.configFile);
+
+  if (action === 'uninstall') {
+    const existing = [HUB_TASK, DISPLAY_TASK].filter(taskExists);
+    if (existing.length === 0) return void console.log('There are no Stellwerk tasks in the Task Scheduler.');
+    console.log(`Remove the tasks ${existing.map((name) => `"${name}"`).join(' and ')} from the Task Scheduler.`);
+    console.log('A hub or display already running keeps running until you close it or log off.\n');
+    if (!(await confirm(yes))) return void console.log('Nothing changed.');
+    for (const name of existing) deleteTask(name);
+    return void console.log('Removed.');
+  }
+
+  const cli = path.join(ROOT, 'dist', 'cli.js');
+  if (!fs.existsSync(cli)) throw new Error('dist/cli.js is missing. Run "npm run build" first.');
+  if (screenNumber !== undefined && !/^[1-9]\d*$/.test(screenNumber)) throw new Error('--screen takes the number of a screen.');
+  const screens = listScreens();
+  const screen = pickScreen(screens, screenNumber === undefined ? undefined : Number(screenNumber));
+  const user = currentUser();
+  const tasks = [
+    hubTask({ node: process.execPath, cli, root: ROOT, logFile: paths.hubLogFile, conhost: conhostPath() }),
+    displayTask({ edge: findEdge(), url: `http://${HOST}:${config.port}`, profileDir: paths.displayProfileDir, screen, root: ROOT }),
+  ];
+
+  console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screens.indexOf(screen) + 1}.\n`);
+  for (const task of tasks) {
+    const when = task.delaySeconds > 0 ? `${task.delaySeconds} s after logon` : 'at logon';
+    console.log(`Task "${task.name}" for ${user}, ${when}:\n  ${commandLine([task.action.command, ...task.action.args])}\n`);
+  }
+  if (!(await confirm(yes))) return void console.log('Nothing changed.');
+  for (const task of tasks) registerTask(task.name, taskXml(task, user));
+  console.log('Registered. Both start at your next logon. To start them now (the hub only if none is running):');
+  console.log(`  schtasks /Run /TN "${HUB_TASK}"`);
+  console.log(`  schtasks /Run /TN "${DISPLAY_TASK}"`);
+  console.log(`The hub's messages: ${paths.hubLogFile}`);
+}
+
+/** Copies everything the hub prints into a file as well, for the hub started at logon without a window. */
+function logToFile(file: string): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    if (fs.statSync(file).size > MAX_HUB_LOG_BYTES) fs.renameSync(file, `${file}.1`);
+  } catch {
+    // No log yet.
+  }
+  const stream = fs.createWriteStream(file, { flags: 'a', mode: 0o600 });
+  stream.write(`--- ${new Date().toISOString()}  Stellwerk ${VERSION}, process ${process.pid}\n`);
+  for (const level of ['log', 'error'] as const) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+      stream.write(`${format(...args)}\n`);
+    };
+  }
 }
 
 async function confirm(yes: boolean): Promise<boolean> {

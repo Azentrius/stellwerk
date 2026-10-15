@@ -19,6 +19,9 @@ The first version: Claude Code sessions and their permission requests on a desk 
   Content Security Policy, no outgoing connections, no automatic decisions.
 - **Rejections on the console:** the hub says why it turned a request away (no token, wrong token, wrong
   content type, foreign host or origin), at most once a minute per reason and never with the token.
+- **Start with Windows:** `stellwerk autostart install` and `uninstall` add and remove two Task Scheduler
+  tasks for the current user: the hub at logon without a window (messages in `hub.log`), the display
+  20 s later full screen on the 1920×720 screen.
 - **Language:** `?lang=en` or `?lang=de` in the display's address picks the language.
 - **Release package:** `stellwerk-VERSION.zip` with the built hub and display, installed with
   `npm ci --omit=dev`; reproducible, with `SHA256SUMS` and a signed build provenance.

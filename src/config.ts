@@ -20,6 +20,10 @@ export interface Paths {
   tokenFile: string;
   auditFile: string;
   rawLogFile: string;
+  /** The messages of the hub started at logon, which has no window. */
+  hubLogFile: string;
+  /** The Edge profile of the display window started at logon. */
+  displayProfileDir: string;
 }
 
 /** %APPDATA%\stellwerk for the configuration, %LOCALAPPDATA%\stellwerk for everything the hub writes. */
@@ -32,6 +36,8 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     tokenFile: path.join(dataDir, 'token'),
     auditFile: path.join(dataDir, 'audit.jsonl'),
     rawLogFile: path.join(dataDir, 'debug-raw.jsonl'),
+    hubLogFile: path.join(dataDir, 'hub.log'),
+    displayProfileDir: path.join(dataDir, 'edge-display'),
   };
 }
 
