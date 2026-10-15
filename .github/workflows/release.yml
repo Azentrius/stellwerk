@@ -26,6 +26,7 @@ jobs:
   # Everything the test check runs, on Windows, where Stellwerk runs.
   test:
     runs-on: windows-2025
+    timeout-minutes: 15
     steps:
       - name: Only from main
         if: github.ref != 'refs/heads/main'
@@ -52,6 +53,7 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write       # tag and release
       id-token: write       # signing the build provenance
@@ -91,9 +93,10 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # This job can write releases and sign the provenance: install without running package scripts.
       - name: Build and package
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm run build
           SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) npm run package
 
