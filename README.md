@@ -6,6 +6,8 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code session and lets you answer their permission requests right there. Like a dispatcher who sees
 every train on the track diagram and sets the signals.
 
+![The display at 1920×720: open permission requests on the left, the sessions in the middle, clock and hub on the right](docs/display.png)
+
 ## What it does
 
 - **Every session at a glance.** Project, title and status of each session: waiting for approval, waiting
@@ -22,7 +24,8 @@ every train on the track diagram and sets the signals.
   "waiting for you" and you answer in the app; allow or deny would not answer a question.
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else, needs a token for every hook request,
   opens no outgoing connections and loads nothing from the internet.
-- English and German, following the system language. One factor scales every size.
+- English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
+  one). One factor scales every size.
 
 ## Requirements
 
@@ -33,12 +36,26 @@ every train on the track diagram and sets the signals.
 
 ## Installation
 
+From a [release](https://github.com/Azentrius/stellwerk/releases): download `stellwerk-VERSION.zip` and
+`SHA256SUMS`, then in PowerShell (replace the version):
+
+```powershell
+(Get-FileHash stellwerk-0.1.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.1.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.1.0.zip -DestinationPath .
+cd stellwerk-0.1.0
+npm ci --omit=dev
+npm link        # optional: makes the command `stellwerk` available everywhere
+```
+
+Or from the source:
+
 ```powershell
 git clone https://github.com/Azentrius/stellwerk.git
 cd stellwerk
 npm ci
 npm run build
-npm link        # optional: makes the command `stellwerk` available everywhere
+npm link        # optional
 ```
 
 Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`.
@@ -175,13 +192,27 @@ Restart the Claude desktop app afterwards.
 npm run typecheck
 npm test                 # unit tests and the hub end to end; runs the TypeScript sources directly
 npm run build            # dist/: the hub and the display
+npm run demo             # a hub on port 4781 with made-up sessions and requests, own token and audit log
+npm run package          # build/: stellwerk-VERSION.zip and SHA256SUMS, reproducible
 node dist/cli.js serve --debug-raw --simulate-hang
 ```
 
 `--simulate-hang` leaves status hooks unanswered, to see how Claude Code behaves with a hung hub. The hub
-reads the display's files when it starts: after `npm run build`, restart it.
+reads the display's files when it starts: after `npm run build`, restart it. The screenshot above is the
+demo at `http://127.0.0.1:4781/?lang=en`, taken with Edge at 1920×720.
 
 What comes next is in [ROADMAP.md](ROADMAP.md).
+
+## Releasing
+
+1. Set the version in `package.json` (with `npm version --no-git-tag-version X.Y.Z`, which updates the
+   lockfile too) and give its section in `CHANGELOG.md` the date: `## X.Y.Z – YYYY-MM-DD`.
+2. Merge to `main`.
+3. On GitHub: Actions › **release** › Run workflow (branch `main`). The workflow runs all tests on
+   Windows, checks that the version is new and matches `package.json` and that its changelog section has
+   a date, builds `stellwerk-X.Y.Z.zip` with `SHA256SUMS` (reproducible, from the time of the commit),
+   signs a build provenance for it and creates the tag `vX.Y.Z` with a release whose notes come from
+   `CHANGELOG.md`. Releases cannot be changed afterwards.
 
 ## License
 

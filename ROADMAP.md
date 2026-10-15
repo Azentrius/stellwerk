@@ -19,13 +19,12 @@ until they are decided.
 
 ## Stage 1 – Claude Code sessions and permission requests
 
-Built in 0.1.0 (see [CHANGELOG](CHANGELOG.md)): the hub, the display, the hook setup, the firewall rule.
+Built in 0.1.0 (see [CHANGELOG](CHANGELOG.md)): the hub, the display, the hook setup, the firewall rule,
+the release package and workflow. The acceptance tests passed on the real setup.
 
 Still open before the first release:
 
-- Acceptance in daily use for a few days, on the real 12.3″ display.
-- Screenshots for the README.
-- A release workflow as in the other Azentrius repositories.
+- A few days in daily use, on the real 12.3″ display.
 - Optional: start with Windows (Task Scheduler).
 
 ---

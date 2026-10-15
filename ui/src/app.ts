@@ -19,7 +19,9 @@ const sessionToken = meta('stellwerk-session');
 const scale = Number(meta('stellwerk-scale')) || 1;
 document.documentElement.style.setProperty('--stellwerk-scale', String(scale));
 
-const { lang, texts } = pickTexts(navigator.languages);
+// ?lang=en or ?lang=de picks the language; otherwise it follows the system.
+const chosen = new URLSearchParams(location.search).get('lang');
+const { lang, texts } = pickTexts(chosen ? [chosen] : navigator.languages);
 document.documentElement.lang = lang;
 for (const node of document.querySelectorAll<HTMLElement>('[data-text]')) {
   const value = texts[node.dataset.text as keyof typeof texts];

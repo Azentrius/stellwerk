@@ -13,7 +13,8 @@
     "erasableSyntaxOnly": true,
     "rewriteRelativeImportExtensions": true,
     "skipLibCheck": true,
+    "newLine": "lf",
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "tools"]
 }

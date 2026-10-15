@@ -32,4 +32,26 @@ jobs:
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          grep -q "^## $version " CHANGELOG.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          node tools/release-notes.ts "$version" > /dev/null || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+      # The release package, unpacked and installed as the README tells users, must start and serve the display.
+      - name: Package, install it as a user would, start the hub
+        shell: pwsh
+        run: |
+          npm run package
+          $unpacked = Join-Path $env:RUNNER_TEMP 'unpacked'
+          Expand-Archive (Get-Item build/stellwerk-*.zip).FullName -DestinationPath $unpacked
+          Set-Location (Get-ChildItem $unpacked -Directory)[0].FullName
+          npm ci --omit=dev
+          node dist/cli.js --version
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP 'appdata'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'localappdata'
+          $hub = Start-Process node -ArgumentList 'dist/cli.js', 'serve' -NoNewWindow -PassThru
+          try {
+            Start-Sleep -Seconds 3
+            foreach ($path in '/', '/app.js', '/app.css', '/static/fonts/RedHatMono/RedHatMonoVF.woff2') {
+              $status = (Invoke-WebRequest "http://127.0.0.1:4780$path" -UseBasicParsing).StatusCode
+              "$path $status"
+            }
+          } finally {
+            Stop-Process -Id $hub.Id
+          }
