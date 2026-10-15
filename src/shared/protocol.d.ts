@@ -5,6 +5,12 @@
 /** Status of a session as the display shows it, most urgent first. */
 export type SessionStatus = 'permission' | 'waiting' | 'working' | 'done' | 'ended';
 
+/**
+ * What a waiting session waits for: an answer to a question, some input, a permission whose card is open
+ * in the app, or only the next prompt.
+ */
+export type WaitingFor = 'question' | 'input' | 'permission' | 'idle';
+
 export interface SessionView {
   id: string;
   /** Last part of the working directory. */
@@ -12,6 +18,9 @@ export interface SessionView {
   cwd: string;
   title: string | null;
   status: SessionStatus;
+  /** Set while the status is 'waiting'. */
+  waitingFor: WaitingFor | null;
+  waitingSince: number | null;
   /** Subagents started and not yet stopped. */
   subagents: number;
   lastActivity: number;

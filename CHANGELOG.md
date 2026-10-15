@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 – not released yet
+
+The display in four columns and truly full screen; what waits in the app is listed too.
+
+- **Four columns:** the sessions on the left, what waits for you next to them, a column kept free for
+  what comes next, and clock and hub on the right.
+- **Names first:** sessions and cards show the session's name in bold and the project below.
+- **Answer in the app:** sessions waiting for an answer in the app (a question, some input, a permission
+  open there) are listed below the cards, with how long they have been waiting. A column with more than
+  fits fades out at the bottom.
+- **Full screen:** the display started with Windows opens in Edge's kiosk mode, without title bar and
+  over the taskbar. Run `stellwerk autostart install` again to switch an existing setup.
+- **Word mark:** "Stell" in the text colour, "werk" in gold and italic.
+
 ## 0.1.0 – 2026-10-15
 
 The first version: Claude Code sessions and their permission requests on a desk display.

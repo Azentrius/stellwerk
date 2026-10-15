@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PermissionOutcome, PermissionView, SessionStatus, SessionView } from '../shared/protocol.js';
+import type { PermissionOutcome, PermissionView, SessionStatus, SessionView, WaitingFor } from '../shared/protocol.js';
 import { isOther, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 
 /** Ended sessions disappear after this time. */
@@ -14,8 +14,13 @@ export const SETTLED_VISIBLE_MS = 6_000;
 export const IDLE_FORGET_MS = 12 * 60 * 60_000;
 export const MAX_SESSIONS = 100;
 
-/** Notifications that mean the session waits for the user. */
-const WAITING_NOTIFICATIONS = new Set(['idle_prompt', 'agent_needs_input', 'elicitation_dialog']);
+/** Notifications that mean the session waits for the user, and for what. */
+const WAITING_NOTIFICATIONS: Readonly<Record<string, WaitingFor>> = {
+  idle_prompt: 'idle',
+  agent_needs_input: 'input',
+  elicitation_dialog: 'input',
+  permission_prompt: 'permission',
+};
 
 /**
  * Tools that ask the user something rather than ask for permission. They arrive as PermissionRequest, but
@@ -33,10 +38,28 @@ interface Session {
   cwd: string;
   title: string | null;
   base: BaseStatus;
+  /** While base is 'waiting': what for, and since when. */
+  waitingFor: WaitingFor | null;
+  waitingSince: number | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
   subagents: Set<string>;
   lastActivity: number;
   endedAt: number | null;
+}
+
+/** Any status but waiting; whatever the session waited for is over. */
+function setStatus(session: Session, base: Exclude<BaseStatus, 'waiting'>): void {
+  session.base = base;
+  session.waitingFor = null;
+  session.waitingSince = null;
+}
+
+/** The session waits for the user. Mere idleness never replaces a question, an input or a permission. */
+function waitFor(session: Session, reason: WaitingFor, now: number): void {
+  if (reason === 'idle' && session.base === 'waiting' && session.waitingFor !== null && session.waitingFor !== 'idle') return;
+  if (session.base !== 'waiting' || session.waitingFor !== reason) session.waitingSince = now;
+  session.base = 'waiting';
+  session.waitingFor = reason;
 }
 
 export interface Permission {
@@ -75,17 +98,17 @@ export class Board {
     switch (event.hook_event_name) {
       case 'UserPromptSubmit':
         // A new prompt: whatever the main agent asked before was answered in the app.
-        session.base = 'working';
+        setStatus(session, 'working');
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === null, 'decided-in-app', now);
 
       case 'Stop':
-        session.base = 'done';
+        setStatus(session, 'done');
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === null, 'decided-in-app', now);
 
       case 'PostToolUse':
       case 'PostToolUseFailure': {
-        // The tool ran, so a matching open request was allowed in the app.
-        session.base = 'working';
+        // The tool ran, so a matching open request was allowed in the app (and a question answered).
+        setStatus(session, 'working');
         const candidates = this.pendingOf(session.id).filter((p) => p.agentId === agentId && p.tool === event.tool_name);
         const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
         const match =
@@ -97,13 +120,14 @@ export class Board {
         const type = event.notification_type ?? '';
         // permission_prompt comes a few seconds after every request; while the display holds it, nothing changes.
         if (type === 'permission_prompt' && this.pendingOf(session.id).length > 0) return [];
-        if (type === 'permission_prompt' || WAITING_NOTIFICATIONS.has(type)) session.base = 'waiting';
+        const reason = WAITING_NOTIFICATIONS[type];
+        if (reason) waitFor(session, reason, now);
         return [];
       }
 
       case 'SubagentStart':
         if (agentId) session.subagents.add(agentId);
-        session.base = 'working';
+        setStatus(session, 'working');
         return [];
 
       case 'SubagentStop':
@@ -112,7 +136,7 @@ export class Board {
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === agentId, 'decided-in-app', now);
 
       case 'SessionEnd':
-        session.base = 'ended';
+        setStatus(session, 'ended');
         session.endedAt = now;
         session.subagents.clear();
         return this.settleWhere((p) => p.sessionId === session.id, 'aborted', now);
@@ -125,6 +149,8 @@ export class Board {
   /** Puts a permission request on the display. */
   addPermission(id: string, event: PermissionRequestEvent, now: number, holdMs: number): Permission {
     const session = this.touch(event, now);
+    // Asking for a permission means working; while the card is open the status shows 'permission'.
+    if (session.base !== 'ended') setStatus(session, 'working');
     const permission: Permission = {
       id,
       sessionId: session.id,
@@ -144,7 +170,7 @@ export class Board {
 
   /** A question to the user (see QUESTION_TOOLS): no card, the session waits for the answer in the app. */
   askUser(event: PermissionRequestEvent, now: number): void {
-    this.touch(event, now).base = 'waiting';
+    waitFor(this.touch(event, now), 'question', now);
   }
 
   /** Notes an event without changing the status. */
@@ -158,6 +184,8 @@ export class Board {
         cwd: event.cwd ?? '',
         title: null,
         base: 'done',
+        waitingFor: null,
+        waitingSince: null,
         subagents: new Set(),
         lastActivity: now,
         endedAt: null,
@@ -169,7 +197,7 @@ export class Board {
     session.lastActivity = now;
     if (session.base === 'ended' && event.hook_event_name !== 'SessionEnd') {
       // Resumed after its end.
-      session.base = 'done';
+      setStatus(session, 'done');
       session.endedAt = null;
     }
     return session;
@@ -187,11 +215,11 @@ export class Board {
     permission.resolvedAt = now;
     const session = this.sessions.get(permission.sessionId);
     if (session && session.base !== 'ended') {
-      if (outcome === 'allowed' || outcome === 'denied') session.base = 'working';
+      if (outcome === 'allowed' || outcome === 'denied') setStatus(session, 'working');
       // The app's own card stays open and waits for the user.
-      else if (outcome === 'handed-to-app' || outcome === 'timed-out') session.base = 'waiting';
+      else if (outcome === 'handed-to-app' || outcome === 'timed-out') waitFor(session, 'permission', now);
       // Answered in the app, by allowing, rejecting or cancelling. If the tool runs, PostToolUse says so.
-      else if (outcome === 'decided-in-app' || outcome === 'aborted') session.base = 'done';
+      else setStatus(session, 'done');
     }
     return true;
   }
@@ -230,6 +258,8 @@ export class Board {
         cwd: s.cwd,
         title: s.title,
         status: this.statusOf(s),
+        waitingFor: this.statusOf(s) === 'waiting' ? s.waitingFor : null,
+        waitingSince: this.statusOf(s) === 'waiting' ? s.waitingSince : null,
         subagents: s.subagents.size,
         lastActivity: s.lastActivity,
         endedAt: s.endedAt,

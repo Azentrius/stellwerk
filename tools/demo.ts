@@ -1,7 +1,7 @@
 // Starts a hub with made-up sessions and open requests: for screenshots and for working on the display
 // without the real token or audit log (a fresh token, the audit log in a temporary folder).
 //
-// Usage: npm run build && node tools/demo.ts [port]     then open http://127.0.0.1:4781/?lang=en
+// Usage: npm run build && node tools/demo.ts [port] [--more]     then open http://127.0.0.1:4781/?lang=en
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -14,7 +14,7 @@ import { HOOK_PATH } from '../src/config.ts';
 import { startHub } from '../src/hub/hub.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
-const port = Number(process.argv[2] ?? 4781);
+const port = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) ?? 4781);
 const token = randomBytes(32).toString('hex');
 const hub = await startHub({
   port,
@@ -52,6 +52,16 @@ send('pipeline', 'data-pipeline', { hook_event_name: 'UserPromptSubmit', session
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a2', agent_type: 'Plan' });
 send('website', 'website', { hook_event_name: 'Notification', notification_type: 'idle_prompt', session_title: 'New landing page' });
+// Waiting for an answer in the app: a question, and a permission the app shows itself.
+send('design', 'design-tokens', {
+  hook_event_name: 'PermissionRequest',
+  session_title: 'Dark theme contrast',
+  tool_name: 'AskUserQuestion',
+  tool_input: { questions: [{ question: 'Which contrast level?', options: [{ label: 'AA' }, { label: 'AAA' }] }] },
+});
+await pause(400);
+send('infra', 'infrastructure', { hook_event_name: 'UserPromptSubmit', session_title: 'Renew certificates' });
+send('infra', 'infrastructure', { hook_event_name: 'Notification', notification_type: 'permission_prompt' });
 await pause(300);
 send('shop', 'shop-api', {
   hook_event_name: 'PermissionRequest',
@@ -59,22 +69,17 @@ send('shop', 'shop-api', {
   tool_name: 'Bash',
   tool_input: { command: 'git push origin release/2.3', description: 'Push the release branch' },
 });
-await pause(1200);
-send('checkout', 'shop-api', {
-  hook_event_name: 'PermissionRequest',
-  session_title: 'Rate limit for the checkout',
-  tool_name: 'Edit',
-  tool_input: {
-    file_path: 'C:\\Projects\\shop-api\\src\\checkout\\limits.ts',
-    old_string: 'const limit = 100;',
-    new_string: 'const limit = 10; // per minute and address\nconst window = 60_000;',
-  },
-});
-await pause(800);
-send('infra', 'infrastructure', {
-  hook_event_name: 'PermissionRequest',
-  session_title: 'Renew certificates',
-  tool_name: 'mcp__github__create_pull_request',
-  mcp_server: { name: 'github' },
-  tool_input: { owner: 'example', repo: 'infrastructure', title: 'Renew certificates', base: 'main', head: 'certs' },
-});
+// A second card (an edit) only with "--more"; with it the answers below no longer fit on 720 px.
+if (process.argv.includes('--more')) {
+  await pause(1200);
+  send('checkout', 'shop-api', {
+    hook_event_name: 'PermissionRequest',
+    session_title: 'Rate limit for the checkout',
+    tool_name: 'Edit',
+    tool_input: {
+      file_path: 'C:\\Projects\\shop-api\\src\\checkout\\limits.ts',
+      old_string: 'const limit = 100;',
+      new_string: 'const limit = 10; // per minute and address\nconst window = 60_000;',
+    },
+  });
+}

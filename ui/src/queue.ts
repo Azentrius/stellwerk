@@ -1,9 +1,10 @@
-// The left column: one card per permission request, the oldest on top. Cards are kept by id and updated
-// in place, so an opened fold stays open and only new cards pulse.
+// The cards in "waiting for you": one per permission request, the oldest on top. Cards are kept by id and
+// updated in place, so an opened fold stays open and only new cards pulse.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, PermissionView } from '../../src/shared/protocol.js';
+import { naming } from './agents.ts';
 import { el } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { duration } from './time.ts';
@@ -22,15 +23,13 @@ interface Card {
 
 export class QueueView {
   private readonly list: HTMLElement;
-  private readonly empty: HTMLElement;
   private readonly texts: Texts;
   private readonly onDecide: (id: string, decision: Decision) => void;
   private readonly cards = new Map<string, Card>();
   private connected = false;
 
-  constructor(list: HTMLElement, empty: HTMLElement, texts: Texts, onDecide: (id: string, decision: Decision) => void) {
+  constructor(list: HTMLElement, texts: Texts, onDecide: (id: string, decision: Decision) => void) {
     this.list = list;
-    this.empty = empty;
     this.texts = texts;
     this.onDecide = onDecide;
     list.addEventListener('click', (event) => this.onClick(event));
@@ -63,7 +62,7 @@ export class QueueView {
         this.cards.delete(id);
       }
     }
-    this.empty.hidden = permissions.length > 0;
+    this.list.hidden = permissions.length === 0;
     return added;
   }
 
@@ -99,12 +98,14 @@ export class QueueView {
     root.dataset.id = view.id;
     root.addEventListener('animationend', () => root.classList.remove('card--new'));
 
+    // As in the agents column: the session's name on top, the project below.
+    const { name, project } = naming(view.project, view.title, view.sessionId);
     const head = el('header', 'card__head');
     const wait = el('span', 'card__wait');
-    head.append(el('span', 'card__project', view.project || view.sessionId.slice(0, 8)), el('span', 'card__sep', '·'));
+    head.append(el('span', 'card__name', name), el('span', 'card__sep', '·'));
     head.append(el('span', 'card__tool', view.tool), wait);
     root.append(head);
-    if (view.title) root.append(el('p', 'card__title', view.title));
+    if (project) root.append(el('p', 'card__project', project));
     root.append(renderToolInput(view.tool, view.input, view.mcpServer, t));
 
     const hold = el('div', 'card__hold');

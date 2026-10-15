@@ -6,13 +6,13 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code session and lets you answer their permission requests right there. Like a dispatcher who sees
 every train on the track diagram and sets the signals.
 
-![The display at 1920×720: open permission requests on the left, the sessions in the middle, clock and hub on the right](docs/display.png)
+![The display at 1920×720: the sessions on the left, what waits for you next to them, room for more, clock and hub on the right](docs/display.png)
 
 ## What it does
 
-- **Every session at a glance.** Project, title and status of each session: waiting for approval, waiting
-  for you, working, done, ended. With the number of running subagents and the time of the last activity.
-  The most urgent first.
+- **Every session at a glance.** In the left column, each session with its name (bold) and project and
+  its status: waiting for approval, waiting for you, working, done, ended. With the number of running
+  subagents and the time of the last activity. The most urgent first.
 - **Permission requests on the display.** Each request becomes a card with the complete input: a shell
   command in full, a file change with path and content, an MCP call with server, tool and parameters.
   **Allow**, **Deny**, or **In the app** to leave it to the Claude app. The oldest request is on top; the
@@ -20,8 +20,9 @@ every train on the track diagram and sets the signals.
 - **The app works as before.** The Claude desktop app shows its own card at the same time, and whichever
   decides first counts. If nobody decides on the display within the hold time (60 s), the request goes
   back to the app. If the hub is not running, Claude Code simply asks in the app, without error messages.
-- **Questions stay in the app.** When Claude asks you something (multiple choice), the session shows
-  "waiting for you" and you answer in the app; allow or deny would not answer a question.
+- **What waits in the app.** When Claude asks you something (multiple choice), needs some input, or has
+  a permission open in the app, the session is listed below the cards under "Answer in the app", with
+  how long it has been waiting. You answer in the app; allow or deny would not answer a question.
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else, needs a token for every hook request,
   opens no outgoing connections and loads nothing from the internet.
 - English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
@@ -84,8 +85,9 @@ adding them. Both start at logon, without administrator rights:
 
 - **Stellwerk hub** starts the hub without a window. Its messages go to
   `%LOCALAPPDATA%\stellwerk\hub.log` (moved to `hub.log.1` when it grows beyond 1 MB).
-- **Stellwerk display** opens the display 20 s later in an Edge app window, full screen on the 1920×720
-  screen, with an Edge profile of its own. `--screen <number>` picks another screen.
+- **Stellwerk display** opens the display 20 s later in Edge's kiosk mode: full screen on the 1920×720
+  screen, without title bar and over the taskbar, with an Edge profile of its own. `--screen <number>`
+  picks another screen. Alt+F4 closes the display.
 
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens. Stop or start a task in the Task Scheduler or with

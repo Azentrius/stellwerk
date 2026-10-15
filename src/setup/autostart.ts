@@ -1,6 +1,6 @@
 // Starting Stellwerk with Windows: two Task Scheduler tasks for the current user, at logon.
 // "Stellwerk hub" runs the hub without a console window (conhost --headless) and writes its messages to
-// hub.log. "Stellwerk display" opens the display a little later in an Edge app window, full screen on the
+// hub.log. "Stellwerk display" opens the display a little later in Edge's kiosk mode, full screen on the
 // chosen screen, with an Edge profile of its own. This module only builds the tasks; registering them is
 // in windows.ts.
 //
@@ -82,14 +82,17 @@ export function displayTask(options: { edge: string; url: string; profileDir: st
     description: 'Opens the Stellwerk display at logon, full screen on the screen chosen at setup.',
     action: {
       command: options.edge,
+      // Kiosk mode: full screen without title bar and over the taskbar (an --app window ignores
+      // --start-fullscreen). Alt+F4 closes it.
       args: [
-        `--app=${options.url}`,
+        '--kiosk',
+        options.url,
+        '--edge-kiosk-type=fullscreen',
         `--user-data-dir=${options.profileDir}`,
         '--no-first-run',
         '--no-default-browser-check',
         `--window-position=${screen.x},${screen.y}`,
         `--window-size=${screen.width},${screen.height}`,
-        '--start-fullscreen',
       ],
       workingDirectory: options.root,
     },

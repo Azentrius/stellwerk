@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PermissionOutcome, SessionStatus } from '../../src/shared/protocol.js';
+import type { PermissionOutcome, SessionStatus, WaitingFor } from '../../src/shared/protocol.js';
 
 export type Lang = 'en' | 'de';
 export type TimeUnit = 's' | 'min' | 'h';
@@ -11,9 +11,13 @@ export type TimeUnit = 's' | 'min' | 'h';
 export interface Texts {
   queueTitle: string;
   agentsTitle: string;
+  answersTitle: string;
   allClear: string;
   noSessions: string;
   status: Record<SessionStatus, string>;
+  /** Why a session waits for an answer in the app. */
+  waitingFor: Record<Exclude<WaitingFor, 'idle'>, string>;
+  since: (duration: string) => string;
   allow: string;
   deny: string;
   inApp: string;
@@ -44,6 +48,7 @@ export interface Texts {
 const en: Texts = {
   queueTitle: 'Waiting for you',
   agentsTitle: 'Agents',
+  answersTitle: 'Answer in the app',
   allClear: 'All signals clear.',
   noSessions: 'No session reported yet.',
   status: {
@@ -53,6 +58,12 @@ const en: Texts = {
     done: 'done',
     ended: 'ended',
   },
+  waitingFor: {
+    question: 'Question',
+    input: 'Needs input',
+    permission: 'Permission',
+  },
+  since: (d) => `for ${d}`,
   allow: 'Allow',
   deny: 'Deny',
   inApp: 'In the app',
@@ -90,6 +101,7 @@ const en: Texts = {
 const de: Texts = {
   queueTitle: 'Wartet auf dich',
   agentsTitle: 'Agenten',
+  answersTitle: 'In der App beantworten',
   allClear: 'Alle Signale auf Fahrt.',
   noSessions: 'Noch keine Sitzung gemeldet.',
   status: {
@@ -99,6 +111,12 @@ const de: Texts = {
     done: 'fertig',
     ended: 'beendet',
   },
+  waitingFor: {
+    question: 'Rückfrage',
+    input: 'braucht eine Eingabe',
+    permission: 'Freigabe',
+  },
+  since: (d) => `seit ${d}`,
   allow: 'Erlauben',
   deny: 'Ablehnen',
   inApp: 'In der App',

@@ -76,16 +76,17 @@ describe('the tasks', () => {
     assert.equal(HUB.restartOnFailure, true);
   });
 
-  test('the display opens later as a full-screen app window on the chosen screen, with its own profile', () => {
+  test('the display opens later in kiosk mode, full screen on the chosen screen, with its own profile', () => {
     assert.equal(DISPLAY.name, DISPLAY_TASK);
     assert.deepEqual(DISPLAY.action.args, [
-      '--app=http://127.0.0.1:4780',
+      '--kiosk',
+      'http://127.0.0.1:4780',
+      '--edge-kiosk-type=fullscreen',
       '--user-data-dir=C:\\Users\\dev\\AppData\\Local\\stellwerk\\edge-display',
       '--no-first-run',
       '--no-default-browser-check',
       '--window-position=0,1440',
       '--window-size=1920,720',
-      '--start-fullscreen',
     ]);
     assert.equal(DISPLAY.delaySeconds, DISPLAY_DELAY_S);
     assert.equal(DISPLAY.restartOnFailure, false);
