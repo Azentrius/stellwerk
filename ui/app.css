@@ -27,10 +27,10 @@ body {
 
 button { font: inherit; }
 
-/* ---------- three columns, by urgency from left to right ---------- */
+/* ---------- four columns: agents, what waits for you, room for later, status ---------- */
 .board {
   display: grid;
-  grid-template-columns: 45fr 35fr 20fr;
+  grid-template-columns: 25fr 40fr 15fr 20fr;
   height: 100vh;
 }
 
@@ -56,7 +56,7 @@ button { font: inherit; }
 }
 .count { color: var(--signature); font-variant-numeric: tabular-nums; }
 
-.queue, .agents {
+.waiting, .agents {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -65,8 +65,17 @@ button { font: inherit; }
   overscroll-behavior: contain;
 }
 
+.waiting { display: flex; flex-direction: column; gap: 1.2rem; padding-inline-end: 0.2rem; }
+
+.section-title {
+  margin: 0 0 0.4rem;
+  color: var(--text-subtle);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 /* ---------- permission cards ---------- */
-.queue { display: flex; flex-direction: column; gap: 0.8rem; padding-inline-end: 0.2rem; }
+.queue { display: flex; flex-direction: column; gap: 0.8rem; }
 
 .card {
   display: flex;
@@ -86,11 +95,11 @@ button { font: inherit; }
 }
 
 .card__head { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; font-size: 1.1rem; }
-.card__project { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card__sep { color: var(--text-subtle); }
 .card__tool { color: var(--signature); font-weight: 600; overflow-wrap: anywhere; }
 .card__wait { margin-inline-start: auto; color: var(--text-subtle); font-variant-numeric: tabular-nums; }
-.card__title { margin: -0.3rem 0 0; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__project { margin: -0.3rem 0 0; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .card__hold { height: 0.2rem; overflow: hidden; background: var(--line); border-radius: var(--radius-pill); }
 .card__hold-bar { display: block; height: 100%; background: var(--signature); transform-origin: left center; transition: transform 1s linear; }
@@ -193,28 +202,55 @@ button { font: inherit; }
 .agents { margin: 0; padding: 0; list-style: none; }
 .agent {
   display: grid;
-  grid-template-columns: 1.3rem minmax(0, 1fr) auto;
+  grid-template-columns: 1.3rem minmax(0, 1fr);
   column-gap: 0.6rem;
   align-items: center;
   padding: 0.5rem 0.2rem;
   border-block-end: 1px solid var(--line);
 }
-.agent .signal { grid-row: span 2; justify-self: center; }
-.agent__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent__status { text-align: end; white-space: nowrap; }
-.agent__title { color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent__meta { color: var(--text-subtle); text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.agent .signal { justify-self: center; }
+/* The session's name on top, bold, with how long ago; the project and the status below. */
+.agent__lines { display: flex; flex-direction: column; min-width: 0; }
+.agent__line { display: flex; align-items: baseline; gap: 0.6rem; min-width: 0; }
+.agent__name, .agent__project { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent__name { font-weight: 600; }
+.agent__ago { flex: none; color: var(--text-subtle); font-variant-numeric: tabular-nums; }
+.agent__project { color: var(--text-subtle); }
+.agent__status { flex: none; }
 .agent--permission .agent__status { color: var(--signature); font-weight: 600; }
 .agent--waiting .agent__status { color: var(--signature); }
 .agent--ended .agent__name, .agent--ended .agent__status { color: var(--text-disabled); font-weight: 400; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 
+/* ---------- answers due in the app ---------- */
+.answers__list { margin: 0; padding: 0; list-style: none; }
+.answer {
+  display: grid;
+  grid-template-columns: 1.3rem auto minmax(0, 1fr) auto;
+  column-gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.45rem 0.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-inline-start: 0.3rem solid var(--signal-halt);
+  border-radius: var(--radius-medium);
+}
+.answer + .answer { margin-block-start: 0.5rem; }
+.answer .signal { align-self: center; justify-self: center; }
+.answer__name { max-width: 22rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.answer__detail { color: var(--signature); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.answer__since { color: var(--text-subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* More below than fits: the bottom fades out. */
+.waiting--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
+
 /* ---------- status column ---------- */
 .col--status { gap: 0.5rem; }
 .col--status p { margin: 0; }
-/* DM Sans: the shared DM Serif Display file only holds the letters of the Azentrius word mark. */
-.wordmark { font-family: var(--az-font-head); font-size: 2.1rem; font-weight: 600; line-height: 1.1; letter-spacing: 0.01em; }
-.wordmark::after { content: "."; color: var(--signature); }
+/* "Stell" in the text colour, "werk" in gold and italic, like the suffix of an Azentrius page title. DM Sans
+   for both: the shared DM Serif Display file only holds the letters of the Azentrius word mark. */
+.wordmark { font-family: var(--az-font-head); font-size: 2.3rem; font-weight: 600; line-height: 1.1; letter-spacing: 0.01em; }
+.wordmark__werk { margin-inline-start: -0.04em; color: var(--signature); font-style: italic; font-weight: 500; }
 .clock { font-size: 3.4rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .hub-state { display: flex; align-items: center; gap: 0.5rem; }
 .hub-state::before { content: ""; flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--signal-fahrt); }

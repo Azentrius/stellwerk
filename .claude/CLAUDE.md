@@ -173,10 +173,12 @@ screenshot is taken from it:
   hosts it without one, but ending the task (`schtasks /End`, Task Scheduler's End) ends only conhost;
   node would run on. Hence `serve --exit-with-parent`: the hub checks its parent every 2 s and stops
   when it is gone. Its output goes to `hub.log` (`--log-file`).
-- Edge places an `--app` window by `--window-position`/`--window-size` in physical pixels of the virtual
-  desktop, as a per-monitor DPI aware process reads them (`listScreens` sets that awareness);
-  `--start-fullscreen` then fills that screen. A profile of its own (`--user-data-dir`) keeps the flags
-  from being ignored by an Edge that is already running.
+- Edge places its window by `--window-position`/`--window-size` in physical pixels of the virtual
+  desktop, as a per-monitor DPI aware process reads them (`listScreens` sets that awareness). An `--app`
+  window ignores `--start-fullscreen` and keeps its title bar; `--kiosk URL --edge-kiosk-type=fullscreen`
+  fills that screen without title bar and over the taskbar (as InPrivate, which the display does not
+  mind). A profile of its own (`--user-data-dir`) keeps the flags from being ignored by an Edge that is
+  already running.
 - Tasks for the current user with an interactive logon token register without elevation. Created with
   `schtasks /Create /XML` (UTF-16 with BOM): defaults of tasks made otherwise stop them on battery and
   after 72 hours.

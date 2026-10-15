@@ -1,10 +1,12 @@
-// Stellwerk's display: connects to the hub, shows the permission requests, the sessions and the hub's
-// state, and sends decisions. Everything goes over the one WebSocket to the hub that served the page.
+// Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
+// requests, answers due in the app) and the hub's state, and sends decisions. Everything goes over the one
+// WebSocket to the hub that served the page.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { renderAgents } from './agents.ts';
+import { renderAnswers, waitingForAnswer } from './answers.ts';
 import { byId } from './dom.ts';
 import { pickTexts } from './i18n.ts';
 import { QueueView } from './queue.ts';
@@ -28,11 +30,15 @@ for (const node of document.querySelectorAll<HTMLElement>('[data-text]')) {
   if (typeof value === 'string') node.textContent = value;
 }
 
-const queue = new QueueView(byId('queue'), byId('queue-empty'), texts, decide);
+const queue = new QueueView(byId('queue'), texts, decide);
 const agents = byId<HTMLUListElement>('agents');
 const agentsEmpty = byId('agents-empty');
-const queueCount = byId('queue-count');
 const agentsCount = byId('agents-count');
+const answers = byId<HTMLUListElement>('answers');
+const answersSection = byId('answers-section');
+const waitingCount = byId('waiting-count');
+const waitingList = byId('waiting-list');
+const waitingEmpty = byId('waiting-empty');
 const clockNode = byId('clock');
 const hubState = byId('hub-state');
 const lastEvent = byId('last-event');
@@ -83,8 +89,6 @@ function decide(id: string, decision: Decision): void {
 /** Draws everything from the last state; returns the ids of new open requests. */
 function render(): string[] {
   const added = queue.update(state?.permissions ?? [], connected);
-  const open = queue.openCount();
-  queueCount.textContent = open > 0 ? `(${open})` : '';
   tick();
   return added;
 }
@@ -97,6 +101,17 @@ function tick(): void {
   renderAgents(agents, sessions, now, texts);
   agentsEmpty.hidden = sessions.length > 0;
   agentsCount.textContent = sessions.length > 0 ? `(${sessions.length})` : '';
+
+  const due = waitingForAnswer(sessions);
+  renderAnswers(answers, due, now, texts);
+  answersSection.hidden = due.length === 0;
+  const waiting = queue.openCount() + due.length;
+  waitingCount.textContent = waiting > 0 ? `(${waiting})` : '';
+  const nothing = (state?.permissions.length ?? 0) === 0 && due.length === 0;
+  waitingEmpty.hidden = !nothing;
+  waitingList.hidden = nothing;
+  const below = waitingList.scrollHeight - waitingList.scrollTop - waitingList.clientHeight;
+  waitingList.classList.toggle('waiting--more', below > 4);
   clockNode.textContent = clock(now);
   hubState.textContent = connected ? texts.hubConnected : texts.hubDisconnected;
   hubState.classList.toggle('hub-state--down', !connected);

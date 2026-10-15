@@ -229,6 +229,65 @@ describe('requests decided in the app', () => {
   });
 });
 
+describe('what a waiting session waits for', () => {
+  const waiting = (board: Board) => {
+    const s = board.view().sessions[0];
+    return { status: s?.status, waitingFor: s?.waitingFor, waitingSince: s?.waitingSince };
+  };
+
+  test('a question, input, a permission open in the app, or only the next prompt', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 2);
+    assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'question', waitingSince: 2 });
+
+    board.apply(event('PostToolUse', { tool_name: 'AskUserQuestion', tool_input: {} }), 3);
+    assert.deepEqual(waiting(board), { status: 'working', waitingFor: null, waitingSince: null });
+
+    board.apply(event('Notification', { notification_type: 'elicitation_dialog' }), 4);
+    assert.equal(waiting(board).waitingFor, 'input');
+    board.apply(event('Notification', { notification_type: 'agent_needs_input' }), 5);
+    assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'input', waitingSince: 4 });
+
+    board.apply(event('Stop'), 6);
+    board.apply(event('Notification', { notification_type: 'idle_prompt' }), 7);
+    assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'idle', waitingSince: 7 });
+  });
+
+  test('a permission handed to the app, or left there when the hold time ended, waits in the app', () => {
+    for (const outcome of ['handed-to-app', 'timed-out'] as const) {
+      const board = new Board();
+      board.addPermission('p1', request(), 1, HOLD);
+      assert.equal(waiting(board).waitingFor, null, 'the card itself is no answer due in the app');
+      board.settle('p1', outcome, 2);
+      assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'permission', waitingSince: 2 }, outcome);
+    }
+    const board = new Board();
+    board.apply(event('Notification', { notification_type: 'permission_prompt' }), 1);
+    assert.equal(waiting(board).waitingFor, 'permission', 'a request the hub never saw');
+  });
+
+  test('mere idleness does not replace a question', () => {
+    const board = new Board();
+    board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 1);
+    board.apply(event('Notification', { notification_type: 'idle_prompt' }), 2);
+    assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'question', waitingSince: 1 });
+  });
+
+  test('anything that means work again ends the waiting', () => {
+    for (const name of ['UserPromptSubmit', 'Stop', 'SubagentStart', 'SessionEnd']) {
+      const board = new Board();
+      board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 1);
+      board.apply(event(name, { agent_id: 'a1' }), 2);
+      assert.equal(waiting(board).waitingFor, null, name);
+    }
+    const board = new Board();
+    board.apply(event('Notification', { notification_type: 'idle_prompt' }), 1);
+    board.addPermission('p1', request(), 2, HOLD);
+    assert.deepEqual(waiting(board), { status: 'permission', waitingFor: null, waitingSince: null });
+  });
+});
+
 describe('subagents', () => {
   test('are counted in pairs of start and stop', () => {
     const board = new Board();
