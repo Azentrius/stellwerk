@@ -49,11 +49,18 @@ The same in every Azentrius repository; keep it when changing the repository or 
 - **CI.** The job `test` runs every check on each push and pull request. Actions are pinned by commit SHA
   with the version as a comment; checkouts use `persist-credentials: false`; the token is read-only unless
   a job needs more.
+- **Releases.** Only the `release` workflow makes releases, on request, from `main`: it checks the
+  version against the code and the existing tags, runs all tests, builds the artifact with `SHA256SUMS`,
+  signs a build provenance (`gh attestation verify`) and takes the notes from `CHANGELOG.md`. Releases are
+  immutable. Files that are not for users stay out of the artifact.
 - **Licensing.** Apache-2.0: `LICENSE` in the root, an SPDX header in every source file, `NOTICE` for
   third-party material.
 
-Here: the job `test` runs on Windows: `npm ci`, typecheck, build, tests, `npm audit`, and checks that
-`CHANGELOG.md` has a section for the version in `package.json`. There is no release workflow yet.
+Here: the job `test` runs on Windows: `npm ci`, typecheck, build, tests, `npm audit`, the changelog section
+for the version in `package.json`, and the package (`npm run package`) unpacked and installed as a user
+would (`npm ci --omit=dev`), with the hub started and its display files fetched. The `release` workflow
+runs the same tests on Windows, then packages on Ubuntu with `SOURCE_DATE_EPOCH` from the commit; it needs
+a dated changelog section (`tools/release-notes.ts --require-date`).
 
 ## Layout
 
@@ -73,6 +80,12 @@ src/                       the hub and the command line (TypeScript, built to di
 ui/                        the display: index.html, app.css, shared design files and fonts
   src/                     the display's TypeScript (built to dist/ui/)
 test/                      node:test, run on the TypeScript sources directly
+tools/
+  package.ts               the release zip (own minimal zip writer, reproducible) and SHA256SUMS
+  release-notes.ts         a version's section of CHANGELOG.md
+  demo.ts                  a hub with made-up sessions and requests (port 4781)
+docs/display.png           the README screenshot: the demo, ?lang=en, Edge headless at 1920×720
+.github/workflows/         test (every push and PR), release (on request)
 ```
 
 ## Commands
@@ -81,15 +94,29 @@ test/                      node:test, run on the TypeScript sources directly
 npm run typecheck
 npm test                 # unit tests and the hub end to end
 npm run build            # dist/
+npm run demo             # demo hub on 4781: own token, audit log in a temporary folder
+npm run package          # build/stellwerk-VERSION.zip + SHA256SUMS (needs the build)
 node dist/cli.js serve   # --debug-raw writes raw hook data, --simulate-hang leaves status hooks unanswered
 ```
 
 Node 24 runs the `.ts` sources directly (type stripping), so tests need no build. Imports use `.ts`
 extensions; `tsc` rewrites them to `.js` (`rewriteRelativeImportExtensions`). Only erasable syntax
-(`erasableSyntaxOnly`): no enums, no namespaces, no parameter properties.
+(`erasableSyntaxOnly`): no enums, no namespaces, no parameter properties. Output uses LF line endings
+(`newLine`), so the package is the same on every platform.
 
-To look at the display without touching the real token and audit log, start a hub from a script with
-`startHub` on another port, a temporary audit file and demo hook requests.
+To look at the display without touching the real token and audit log, use `npm run demo`. The README
+screenshot is taken from it:
+`msedge --headless=new --window-size=1920,720 --virtual-time-budget=6000 --screenshot=docs\display.png "http://127.0.0.1:4781/?lang=en"`.
+
+## Releases and the repository
+
+- The version lives in `package.json` (`npm version --no-git-tag-version X.Y.Z` keeps the lockfile in
+  step).
+- Release: raise the version, give its `CHANGELOG.md` section the date, merge, then Actions › release ›
+  Run workflow on `main`. The workflow checks the version, runs all tests, builds the package and creates
+  tag and release.
+- The package takes only `dist/`, `ui/` without its sources, `package.json`, the lockfile and the
+  license, readme and changelog (`tools/package.ts`); `test/release.test.ts` checks that.
 
 ## Rules (not negotiable)
 

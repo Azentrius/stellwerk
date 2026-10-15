@@ -20,7 +20,9 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p ui/tsconfig.json --noEmit",
     "serve": "node dist/cli.js serve",
     "test": "node --test \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "package": "node tools/package.ts",
+    "demo": "node tools/demo.ts"
   },
   "dependencies": {
     "ws": "^8.22.0",
