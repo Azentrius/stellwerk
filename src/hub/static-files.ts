@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -45,6 +46,16 @@ export function loadStaticFiles(uiRoot: string, webRoot: string): { files: Map<s
     files.set(`/${name}`, { body: fs.readFileSync(path.join(webRoot, name)), type: TYPES['.js']! });
   }
   return { files, missingBuild: !modules.includes('app.js') };
+}
+
+/**
+ * A short fingerprint of everything the display is made of. The page carries the one it was served with
+ * and the hub names its own in every state, so an open display notices when the hub serves a newer one.
+ */
+export function displayBuild(template: string, files: Map<string, StaticFile>): string {
+  const hash = createHash('sha256').update(template);
+  for (const name of [...files.keys()].sort()) hash.update(`\0${name}\0`).update(files.get(name)!.body);
+  return hash.digest('hex').slice(0, 16);
 }
 
 export function loadIndexTemplate(uiRoot: string): string {

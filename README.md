@@ -95,7 +95,8 @@ adding them. Both start at logon, without administrator rights:
   picks another screen. Alt+F4 closes the display.
 
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
-Node.js elsewhere or rearranging the screens. Stop or start a task in the Task Scheduler or with
+Node.js elsewhere or rearranging the screens. After an update, restarting the hub is enough: the open
+display notices that the hub serves a newer version and loads itself again. Stop or start a task in the Task Scheduler or with
 `schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
 its task. `stellwerk autostart uninstall` removes both tasks.
 

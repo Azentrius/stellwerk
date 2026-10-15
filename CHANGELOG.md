@@ -23,6 +23,9 @@ hardware are shown too.
   password and a firewall rule, started at logon by the task "Stellwerk hardware". The status column then
   shows load and temperature of processor and graphics card and the memory in use. `stellwerk hardware
   uninstall` removes it all.
+- **Display follows updates:** the hub names a fingerprint of the display files it serves, in the page
+  and in every state. An open display that finds another one after the hub restarts loads itself again,
+  so restarting the hub is enough after an update.
 
 ## 0.1.0 – 2026-10-15
 

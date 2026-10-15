@@ -1,7 +1,7 @@
 // Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
 // requests, answers due in the app, open pull requests), the hub's state and the hardware values, and
-// sends decisions. Everything goes over the one
-// WebSocket to the hub that served the page.
+// sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
+// serves a newer display after an update, the page loads itself again.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,14 +13,18 @@ import { hardwareLine, renderHardware } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { githubLine, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
+import { shouldReload } from './reload.ts';
 import { ago, clock } from './time.ts';
 
 const WS_PROTOCOL = 'stellwerk.v1';
 const WS_SESSION_PREFIX = 'stellwerk.session.';
 const TOAST_MS = 3000;
+/** sessionStorage: the hub build a reload was last tried for. */
+const RELOAD_KEY = 'stellwerk-reloaded-for';
 
 const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content ?? '';
 const sessionToken = meta('stellwerk-session');
+const pageBuild = meta('stellwerk-build');
 const scale = Number(meta('stellwerk-scale')) || 1;
 document.documentElement.style.setProperty('--stellwerk-scale', String(scale));
 
@@ -81,6 +85,7 @@ function connect(): void {
 
 function onMessage(message: ServerMessage): void {
   if (message.type === 'state') {
+    if (reloadForNewBuild(message.hub.build)) return;
     clockOffset = message.now - Date.now();
     state = message;
     const added = render();
@@ -89,6 +94,21 @@ function onMessage(message: ServerMessage): void {
     queue.release(message.id);
     toast(message.reason === 'already-decided' ? texts.alreadyDecided : texts.notOpen);
   }
+}
+
+/** Loads the page again when the hub serves another build of the display; true if it does. */
+function reloadForNewBuild(hubBuild: string): boolean {
+  let tried: string | null = null;
+  // Without storage there is no limit on the tries; the hub sends no-store, so a reload brings the new page.
+  try {
+    tried = sessionStorage.getItem(RELOAD_KEY);
+  } catch {}
+  if (!shouldReload(pageBuild, hubBuild, tried)) return false;
+  try {
+    sessionStorage.setItem(RELOAD_KEY, hubBuild);
+  } catch {}
+  location.reload();
+  return true;
 }
 
 function decide(id: string, decision: Decision): void {
