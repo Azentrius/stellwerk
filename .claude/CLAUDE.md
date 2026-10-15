@@ -77,7 +77,7 @@ src/                       the hub and the command line (TypeScript, built to di
   hub/hardware.ts          values from LibreHardwareMonitor's data.json; its settings file
   hub/hook-input.ts        zod schemas for the hook data; unknown fields are dropped
   hub/audit.ts             audit.jsonl
-  hub/static-files.ts      the display's files, an explicit list read at start
+  hub/static-files.ts      the display's files, an explicit list read at start, and their fingerprint
   setup/claude-settings.ts Stellwerk's entries in Claude Code's settings, diff
   setup/windows.ts         user environment variable, firewall rule, screens, Task Scheduler
   setup/autostart.ts       the two logon tasks (pure): screen choice, command lines, task XML
@@ -212,6 +212,11 @@ screenshot is taken from it:
   fills that screen without title bar and over the taskbar (as InPrivate, which the display does not
   mind). A profile of its own (`--user-data-dir`) keeps the flags from being ignored by an Edge that is
   already running.
+- After a hub restart an open display only reconnects its WebSocket and keeps its old page. Hence the
+  build fingerprint (`displayBuild` in `static-files.ts`, `{{build}}` in the page, `hub.build` in every
+  state, `ui/src/reload.ts`): with other display files the page loads itself again, once per build. It
+  needs the same hook token as before; with a new token the page token differs, the WebSocket is turned
+  away (403) and the display has to be reloaded by hand (the demo makes a new token at each start).
 - Tasks for the current user with an interactive logon token register without elevation. Created with
   `schtasks /Create /XML` (UTF-16 with BOM): defaults of tasks made otherwise stop them on battery and
   after 72 hours.

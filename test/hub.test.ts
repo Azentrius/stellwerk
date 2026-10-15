@@ -198,6 +198,32 @@ describe('the display page', () => {
       assert.equal((await call(port, { method: 'GET', path: p }).reply).status, 404, p);
     }
   });
+
+  test('carries the build it was served with, the same the hub names in every state', async () => {
+    const { port } = await startTestHub();
+    const { body } = await call(port, { method: 'GET', path: '/' }).reply;
+    const pageBuild = /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1];
+    assert.ok(pageBuild, 'the page names its build');
+    const screen = await display(port);
+    assert.equal((await screen.state(() => true)).hub.build, pageBuild);
+    screen.close();
+  });
+
+  test('a changed display file gives another build', async () => {
+    const uiRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-ui-'));
+    fs.cpSync(path.join(ROOT, 'ui'), uiRoot, { recursive: true });
+    const build = async () => {
+      const { port } = await startTestHub({ uiRoot });
+      const screen = await display(port);
+      const value = (await screen.state(() => true)).hub.build;
+      screen.close();
+      return value;
+    };
+    const before = await build();
+    assert.equal(await build(), before, 'the same files, the same build');
+    fs.appendFileSync(path.join(uiRoot, 'app.css'), '\n.changed { color: red; }\n');
+    assert.notEqual(await build(), before);
+  });
 });
 
 describe('security checks', () => {

@@ -19,7 +19,7 @@ import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts'
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
-import { loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
+import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 export const MAX_OPEN_PERMISSIONS = 20;
@@ -89,9 +89,10 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   // Derived from the hook token (which it does not reveal), so an open display reconnects after a restart.
   const sessionToken = createHmac('sha256', options.token).update('stellwerk display session').digest('hex');
   const { files, missingBuild } = loadStaticFiles(options.uiRoot, options.webRoot);
-  const index = Buffer.from(
-    renderIndex(loadIndexTemplate(options.uiRoot), { session: sessionToken, scale: String(options.scale) }),
-  );
+  const template = loadIndexTemplate(options.uiRoot);
+  // An open display reloads itself when this differs from the build it was served with.
+  const build = displayBuild(template, files);
+  const index = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));
   let port = options.port;
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
@@ -343,7 +344,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       now: now(),
       ...board.view(),
       pullRequests: github?.pullRequests ?? [],
-      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound },
+      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
     };

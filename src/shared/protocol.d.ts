@@ -57,6 +57,8 @@ export interface HubView {
   startedAt: number;
   lastEventAt: number | null;
   sound: boolean;
+  /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
+  build: string;
 }
 
 /** The Actions runs on a pull request's head commit, summed up. */
