@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PermissionOutcome, SessionStatus, WaitingFor } from '../../src/shared/protocol.js';
+import type { ChecksState, GitHubProblem, PermissionOutcome, SessionStatus, WaitingFor } from '../../src/shared/protocol.js';
 
 export type Lang = 'en' | 'de';
 export type TimeUnit = 's' | 'min' | 'h';
@@ -18,6 +18,10 @@ export interface Texts {
   /** Why a session waits for an answer in the app. */
   waitingFor: Record<Exclude<WaitingFor, 'idle'>, string>;
   since: (duration: string) => string;
+  pullsTitle: string;
+  draft: string;
+  checks: Record<ChecksState, string>;
+  github: { asking: string; synced: (ago: string) => string; problem: Record<GitHubProblem, string> };
   allow: string;
   deny: string;
   inApp: string;
@@ -64,6 +68,20 @@ const en: Texts = {
     permission: 'Permission',
   },
   since: (d) => `for ${d}`,
+  pullsTitle: 'Open pull requests',
+  draft: 'draft',
+  checks: { passing: 'checks passed', failing: 'checks failed', pending: 'checks running', none: 'no checks' },
+  github: {
+    asking: 'GitHub: asking',
+    synced: (ago) => `GitHub: updated ${ago}`,
+    problem: {
+      rejected: 'GitHub: token rejected',
+      forbidden: 'GitHub: no access',
+      'not-found': 'GitHub: owner not found',
+      unreachable: 'GitHub: not reachable',
+      unexpected: 'GitHub: unexpected answer',
+    },
+  },
   allow: 'Allow',
   deny: 'Deny',
   inApp: 'In the app',
@@ -117,6 +135,20 @@ const de: Texts = {
     permission: 'Freigabe',
   },
   since: (d) => `seit ${d}`,
+  pullsTitle: 'Offene Pull Requests',
+  draft: 'Entwurf',
+  checks: { passing: 'Checks grün', failing: 'Checks rot', pending: 'Checks laufen', none: 'keine Checks' },
+  github: {
+    asking: 'GitHub: wird abgefragt',
+    synced: (ago) => `GitHub: aktualisiert ${ago}`,
+    problem: {
+      rejected: 'GitHub: Token abgelehnt',
+      forbidden: 'GitHub: kein Zugriff',
+      'not-found': 'GitHub: Besitzer nicht gefunden',
+      unreachable: 'GitHub: nicht erreichbar',
+      unexpected: 'GitHub: unerwartete Antwort',
+    },
+  },
   allow: 'Erlauben',
   deny: 'Ablehnen',
   inApp: 'In der App',

@@ -197,6 +197,11 @@ button { font: inherit; }
 .signal--working { background: var(--signal-fahrt); }
 .signal--done { background: var(--text-subtle); }
 .signal--ended { background: transparent; border: 0.15rem solid var(--text-disabled); }
+/* Checks of a pull request: green passed, red failed, a gold ring while running, grey without runs. */
+.signal--checks-passing { background: var(--signal-fahrt); }
+.signal--checks-failing { background: var(--status-danger); }
+.signal--checks-pending { background: transparent; border: 0.18rem solid var(--signal-halt); }
+.signal--checks-none { background: var(--text-disabled); }
 
 /* ---------- sessions ---------- */
 .agents { margin: 0; padding: 0; list-style: none; }
@@ -241,6 +246,22 @@ button { font: inherit; }
 .answer__detail { color: var(--signature); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .answer__since { color: var(--text-subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* ---------- open pull requests ---------- */
+.pulls__list { margin: 0; padding: 0; list-style: none; }
+.pull {
+  display: grid;
+  grid-template-columns: 1.3rem auto minmax(0, 1fr) auto;
+  column-gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.45rem 0.8rem;
+  border-block-end: 1px solid var(--line);
+}
+.pull .signal { align-self: center; justify-self: center; }
+.pull__title { max-width: 24rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pull__detail { color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pull__age { color: var(--text-subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pull--failing .pull__title { color: var(--danger-text); }
+
 /* More below than fits: the bottom fades out. */
 .waiting--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
 
@@ -256,7 +277,8 @@ button { font: inherit; }
 .hub-state::before { content: ""; flex: none; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--signal-fahrt); }
 .hub-state--down { color: var(--danger-text); }
 .hub-state--down::before { background: var(--status-danger); }
-.last-event { color: var(--text-subtle); }
+.last-event, .github-state { color: var(--text-subtle); }
+.github-state--problem { color: var(--danger-text); }
 
 /* ---------- toast ---------- */
 .toast {

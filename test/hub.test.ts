@@ -329,6 +329,45 @@ describe('rejections on the console', () => {
   });
 });
 
+describe('open pull requests', () => {
+  test('without a GitHub token the hub asks nobody and the state says so', async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    const state = await screen.state(() => true);
+    assert.equal(state.github, null);
+    assert.deepEqual(state.pullRequests, []);
+    screen.close();
+  });
+
+  test('with a token the display gets the list and when it was brought up to date', async () => {
+    const calls: string[] = [];
+    const fakeFetch = (async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      calls.push(url.href);
+      const body: Record<string, unknown> = {
+        '/orgs/acme/repos': [{ name: 'api' }],
+        '/repos/acme/api/pulls': [
+          { number: 7, title: 'Bump zod', updated_at: '2026-10-15T10:00:00Z', user: { login: 'dependabot[bot]' }, head: { sha: 'a'.repeat(40) } },
+        ],
+        '/repos/acme/api/actions/runs': { workflow_runs: [{ status: 'completed', conclusion: 'failure' }] },
+      };
+      return new Response(JSON.stringify(body[url.pathname]), { status: 200 });
+    }) as typeof fetch;
+    const { port } = await startTestHub({ github: { owner: 'acme', token: `github_pat_${'t'.repeat(30)}`, intervalMs: 60_000, fetch: fakeFetch } });
+    const screen = await display(port);
+    const state = await screen.state((s) => s.pullRequests.length === 1);
+    assert.deepEqual(state.pullRequests[0], {
+      repo: 'api', number: 7, title: 'Bump zod', author: 'dependabot[bot]', draft: false, updatedAt: Date.parse('2026-10-15T10:00:00Z'), checks: 'failing',
+    });
+    assert.equal(state.github?.owner, 'acme');
+    assert.equal(state.github?.problem, null);
+    assert.ok(state.github?.syncedAt);
+    assert.doesNotMatch(JSON.stringify(state), /github_pat_/, 'the token never reaches the display');
+    assert.ok(calls.every((u) => u.startsWith('https://api.github.com/')));
+    screen.close();
+  });
+});
+
 describe('status hooks', () => {
   test('are answered at once with an empty body, and the display shows the session', async () => {
     const { port } = await startTestHub();

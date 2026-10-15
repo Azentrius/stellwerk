@@ -24,6 +24,8 @@ export interface Paths {
   hubLogFile: string;
   /** The Edge profile of the display window started at logon. */
   displayProfileDir: string;
+  /** The read-only GitHub token for the list of open pull requests. */
+  githubTokenFile: string;
 }
 
 /** %APPDATA%\stellwerk for the configuration, %LOCALAPPDATA%\stellwerk for everything the hub writes. */
@@ -38,8 +40,12 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     rawLogFile: path.join(dataDir, 'debug-raw.jsonl'),
     hubLogFile: path.join(dataDir, 'hub.log'),
     displayProfileDir: path.join(dataDir, 'edge-display'),
+    githubTokenFile: path.join(dataDir, 'github-token'),
   };
 }
+
+/** A GitHub user or organisation name. */
+export const GITHUB_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 
 const configSchema = z.strictObject({
   port: z.number().int().min(1024).max(65535).default(4780),
@@ -52,9 +58,23 @@ const configSchema = z.strictObject({
   sound: z.boolean().default(false),
   scale: z.number().min(0.5).max(3).default(1),
   debugRawLog: z.boolean().default(false),
+  /** Whose open pull requests to show (with a token from `stellwerk github token`). */
+  githubOwner: z.string().regex(GITHUB_OWNER).optional(),
+  githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
 });
 
 export type Config = z.infer<typeof configSchema>;
+
+/** Sets one value in config.json and keeps the others; the result must still be a valid configuration. */
+export function setConfigValue(file: string, key: keyof Config, value: unknown): void {
+  const raw = fs.existsSync(file) ? readJsonFile(file) : {};
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error(`${file} does not hold a JSON object.`);
+  const next = { ...(raw as Record<string, unknown>), [key]: value };
+  const parsed = configSchema.safeParse(next);
+  if (!parsed.success) throw new Error(`${file}:\n${z.prettifyError(parsed.error)}`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+}
 
 /** Reads a JSON file, tolerating the byte order mark that Windows editors like to add. */
 export function readJsonFile(file: string): unknown {
