@@ -41,26 +41,28 @@ user informally ("Wartet auf dich").
 
 The same in every Azentrius repository; keep it when changing the repository or its settings.
 
-- **Security.** `SECURITY.md` with private vulnerability reporting; secret scanning with push protection;
-  Dependabot alerts and security updates; Dependabot version updates for every ecosystem in use and for
-  GitHub Actions; CodeQL default setup.
-- **Branches and tags.** Ruleset `main`: pull request, squash only, linear history, no deletion or force
-  push, required check `test`. Ruleset `release tags`: `v*` cannot be deleted or moved.
-- **CI.** The job `test` runs every check on each push and pull request. Actions are pinned by commit SHA
-  with the version as a comment; checkouts use `persist-credentials: false`; the token is read-only unless
-  a job needs more.
+- **Security.** `SECURITY.md` with private vulnerability reporting; secret scanning with push
+  protection; Dependabot alerts and security updates; Dependabot version updates for every
+  ecosystem in use and for GitHub Actions; CodeQL default setup.
+- **Branches and tags.** Ruleset `main`: pull request, squash only, linear history, no deletion or
+  force push, required check `test`. Ruleset `release tags`: `v*` cannot be deleted or moved.
+- **CI.** The job `test` runs every test and every lint on each push and pull request. Actions are
+  pinned by commit SHA with the version as a comment; checkouts use `persist-credentials: false`;
+  the token is read-only unless a job needs more. Check tools are pinned as well, so Dependabot keeps
+  them current.
 - **Releases.** Only the `release` workflow makes releases, on request, from `main`: it checks the
-  version against the code and the existing tags, runs all tests, builds the artifact with `SHA256SUMS`,
-  signs a build provenance (`gh attestation verify`) and takes the notes from `CHANGELOG.md`. Releases are
-  immutable. Files that are not for users stay out of the artifact.
-- **Licensing.** Apache-2.0: `LICENSE` in the root, an SPDX header in every source file, `NOTICE` for
-  third-party material.
+  version against the code and the existing tags, runs all tests, builds the artifact with
+  `SHA256SUMS`, signs a build provenance (`gh attestation verify`) and takes the notes from
+  `CHANGELOG.md`. Releases are immutable. Files that are not for users stay out of the artifact.
+- **Licensing.** Apache-2.0: `LICENSE` in the root, an SPDX header in every source file, `NOTICE`
+  for third-party material.
 
 Here: the job `test` runs on Windows: `npm ci`, typecheck, build, tests, `npm audit`, the changelog section
 for the version in `package.json`, and the package (`npm run package`) unpacked and installed as a user
 would (`npm ci --omit=dev`), with the hub started and its display files fetched. The `release` workflow
 runs the same tests on Windows, then packages on Ubuntu with `SOURCE_DATE_EPOCH` from the commit; it needs
-a dated changelog section (`tools/release-notes.ts --require-date`).
+a dated changelog section (`tools/release-notes.ts --require-date`). The packaging job can write releases
+and sign the provenance, so it installs with `npm ci --ignore-scripts`. Every job has a `timeout-minutes`.
 
 ## Layout
 
