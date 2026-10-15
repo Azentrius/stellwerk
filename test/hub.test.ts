@@ -180,7 +180,13 @@ describe('the display page', () => {
     assert.equal(page.headers['x-content-type-options'], 'nosniff');
     assert.match(page.body, /name="stellwerk-session" content="[0-9a-f]{64}"/);
     assert.doesNotMatch(page.body, new RegExp(TOKEN));
-    assert.doesNotMatch(page.body, /<script>|style="/);
+    // Nothing inline: every script tag (any case, any attributes) loads a file, and there is no style
+    // element or style attribute.
+    const scripts = page.body.match(/<script\b[^>]*>/gi) ?? [];
+    assert.ok(scripts.length > 0, 'the page loads its script');
+    for (const tag of scripts) assert.match(tag, /\ssrc\s*=/i, `inline script: ${tag}`);
+    assert.doesNotMatch(page.body, /<style\b/i);
+    assert.doesNotMatch(page.body, /\sstyle\s*=/i);
   });
 
   test('only the listed files are served', async () => {
