@@ -22,6 +22,7 @@ test('without a file every setting has its default', () => {
     scale: 1,
     debugRawLog: false,
     githubIntervalSeconds: 120,
+    hardwareMonitor: false,
   });
 });
 
@@ -91,6 +92,21 @@ test('the files live under APPDATA and LOCALAPPDATA', () => {
   assert.equal(paths.configFile, path.join('C:\\Users\\u\\AppData\\Roaming', 'stellwerk', 'config.json'));
   assert.equal(paths.auditFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'audit.jsonl'));
   assert.equal(paths.tokenFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'token'));
+});
+
+test('the hardware monitor lives in Program Files, where only administrators can change it', () => {
+  const paths = defaultPaths({ ProgramFiles: 'D:\\Programs' });
+  assert.equal(paths.hardwareDir, path.join('D:\\Programs', 'Stellwerk', 'LibreHardwareMonitor'));
+  assert.equal(defaultPaths({}).hardwareDir, path.join('C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'));
+});
+
+test('the hardware monitor is switched on and off in the configuration', () => {
+  const file = path.join(tempDir(), 'config.json');
+  setConfigValue(file, 'hardwareMonitor', true);
+  assert.equal(loadConfig(file).hardwareMonitor, true);
+  setConfigValue(file, 'hardwareMonitor', false);
+  assert.equal(loadConfig(file).hardwareMonitor, false);
+  assert.throws(() => setConfigValue(file, 'hardwareMonitor', 'yes'));
 });
 
 test('the token is created once, 256 bits as hex, and read back the same', () => {

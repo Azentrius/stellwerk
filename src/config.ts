@@ -26,6 +26,11 @@ export interface Paths {
   displayProfileDir: string;
   /** The read-only GitHub token for the list of open pull requests. */
   githubTokenFile: string;
+  /**
+   * LibreHardwareMonitor, set up by `stellwerk hardware install`. In Program Files, where only
+   * administrators can change it: it runs with their rights.
+   */
+  hardwareDir: string;
 }
 
 /** %APPDATA%\stellwerk for the configuration, %LOCALAPPDATA%\stellwerk for everything the hub writes. */
@@ -41,6 +46,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     hubLogFile: path.join(dataDir, 'hub.log'),
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
+    hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),
   };
 }
 
@@ -61,6 +67,8 @@ const configSchema = z.strictObject({
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */
   githubOwner: z.string().regex(GITHUB_OWNER).optional(),
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
+  /** Show CPU, memory and graphics card from LibreHardwareMonitor (set by `stellwerk hardware install`). */
+  hardwareMonitor: z.boolean().default(false),
 });
 
 export type Config = z.infer<typeof configSchema>;

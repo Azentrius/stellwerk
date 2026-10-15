@@ -82,6 +82,37 @@ export interface GitHubView {
   problem: GitHubProblem | null;
 }
 
+/** Load in percent and temperature in °C of a processor; null where the sensor gives nothing. */
+export interface Gauge {
+  load: number | null;
+  temperature: number | null;
+}
+
+export interface MemoryGauge {
+  /** In percent. */
+  load: number | null;
+  /** In GB. */
+  used: number | null;
+  total: number | null;
+}
+
+/** What LibreHardwareMonitor reports, picked out: null for a part it does not report. */
+export interface HardwareValues {
+  cpu: Gauge | null;
+  gpu: Gauge | null;
+  memory: MemoryGauge | null;
+}
+
+/** Why the last question to LibreHardwareMonitor failed. */
+export type HardwareProblem = 'not-running' | 'rejected' | 'unexpected';
+
+export interface HardwareView {
+  /** Null before the first answer and while there is a problem: old values would mislead. */
+  values: HardwareValues | null;
+  updatedAt: number | null;
+  problem: HardwareProblem | null;
+}
+
 export interface StateMessage {
   type: 'state';
   /** The hub's clock when it sent the message. */
@@ -94,6 +125,8 @@ export interface StateMessage {
   hub: HubView;
   /** Null when no GitHub token is set up. */
   github: GitHubView | null;
+  /** Null when the hardware monitor is not set up. */
+  hardware: HardwareView | null;
 }
 
 export interface DecisionResultMessage {

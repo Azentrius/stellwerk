@@ -10,7 +10,8 @@ Report them privately through GitHub instead:
 
 Please include:
 
-- what is affected (hub, display, hook setup, firewall rule; version or commit),
+- what is affected (hub, display, hook setup, firewall rule, hardware monitor
+  setup; version or commit),
 - steps to reproduce,
 - the impact you expect.
 
@@ -41,13 +42,24 @@ reachable only from the machine it runs on and only by the display it serves:
 - the hub starts no programs; only the setup commands run `icacls`,
   `powershell`, `netsh` and `schtasks`, with fixed arguments and without a
   shell;
-- the hub's only outgoing connection is to `api.github.com` (fixed in the
-  code), for the list of open pull requests, and only once a GitHub token is
-  set up: fine-grained only, meant to read pull requests and Actions and
-  nothing else, kept like the hook token, never logged, never sent to the
+- the hub's only connection to another machine is to `api.github.com` (fixed
+  in the code), for the list of open pull requests, and only once a GitHub
+  token is set up: fine-grained only, meant to read pull requests and Actions
+  and nothing else, kept like the hook token, never logged, never sent to the
   display; GitHub's answers are checked before use and redirects are not
   followed;
-- the start with Windows runs as the current user without elevation;
+- besides that the hub asks only LibreHardwareMonitor on `127.0.0.1:8085`
+  for `data.json`, when the hardware monitor is set up, with the password
+  from LibreHardwareMonitor's settings file, and never sends that password
+  to the display;
+- `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
+  archive, pinned in the code by URL, size and SHA-256, unpacks it only into
+  its own folder in Program Files (refusing any file name that would leave
+  it), turns on LibreHardwareMonitor's password and blocks its port for other
+  machines; that program runs with administrator rights, from a folder only
+  administrators can change;
+- the start of the hub and the display with Windows runs as the current user
+  without elevation;
 - the display loads only the hub's own files under a strict Content Security
   Policy and shows hook data and pull request titles as text only.
 
@@ -61,8 +73,11 @@ Reports are particularly welcome for:
 - hook data that the display renders as HTML or script,
 - the hook token or the GitHub token appearing in a log, a URL, a page or any
   file other than its own,
-- the hub connecting anywhere but `api.github.com`, or to it without a token
-  set up,
+- the hub connecting anywhere but `api.github.com` and LibreHardwareMonitor on
+  `127.0.0.1:8085`, or to them without being set up,
+- `stellwerk hardware install` accepting another file than the pinned one,
+  writing outside its folder, or leaving LibreHardwareMonitor's web server
+  reachable without the password or from other machines,
 - an unanswered or slow hub blocking Claude Code beyond the hook timeouts,
 - `stellwerk hooks install` or `uninstall` changing more of Claude Code's
   settings than Stellwerk's own entries,

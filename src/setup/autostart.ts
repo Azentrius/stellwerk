@@ -58,6 +58,8 @@ export interface Task {
   delaySeconds: number;
   /** Start the program again if it ends with an error (the hub, not the display). */
   restartOnFailure: boolean;
+  /** Run with the user's administrator rights (only the hardware monitor, which reads the sensors). */
+  elevated?: boolean;
 }
 
 export function hubTask(paths: { node: string; cli: string; root: string; logFile: string; conhost: string }): Task {
@@ -135,7 +137,7 @@ export function taskXml(task: Task, user: string): string {
     <Principal id="Author">
       <UserId>${x(user)}</UserId>
       <LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel>
+      <RunLevel>${task.elevated ? 'HighestAvailable' : 'LeastPrivilege'}</RunLevel>
     </Principal>
   </Principals>
   <Settings>
@@ -159,8 +161,7 @@ export function taskXml(task: Task, user: string): string {
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>${x(task.action.command)}</Command>
-      <Arguments>${x(commandLine(task.action.args))}</Arguments>
+      <Command>${x(task.action.command)}</Command>${task.action.args.length > 0 ? `\n      <Arguments>${x(commandLine(task.action.args))}</Arguments>` : ''}
       <WorkingDirectory>${x(task.action.workingDirectory)}</WorkingDirectory>
     </Exec>
   </Actions>

@@ -16,7 +16,7 @@ import { startHub } from '../src/hub/hub.ts';
 const ROOT = path.join(import.meta.dirname, '..');
 const port = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) ?? 4781);
 const token = randomBytes(32).toString('hex');
-// A stand-in for api.github.com: the demo never goes to the network.
+// A stand-in for api.github.com: the demo goes to no network and to no LibreHardwareMonitor.
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const fakeGitHub: Record<string, unknown> = {
   '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'website' }],
@@ -40,6 +40,31 @@ const demoFetch = (async (input: string | URL | Request) => {
     : fakeGitHub[url.pathname];
   return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 });
 }) as typeof fetch;
+// And one for LibreHardwareMonitor on 127.0.0.1:8085, with values that move a little.
+const sensor = (id: string, name: string, type: string, value: string) => ({ Text: name, SensorId: id, Type: type, RawValue: value, Children: [] });
+const wobble = (base: number) => (base + Math.random() * 4 - 2).toFixed(1);
+const demoHardwareFetch = (async () =>
+  new Response(
+    JSON.stringify({
+      Text: 'Sensor',
+      Children: [
+        {
+          Text: 'DEMO-PC',
+          Children: [
+            sensor('/intelcpu/0/load/0', 'CPU Total', 'Load', `${wobble(23)} %`),
+            sensor('/intelcpu/0/temperature/13', 'CPU Package', 'Temperature', `${wobble(61)} °C`),
+            sensor('/gpu-nvidia/0/load/0', 'GPU Core', 'Load', `${wobble(8)} %`),
+            sensor('/gpu-nvidia/0/temperature/0', 'GPU Core', 'Temperature', `${wobble(48)} °C`),
+            sensor('/ram/load/0', 'Memory', 'Load', '45.2 %'),
+            sensor('/ram/data/0', 'Memory Used', 'Data', '14.3 GB'),
+            sensor('/ram/data/1', 'Memory Available', 'Data', '17.4 GB'),
+          ],
+        },
+      ],
+    }),
+    { status: 200 },
+  )) as typeof fetch;
+const demoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-'));
 
 const hub = await startHub({
   port,
@@ -47,10 +72,11 @@ const hub = await startHub({
   holdMs: 30 * 60_000,
   scale: 1,
   sound: false,
-  auditFile: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-')), 'audit.jsonl'),
+  auditFile: path.join(demoDir, 'audit.jsonl'),
   uiRoot: path.join(ROOT, 'ui'),
   webRoot: path.join(ROOT, 'dist', 'ui'),
   github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
+  hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
