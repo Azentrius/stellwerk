@@ -17,14 +17,10 @@ until they are decided.
 
 ---
 
-## Stage 1 – Claude Code sessions and permission requests
+## Stage 1 – Claude Code sessions and permission requests ✅
 
-Built in 0.1.0 (see [CHANGELOG](CHANGELOG.md)): the hub, the display, the hook setup, the firewall rule,
+Done in 0.1.0 (see [CHANGELOG](CHANGELOG.md)): the hub, the display, the hook setup, the firewall rule,
 the start with Windows, the release package and workflow. The acceptance tests passed on the real setup.
-
-Still open before the first release:
-
-- A few days in daily use, on the real 12.3″ display.
 
 ---
 

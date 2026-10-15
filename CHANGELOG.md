@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 – not released yet
+## 0.1.0 – 2026-10-15
 
 The first version: Claude Code sessions and their permission requests on a desk display.
 
