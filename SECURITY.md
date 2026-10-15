@@ -39,8 +39,9 @@ reachable only from the machine it runs on and only by the display it serves:
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;
 - the hub starts no programs and opens no outgoing connections; only the
-  setup commands run `icacls`, `powershell` and `netsh`, with fixed arguments
-  and without a shell;
+  setup commands run `icacls`, `powershell`, `netsh` and `schtasks`, with
+  fixed arguments and without a shell;
+- the start with Windows runs as the current user without elevation;
 - the display loads only the hub's own files under a strict Content Security
   Policy and shows hook data as text only.
 
@@ -55,4 +56,6 @@ Reports are particularly welcome for:
 - the token appearing in a log, a URL, a page or any file other than its own,
 - an unanswered or slow hub blocking Claude Code beyond the hook timeouts,
 - `stellwerk hooks install` or `uninstall` changing more of Claude Code's
-  settings than Stellwerk's own entries.
+  settings than Stellwerk's own entries,
+- `stellwerk autostart install` registering tasks that run with more rights
+  or other programs than the ones it shows.

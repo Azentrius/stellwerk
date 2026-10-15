@@ -75,7 +75,8 @@ src/                       the hub and the command line (TypeScript, built to di
   hub/audit.ts             audit.jsonl
   hub/static-files.ts      the display's files, an explicit list read at start
   setup/claude-settings.ts Stellwerk's entries in Claude Code's settings, diff
-  setup/windows.ts         user environment variable, firewall rule
+  setup/windows.ts         user environment variable, firewall rule, screens, Task Scheduler
+  setup/autostart.ts       the two logon tasks (pure): screen choice, command lines, task XML
   shared/protocol.d.ts     types of the WebSocket messages, shared with the display
 ui/                        the display: index.html, app.css, shared design files and fonts
   src/                     the display's TypeScript (built to dist/ui/)
@@ -128,7 +129,8 @@ screenshot is taken from it:
    (`reject()` in `hub.ts`, throttled per reason), so a setup problem is visible.
 3. **No automatic decisions.** Only a person allows or denies: no rules, no "always allow".
 4. **The hub runs nothing.** It starts no programs and opens no outgoing connections. Only the setup
-   commands run `icacls`, `powershell` and `netsh`, with fixed arguments, no shell, values on stdin.
+   commands run `icacls`, `powershell`, `netsh` and `schtasks`, with fixed arguments, no shell, values on
+   stdin; PowerShell scripts go in with `-EncodedCommand`.
 5. **Claude Code never waits on Stellwerk.** Status hooks answer at once; held requests end by the hold
    time, which stays at least 10 s below the hook timeout. Never `onFailure: "block"`.
 6. **Display without network.** Only the hub's own files, strict CSP, no inline scripts or styles, no
@@ -162,3 +164,17 @@ screenshot is taken from it:
   app's card has no separate "for this session" option. Keep that in mind when testing.
 - `PermissionRequest` input: the common fields, `tool_name`, `tool_input`, `permission_suggestions`, and
   `mcp_server` for MCP tools; no `tool_use_id`.
+
+## Useful knowledge (start with Windows)
+
+- A Task Scheduler task that runs `node.exe` directly opens a console window. `conhost.exe --headless`
+  hosts it without one, but ending the task (`schtasks /End`, Task Scheduler's End) ends only conhost;
+  node would run on. Hence `serve --exit-with-parent`: the hub checks its parent every 2 s and stops
+  when it is gone. Its output goes to `hub.log` (`--log-file`).
+- Edge places an `--app` window by `--window-position`/`--window-size` in physical pixels of the virtual
+  desktop, as a per-monitor DPI aware process reads them (`listScreens` sets that awareness);
+  `--start-fullscreen` then fills that screen. A profile of its own (`--user-data-dir`) keeps the flags
+  from being ignored by an Edge that is already running.
+- Tasks for the current user with an interactive logon token register without elevation. Created with
+  `schtasks /Create /XML` (UTF-16 with BOM): defaults of tasks made otherwise stop them on battery and
+  after 72 hours.

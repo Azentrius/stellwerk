@@ -20,12 +20,11 @@ until they are decided.
 ## Stage 1 – Claude Code sessions and permission requests
 
 Built in 0.1.0 (see [CHANGELOG](CHANGELOG.md)): the hub, the display, the hook setup, the firewall rule,
-the release package and workflow. The acceptance tests passed on the real setup.
+the start with Windows, the release package and workflow. The acceptance tests passed on the real setup.
 
 Still open before the first release:
 
 - A few days in daily use, on the real 12.3″ display.
-- Optional: start with Windows (Task Scheduler).
 
 ---
 
@@ -58,9 +57,10 @@ the Claude desktop app.
 
 ---
 
-## Stage 6 – Touch and a fixed place
+## Stage 6 – Touch
 
-Fine-tuning for touch on the 12.3″ display, start with Windows, a fixed window on the second screen.
+Fine-tuning for touch on the 12.3″ display. The start with Windows and the fixed full-screen window on
+the second screen came with stage 1.
 
 ---
 
