@@ -17,7 +17,9 @@ every train on the track diagram and sets the signals.
   card shows how long it has been waiting and how much of the hold time is left.
 - **The app works as before.** The Claude desktop app shows its own card at the same time, and whichever
   decides first counts. If nobody decides on the display within the hold time (60 s), the request goes
-  back to the app. If the hub is not running, Claude Code simply asks in the app.
+  back to the app. If the hub is not running, Claude Code simply asks in the app, without error messages.
+- **Questions stay in the app.** When Claude asks you something (multiple choice), the session shows
+  "waiting for you" and you answer in the app; allow or deny would not answer a question.
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else, needs a token for every hook request,
   opens no outgoing connections and loads nothing from the internet.
 - English and German, following the system language. One factor scales every size.
@@ -66,13 +68,14 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 | Denied | You tapped **Deny**; Claude is told "Denied via Stellwerk". |
 | Handed to the app | You tapped **In the app**; the app's card stays open. |
 | Time is up | Nobody decided within the hold time; the app's card stays open. |
-| Decided in the app | You answered in the app; the card goes with the session's next event. |
-| Cancelled | Claude Code dropped the request (Esc, rejected in the app, session ended). |
+| Decided in the app | You answered in the app: allowed, rejected or cancelled with Esc. The card goes at once. |
+| Cancelled | The session ended while the request was open. |
 
-Every request and its outcome goes into the audit log.
+Every request and its outcome goes into the audit log. For a request decided in the app, the hub only
+knows that it was answered there, not how; the tool's run (or its absence) shows in the session.
 
-Choosing "allow for this session" in the app switches the session to accepting edits, and later edits
-then need no permission at all, so no card appears for them.
+Once a file edit was allowed in the app, Claude Code may switch the session to accepting edits. Later
+edits then need no permission at all, so no card appears for them.
 
 ## The hooks
 

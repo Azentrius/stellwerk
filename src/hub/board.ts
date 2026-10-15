@@ -17,6 +17,12 @@ export const MAX_SESSIONS = 100;
 /** Notifications that mean the session waits for the user. */
 const WAITING_NOTIFICATIONS = new Set(['idle_prompt', 'agent_needs_input', 'elicitation_dialog']);
 
+/**
+ * Tools that ask the user something rather than ask for permission. They arrive as PermissionRequest, but
+ * allow or deny would not answer them, so they get no card: the session waits for the user in the app.
+ */
+export const QUESTION_TOOLS: ReadonlySet<string> = new Set(['AskUserQuestion']);
+
 const STATUS_ORDER: Record<SessionStatus, number> = { permission: 0, waiting: 1, working: 2, done: 3, ended: 4 };
 
 /** The status a session has apart from open requests. */
@@ -136,7 +142,12 @@ export class Board {
     return permission;
   }
 
-  /** Notes an event without changing the status, e.g. a request turned away because too many are open. */
+  /** A question to the user (see QUESTION_TOOLS): no card, the session waits for the answer in the app. */
+  askUser(event: PermissionRequestEvent, now: number): void {
+    this.touch(event, now).base = 'waiting';
+  }
+
+  /** Notes an event without changing the status. */
   touch(event: HookEvent, now: number): Session {
     this.lastEventAt = now;
     let session = this.sessions.get(event.session_id);
@@ -166,7 +177,8 @@ export class Board {
 
   /**
    * Settles an open request from outside: a decision on the display, the end of the hold time, or Claude
-   * Code closing the request. Returns false if it is unknown or already settled.
+   * Code closing the request because it was answered in the app. Returns false if it is unknown or
+   * already settled.
    */
   settle(id: string, outcome: PermissionOutcome, now: number): boolean {
     const permission = this.permissions.get(id);
@@ -178,8 +190,8 @@ export class Board {
       if (outcome === 'allowed' || outcome === 'denied') session.base = 'working';
       // The app's own card stays open and waits for the user.
       else if (outcome === 'handed-to-app' || outcome === 'timed-out') session.base = 'waiting';
-      // Cancelled or rejected in the app: nothing to do on the display.
-      else if (outcome === 'aborted') session.base = 'done';
+      // Answered in the app, by allowing, rejecting or cancelling. If the tool runs, PostToolUse says so.
+      else if (outcome === 'decided-in-app' || outcome === 'aborted') session.base = 'done';
     }
     return true;
   }

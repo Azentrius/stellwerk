@@ -118,6 +118,25 @@ describe('permission requests', () => {
     }
   });
 
+  test('a request closed by Claude Code (answered in the app) leaves the session done until its next event', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.addPermission('p1', request(), 2, HOLD);
+    board.settle('p1', 'decided-in-app', 3);
+    assert.equal(statusOf(board), 'done');
+    board.apply(event('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'git push origin main' } }), 4);
+    assert.equal(statusOf(board), 'working');
+  });
+
+  test('a question to the user gets no card; the session waits for the answer', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 2);
+    assert.equal(statusOf(board), 'waiting');
+    assert.equal(board.permissions.size, 0);
+    assert.equal(board.lastEventAt, 2);
+  });
+
   test('a request is settled once; later attempts and unknown ids return false', () => {
     const board = new Board();
     board.addPermission('p1', request(), 1, HOLD);
