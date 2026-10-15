@@ -16,6 +16,31 @@ import { startHub } from '../src/hub/hub.ts';
 const ROOT = path.join(import.meta.dirname, '..');
 const port = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) ?? 4781);
 const token = randomBytes(32).toString('hex');
+// A stand-in for api.github.com: the demo never goes to the network.
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+const fakeGitHub: Record<string, unknown> = {
+  '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'website' }],
+  '/repos/example/shop-api/pulls': [
+    { number: 41, title: 'Release 2.3', updated_at: hoursAgo(0.2), user: { login: 'dev' }, head: { sha: 'a'.repeat(40) } },
+    { number: 39, title: 'Bump zod from 4.1 to 4.2', updated_at: hoursAgo(5), user: { login: 'dependabot[bot]' }, head: { sha: 'b'.repeat(40) } },
+  ],
+  '/repos/example/website/pulls': [
+    { number: 12, title: 'New landing page', draft: true, updated_at: hoursAgo(1), user: { login: 'dev' }, head: { sha: 'c'.repeat(40) } },
+  ],
+};
+const runsFor: Record<string, unknown> = {
+  ['a'.repeat(40)]: [{ status: 'in_progress', conclusion: null }],
+  ['b'.repeat(40)]: [{ status: 'completed', conclusion: 'success' }],
+  ['c'.repeat(40)]: [{ status: 'completed', conclusion: 'failure' }],
+};
+const demoFetch = (async (input: string | URL | Request) => {
+  const url = new URL(String(input));
+  const body = url.pathname.endsWith('/actions/runs')
+    ? { workflow_runs: runsFor[url.searchParams.get('head_sha') ?? ''] ?? [] }
+    : fakeGitHub[url.pathname];
+  return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 });
+}) as typeof fetch;
+
 const hub = await startHub({
   port,
   token,
@@ -25,6 +50,7 @@ const hub = await startHub({
   auditFile: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-')), 'audit.jsonl'),
   uiRoot: path.join(ROOT, 'ui'),
   webRoot: path.join(ROOT, 'dist', 'ui'),
+  github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');

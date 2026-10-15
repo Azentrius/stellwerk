@@ -23,8 +23,11 @@ every train on the track diagram and sets the signals.
 - **What waits in the app.** When Claude asks you something (multiple choice), needs some input, or has
   a permission open in the app, the session is listed below the cards under "Answer in the app", with
   how long it has been waiting. You answer in the app; allow or deny would not answer a question.
-- **Local only.** The hub listens on `127.0.0.1` and nowhere else, needs a token for every hook request,
-  opens no outgoing connections and loads nothing from the internet.
+- **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
+  owner (all repositories) are listed too, each with the state of its Actions runs.
+- **Local only.** The hub listens on `127.0.0.1` and nowhere else and needs a token for every hook
+  request. The display loads nothing from the internet. The only connection the hub opens is to
+  `api.github.com`, and only once you set up a GitHub token.
 - English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
   one). One factor scales every size.
 
@@ -94,6 +97,39 @@ Node.js elsewhere or rearranging the screens. Stop or start a task in the Task S
 `schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
 its task. `stellwerk autostart uninstall` removes both tasks.
 
+## Open pull requests
+
+Optional. On github.com create a fine-grained personal access token (Settings › Developer settings ›
+Fine-grained tokens):
+
+- Resource owner: the user or organisation whose pull requests you want to see
+- Repository access: All repositories
+- Permissions: **Pull requests: Read** and **Actions: Read**, nothing else
+
+Then:
+
+```powershell
+stellwerk github token --owner Azentrius
+```
+
+It asks for the token without showing it, tries it once against `api.github.com` and keeps it, readable
+by your Windows user only, in `%LOCALAPPDATA%\stellwerk\github-token`; the owner goes into
+`config.json`. Only fine-grained tokens (`github_pat_…`) are accepted. Restart the hub afterwards.
+
+Every two minutes the hub then asks `api.github.com` for the owner's repositories (archived ones are
+left out), their open pull requests, and the Actions runs on each pull request's head commit:
+
+| Signal | Checks |
+|---|---|
+| green | all runs passed |
+| red | a run failed, timed out or was cancelled |
+| gold ring | runs still going, or waiting for approval |
+| grey | no runs |
+
+The status column says when the list was last brought up to date, or why that failed (token rejected,
+no access, not reachable). The token is never logged and never sent to the display.
+`stellwerk github remove` deletes it; the hub then opens no connection at all.
+
 ## How a permission request goes
 
 1. Claude Code wants to run a tool that needs your permission and sends the request to the hub.
@@ -150,6 +186,8 @@ session appears with its first event, which in the desktop app is the first prom
 | `sound` | A soft chime for each new request. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code. |
+| `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
+| `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
 
 Restart the hub after a change.
 
@@ -163,6 +201,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\debug-raw.jsonl` | Raw hook data, only in debug mode |
 | `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
 | `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |
+| `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
@@ -178,8 +217,10 @@ Restart the hub after a change.
 - Decisions travel only over the display's WebSocket. The hub checks `Host` and `Origin` (against
   DNS rebinding and foreign pages) and a token it puts into the page it serves.
 - Nothing is allowed automatically: no rules, no "always allow".
-- The hub starts no programs and opens no outgoing connections. The display loads only the hub's own
-  files under a strict Content Security Policy and shows hook data as text, never as HTML.
+- The hub starts no programs. Its only outgoing connection is to `api.github.com`, for the list of
+  pull requests, and only with a fine-grained read-only token you set up. The display loads only the
+  hub's own files under a strict Content Security Policy and shows hook data and pull request titles as
+  text, never as HTML.
 - Hook requests are limited to 1 MB, open requests to 20 at a time.
 
 Details and how to report a problem: [SECURITY.md](SECURITY.md).
@@ -203,6 +244,7 @@ If the console stays silent, Claude Code sends nothing: check that the hooks are
 
 ```powershell
 stellwerk autostart uninstall
+stellwerk github remove
 stellwerk hooks uninstall
 stellwerk uninstall          # as administrator: removes the firewall rule
 npm rm -g stellwerk          # if you used npm link

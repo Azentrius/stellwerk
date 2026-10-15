@@ -15,6 +15,7 @@ import type { Decision, DecisionResultMessage, PermissionOutcome, StateMessage }
 import { HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
+import { GitHubWatcher } from './github.ts';
 import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
 import { loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
@@ -48,6 +49,8 @@ export interface HubOptions {
   rawLogFile?: string | null;
   /** Debug: status hooks are never answered, as if the hub hung. */
   simulateHang?: boolean;
+  /** Open pull requests from GitHub; the only outgoing connection, and only with a token. */
+  github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -120,6 +123,10 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   const sweepTimer = setInterval(() => {
     if (board.sweep(now())) scheduleBroadcast();
   }, SWEEP_INTERVAL_MS);
+  const github = options.github
+    ? new GitHubWatcher({ ...options.github, now, onChange: () => scheduleBroadcast(), log })
+    : null;
+  github?.start();
 
   // ---------- HTTP ----------
 
@@ -327,7 +334,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       type: 'state',
       now: now(),
       ...board.view(),
+      pullRequests: github?.pullRequests ?? [],
       hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound },
+      github: github?.view() ?? null,
     };
   }
 
@@ -395,6 +404,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     async close() {
       closing = true;
       clearInterval(sweepTimer);
+      github?.stop();
       if (broadcastTimer) clearTimeout(broadcastTimer);
       // Whatever is still held goes back to the app's own card.
       for (const id of [...held.keys()]) finish(id, 'handed-to-app', 'hub stopped');

@@ -9,6 +9,7 @@ import { renderAgents } from './agents.ts';
 import { renderAnswers, waitingForAnswer } from './answers.ts';
 import { byId } from './dom.ts';
 import { pickTexts } from './i18n.ts';
+import { githubLine, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { ago, clock } from './time.ts';
 
@@ -36,6 +37,9 @@ const agentsEmpty = byId('agents-empty');
 const agentsCount = byId('agents-count');
 const answers = byId<HTMLUListElement>('answers');
 const answersSection = byId('answers-section');
+const pulls = byId<HTMLUListElement>('pulls');
+const pullsSection = byId('pulls-section');
+const githubState = byId('github-state');
 const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
@@ -105,9 +109,12 @@ function tick(): void {
   const due = waitingForAnswer(sessions);
   renderAnswers(answers, due, now, texts);
   answersSection.hidden = due.length === 0;
-  const waiting = queue.openCount() + due.length;
+  const open = state?.pullRequests ?? [];
+  renderPulls(pulls, open, now, texts);
+  pullsSection.hidden = open.length === 0;
+  const waiting = queue.openCount() + due.length + open.length;
   waitingCount.textContent = waiting > 0 ? `(${waiting})` : '';
-  const nothing = (state?.permissions.length ?? 0) === 0 && due.length === 0;
+  const nothing = (state?.permissions.length ?? 0) === 0 && due.length === 0 && open.length === 0;
   waitingEmpty.hidden = !nothing;
   waitingList.hidden = nothing;
   const below = waitingList.scrollHeight - waitingList.scrollTop - waitingList.clientHeight;
@@ -117,6 +124,10 @@ function tick(): void {
   hubState.classList.toggle('hub-state--down', !connected);
   const last = state?.hub.lastEventAt ?? null;
   lastEvent.textContent = last === null ? texts.noEvent : texts.lastEvent(ago(now - last, texts));
+  const line = githubLine(state?.github ?? null, now, texts);
+  githubState.hidden = line === null;
+  githubState.textContent = line?.text ?? '';
+  githubState.classList.toggle('github-state--problem', line?.problem ?? false);
 }
 
 function toast(text: string): void {

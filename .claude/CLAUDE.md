@@ -70,9 +70,10 @@ and sign the provenance, so it installs with `npm ci --ignore-scripts`. Every jo
 src/                       the hub and the command line (TypeScript, built to dist/)
   cli.ts                   stellwerk serve | hooks install/uninstall | install/uninstall
   config.ts                paths (%APPDATA%, %LOCALAPPDATA%), config.json, fixed address 127.0.0.1
-  token.ts                 the hook token: created once, readable by the current user only
+  token.ts                 the hook token and the GitHub token, readable by the current user only
   hub/hub.ts               HTTP endpoint, held requests, WebSocket, security checks
   hub/board.ts             the status model (pure): sessions, statuses, requests, what settles them
+  hub/github.ts            open pull requests and their Actions runs from api.github.com
   hub/hook-input.ts        zod schemas for the hook data; unknown fields are dropped
   hub/audit.ts             audit.jsonl
   hub/static-files.ts      the display's files, an explicit list read at start
@@ -130,9 +131,11 @@ screenshot is taken from it:
    in constant time and never logged, never put in URLs. Every rejection is reported on the console
    (`reject()` in `hub.ts`, throttled per reason), so a setup problem is visible.
 3. **No automatic decisions.** Only a person allows or denies: no rules, no "always allow".
-4. **The hub runs nothing.** It starts no programs and opens no outgoing connections. Only the setup
-   commands run `icacls`, `powershell`, `netsh` and `schtasks`, with fixed arguments, no shell, values on
-   stdin; PowerShell scripts go in with `-EncodedCommand`.
+4. **The hub runs nothing, and talks only to GitHub.** It starts no programs. Its one outgoing connection
+   is to `api.github.com` (`GITHUB_API` in `hub/github.ts`), only with a fine-grained read-only token,
+   without redirects, every answer checked with zod. Any other destination needs a decision and a review
+   first. Only the setup commands run `icacls`, `powershell`, `netsh` and `schtasks`, with fixed arguments,
+   no shell, values on stdin; PowerShell scripts go in with `-EncodedCommand`.
 5. **Claude Code never waits on Stellwerk.** Status hooks answer at once; held requests end by the hold
    time, which stays at least 10 s below the hook timeout. Never `onFailure: "block"`.
 6. **Display without network.** Only the hub's own files, strict CSP, no inline scripts or styles, no
@@ -166,6 +169,14 @@ screenshot is taken from it:
   app's card has no separate "for this session" option. Keep that in mind when testing.
 - `PermissionRequest` input: the common fields, `tool_name`, `tool_input`, `permission_suggestions`, and
   `mcp_server` for MCP tools; no `tool_use_id`.
+
+## Useful knowledge (GitHub)
+
+- Fine-grained tokens cannot get the "Checks" permission, so check runs are not readable. The state of a
+  pull request comes from the Actions runs on its head commit (`/actions/runs?head_sha=`), which needs
+  "Actions: Read"; code scanning's default setup and Dependabot show up there too.
+- `/orgs/{owner}/repos` answers 404 for a user; the watcher then asks `/users/{owner}/repos`.
+- `npm run demo` answers the hub's GitHub questions itself (a stand-in `fetch`), so it never goes online.
 
 ## Useful knowledge (start with Windows)
 

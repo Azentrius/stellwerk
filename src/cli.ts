@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { format, parseArgs } from 'node:util';
-import { HOST, defaultPaths, loadConfig, readJsonFile } from './config.ts';
+import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue } from './config.ts';
+import { GitHubWatcher, describeProblem } from './hub/github.ts';
 import { startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -42,7 +43,7 @@ import {
   setUserEnv,
   taskExists,
 } from './setup/windows.ts';
-import { ensureToken } from './token.ts';
+import { ensureToken, isGitHubToken, readGitHubToken, removeGitHubToken, saveGitHubToken } from './token.ts';
 
 /** hub.log is moved to hub.log.1 when it grows beyond this at a start. */
 const MAX_HUB_LOG_BYTES = 1024 * 1024;
@@ -73,6 +74,11 @@ Usage:
       or the one given) at logon, through two Task Scheduler tasks.
   stellwerk autostart uninstall [--yes]
       Remove these tasks.
+  stellwerk github token [--owner <name>]
+      Show the owner's open pull requests: asks for a read-only fine-grained token
+      (input hidden), tries it once against api.github.com and keeps it for the hub.
+  stellwerk github remove
+      Forget the GitHub token; the hub then opens no connection to GitHub.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -87,6 +93,7 @@ async function main(): Promise<void> {
       'simulate-hang': { type: 'boolean', default: false },
       'log-file': { type: 'string' },
       'exit-with-parent': { type: 'boolean', default: false },
+      owner: { type: 'string' },
       screen: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', default: false },
@@ -106,6 +113,7 @@ async function main(): Promise<void> {
   if (command === 'autostart' && (action === 'install' || action === 'uninstall')) {
     return autostart(action, values.yes, values.screen);
   }
+  if (command === 'github' && (action === 'token' || action === 'remove')) return githubToken(action, values.owner);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -121,6 +129,11 @@ async function serve(
   const config = loadConfig(paths.configFile);
   const { token, created } = ensureToken(paths.tokenFile);
   const rawLog = debugRaw || config.debugRawLog;
+  const githubToken = config.githubOwner ? readGitHubToken(paths.githubTokenFile) : null;
+  const github =
+    config.githubOwner && githubToken
+      ? { owner: config.githubOwner, token: githubToken, intervalMs: config.githubIntervalSeconds * 1000 }
+      : null;
   let hub;
   try {
     hub = await startHub({
@@ -134,6 +147,7 @@ async function serve(
       webRoot: path.join(ROOT, 'dist', 'ui'),
       rawLogFile: rawLog ? paths.rawLogFile : null,
       simulateHang,
+      github,
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
@@ -149,6 +163,11 @@ async function serve(
   if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
   if (rawLog) console.log(`Debug: raw hook data goes to ${paths.rawLogFile}. It holds prompts and code, delete it afterwards.`);
   if (simulateHang) console.log('Debug: status hooks are not answered (simulated hang).');
+  if (github) {
+    console.log(`Open pull requests of ${github.owner} from api.github.com, every ${config.githubIntervalSeconds} s.`);
+  } else if (config.githubOwner) {
+    console.log(`githubOwner is set, but there is no GitHub token. Run "stellwerk github token".`);
+  }
   console.log('Ctrl+C stops the hub.\n');
 
   const stop = () => void hub.close().then(() => process.exit(0));
@@ -280,6 +299,74 @@ async function autostart(action: 'install' | 'uninstall', yes: boolean, screenNu
   console.log(`  schtasks /Run /TN "${HUB_TASK}"`);
   console.log(`  schtasks /Run /TN "${DISPLAY_TASK}"`);
   console.log(`The hub's messages: ${paths.hubLogFile}`);
+}
+
+async function githubToken(action: 'token' | 'remove', owner: string | undefined): Promise<void> {
+  const paths = defaultPaths();
+  if (action === 'remove') {
+    console.log(removeGitHubToken(paths.githubTokenFile) ? 'GitHub token removed. Restart the hub.' : 'There is no GitHub token.');
+    return;
+  }
+  if (owner !== undefined && !GITHUB_OWNER.test(owner)) throw new Error(`"${owner}" is not a GitHub user or organisation name.`);
+  const config = loadConfig(paths.configFile);
+  const target = owner ?? config.githubOwner;
+  if (!target) throw new Error('Whose pull requests? Give the owner with --owner, e.g. --owner Azentrius.');
+
+  console.log(`A fine-grained token for ${target}: Repository access "All repositories",`);
+  console.log('permissions "Pull requests: Read" and "Actions: Read", nothing else.');
+  const token = (await readSecret('Paste the token (input stays hidden): ')).trim();
+  if (!isGitHubToken(token)) throw new Error('That is not a fine-grained GitHub token (it starts with "github_pat_"). Nothing saved.');
+
+  // One round before saving, so a wrong token or a missing permission shows now, not on the display.
+  const trial = new GitHubWatcher({ owner: target, token, intervalMs: 0 });
+  await trial.poll();
+  if (trial.problem) throw new Error(`GitHub: ${describeProblem(trial.problem)} Nothing saved.`);
+  const repos = new Set(trial.pullRequests.map((pr) => pr.repo)).size;
+  console.log(`Works: ${trial.pullRequests.length} open pull request(s) in ${repos} repositories of ${target}.`);
+
+  saveGitHubToken(paths.githubTokenFile, token);
+  if (owner && owner !== config.githubOwner) setConfigValue(paths.configFile, 'githubOwner', owner);
+  console.log(`Saved to ${paths.githubTokenFile} (readable by you only). Restart the hub to show the pull requests.`);
+}
+
+/** Reads a secret from the terminal without showing it; from standard input when there is no terminal. */
+async function readSecret(prompt: string): Promise<string> {
+  const stdin = process.stdin;
+  if (!stdin.isTTY) {
+    let text = '';
+    for await (const chunk of stdin) text += String(chunk);
+    return text.split(/\r?\n/)[0] ?? '';
+  }
+  process.stdout.write(prompt);
+  stdin.setRawMode(true);
+  stdin.setEncoding('utf8');
+  stdin.resume();
+  return new Promise((resolve, reject) => {
+    let value = '';
+    const done = () => {
+      stdin.off('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      process.stdout.write('\n');
+    };
+    const onData = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') {
+          done();
+          resolve(value);
+          return;
+        }
+        if (ch === '\u0003') {
+          done();
+          reject(new Error('Cancelled.'));
+          return;
+        }
+        if (ch === '\u007f' || ch === '\b') value = value.slice(0, -1);
+        else if (ch >= ' ') value += ch;
+      }
+    };
+    stdin.on('data', onData);
+  });
 }
 
 /** Copies everything the hub prints into a file as well, for the hub started at logon without a window. */

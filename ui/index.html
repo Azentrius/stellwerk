@@ -28,6 +28,10 @@
             <h3 class="section-title" id="answers-title" data-text="answersTitle"></h3>
             <ul class="answers__list" id="answers"></ul>
           </section>
+          <section class="pulls" id="pulls-section" aria-labelledby="pulls-title" hidden>
+            <h3 class="section-title" id="pulls-title" data-text="pullsTitle"></h3>
+            <ul class="pulls__list" id="pulls"></ul>
+          </section>
         </div>
         <div class="all-clear" id="waiting-empty" hidden>
           <span class="signal signal--working" aria-hidden="true"></span>
@@ -40,6 +44,7 @@
         <p class="clock" id="clock"></p>
         <p class="hub-state" id="hub-state"></p>
         <p class="last-event" id="last-event"></p>
+        <p class="github-state" id="github-state" hidden></p>
       </aside>
     </main>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>

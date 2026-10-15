@@ -59,6 +59,29 @@ export interface HubView {
   sound: boolean;
 }
 
+/** The Actions runs on a pull request's head commit, summed up. */
+export type ChecksState = 'passing' | 'failing' | 'pending' | 'none';
+
+export interface PullRequestView {
+  repo: string;
+  number: number;
+  title: string;
+  author: string;
+  draft: boolean;
+  updatedAt: number;
+  checks: ChecksState;
+}
+
+/** Why the last question to GitHub failed. */
+export type GitHubProblem = 'rejected' | 'forbidden' | 'not-found' | 'unreachable' | 'unexpected';
+
+export interface GitHubView {
+  owner: string;
+  /** When the list was last brought up to date; null before the first success. */
+  syncedAt: number | null;
+  problem: GitHubProblem | null;
+}
+
 export interface StateMessage {
   type: 'state';
   /** The hub's clock when it sent the message. */
@@ -66,7 +89,11 @@ export interface StateMessage {
   sessions: SessionView[];
   /** Open requests (oldest first), then the ones settled in the last few seconds. */
   permissions: PermissionView[];
+  /** Open pull requests, most recently updated first; empty without a GitHub token. */
+  pullRequests: PullRequestView[];
   hub: HubView;
+  /** Null when no GitHub token is set up. */
+  github: GitHubView | null;
 }
 
 export interface DecisionResultMessage {

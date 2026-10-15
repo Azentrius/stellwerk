@@ -24,6 +24,14 @@ the start with Windows, the release package and workflow. The acceptance tests p
 
 ---
 
+## In 0.2.0 – Four columns and open pull requests
+
+The display in four columns, full screen; sessions waiting for an answer in the app; the open pull
+requests of a GitHub owner with the state of their Actions runs. GitHub is the first data source outside
+the machine: read only, with a fine-grained token, nothing but `api.github.com`.
+
+---
+
 ## Stage 2 – System values and alerts
 
 CPU, memory and temperatures from LibreHardwareMonitor's web server (port 8085); server and app alerts

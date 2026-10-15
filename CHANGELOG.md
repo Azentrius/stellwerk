@@ -13,6 +13,10 @@ The display in four columns and truly full screen; what waits in the app is list
 - **Full screen:** the display started with Windows opens in Edge's kiosk mode, without title bar and
   over the taskbar. Run `stellwerk autostart install` again to switch an existing setup.
 - **Word mark:** "Stell" in the text colour, "werk" in gold and italic.
+- **Open pull requests:** with a fine-grained read-only token (`stellwerk github token --owner NAME`), the
+  open pull requests of all the owner's repositories are listed under "Waiting for you", each with the
+  state of its Actions runs; the status column says when the list was updated or why that failed. This
+  is the hub's only outgoing connection, to `api.github.com`, and it exists only with the token.
 
 ## 0.1.0 – 2026-10-15
 
