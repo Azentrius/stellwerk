@@ -15,6 +15,9 @@ hardware are shown too.
   over the taskbar. Run `stellwerk autostart install` again to switch an existing setup.
 - **Name and signature:** "Stellwerk." in the text colour with the word mark's dot in gold, nothing in
   italics; the Azentrius signature with the version at the foot of the status column.
+- **Own sign:** the favicon is Stellwerk's sign from the Azentrius design system, a semaphore signal
+  set to clear with the word mark's gold dot, gold on ink. It replaces the gold diamond on a grey mast.
+  The sign is a mark of Azentrius and not under the Apache License (see NOTICE).
 - **Azentrius design system:** every state carries its icon and a word: waiting for approval needs
   attention, waiting for you is a note, working, a connected hub and passed checks are good, failed
   checks, a disconnected hub and problems with GitHub or the hardware are errors, a temperature from 90 °C

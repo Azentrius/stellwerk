@@ -340,6 +340,7 @@ What comes next is in [ROADMAP.md](ROADMAP.md).
 Stellwerk is licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE). The fonts DM
 Sans, DM Serif Display and Red Hat Mono are licensed under the SIL Open Font License 1.1. The icons are
 Font Awesome Free 5.15.4 by Fonticons, Inc., taken over through `@patternfly/react-icons` 6.4.0 and
-licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)).
+licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)). The Stellwerk
+sign (`ui/icon.svg`) is a mark of Azentrius and is not licensed under the Apache License.
 
 Made by [Azentrius](https://azentrius.de).
