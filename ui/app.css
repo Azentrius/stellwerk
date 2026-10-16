@@ -189,6 +189,11 @@ button { font: inherit; }
 .entry--short .entry__details { flex: 1 1 0; }
 .entry--short .az-label { order: 1; }
 .entry--short .entry__time { order: 2; }
+/* The state as its icon alone (the checks of a pull request), in front of the name; its word is the
+   icon's name and tooltip. The place stays when there is no icon, so the names line up. */
+.entry__icon { flex: none; align-self: center; display: inline-flex; justify-content: center; inline-size: 1.2rem; color: var(--text-subtle); }
+.entry__icon--success { color: var(--status-success); }
+.entry__icon--danger { color: var(--status-danger); }
 .agent--ended .entry__name { color: var(--text-disabled); font-weight: 400; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 

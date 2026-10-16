@@ -1,6 +1,8 @@
 // The design system's language for states, as the display speaks it: five kinds, each with its fixed icon,
 // always with a word. A state never stands in colour alone, and gold is never a state. An error the user
-// can fix says how, below what happened.
+// can fix says how, below what happened. The one place without room for the word is the checks of a pull
+// request: there the icon stands alone and the word becomes its name and tooltip (`stateIcon`), so the
+// repository can be read.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -53,7 +55,10 @@ export function sessionState(status: SessionStatus, texts: Texts): State {
   return state(SESSION_TONE[status], texts.status[status], status === 'ended' ? 'ban' : null);
 }
 
-/** Passed is good, failed an error; running and no runs at all carry no judgement yet. */
+/**
+ * Passed is good, failed an error; running and no runs at all carry no judgement yet. Running has the
+ * hourglass, since the icon stands alone in the list; no runs leave the place empty.
+ */
 const CHECKS_TONE: Record<ChecksState, Tone> = {
   passing: 'success',
   failing: 'danger',
@@ -62,7 +67,7 @@ const CHECKS_TONE: Record<ChecksState, Tone> = {
 };
 
 export function checksState(checks: ChecksState, texts: Texts): State {
-  return state(CHECKS_TONE[checks], texts.checks[checks]);
+  return state(CHECKS_TONE[checks], texts.checks[checks], checks === 'pending' ? 'pending' : null);
 }
 
 /** Connected is good; disconnected is an error with a way to fix it. */
