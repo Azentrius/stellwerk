@@ -1,6 +1,6 @@
 # Roadmap
 
-As of 2026-10-15. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
+As of 2026-10-16. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
 until they are decided.
 
 **Guardrails for every stage** (they keep applying):
@@ -24,13 +24,14 @@ the start with Windows, the release package and workflow. The acceptance tests p
 
 ---
 
-## In 0.2.0 – Four columns, open pull requests, hardware
+## 0.2.0 – Four columns, open pull requests, hardware ✅
 
-The display in four columns, full screen; sessions waiting for an answer in the app; the open pull
-requests of a GitHub owner with the state of their Actions runs. GitHub is the first data source outside
-the machine: read only, with a fine-grained token, nothing but `api.github.com`. Processor, graphics card
-and memory from LibreHardwareMonitor, which `stellwerk hardware install` sets up (the first part of
-stage 2).
+Done in 0.2.0 (see [CHANGELOG](CHANGELOG.md)): the display in four columns, full screen, in the Azentrius
+design system, with errors that say how to fix them; sessions waiting for an answer in the app; the open
+pull requests of a GitHub owner with the state of their Actions runs. GitHub is the first data source
+outside the machine: read only, with a fine-grained token, nothing but `api.github.com`. Processor,
+graphics card and memory from LibreHardwareMonitor, which `stellwerk hardware install` sets up (the first
+part of stage 2). Allowing and denying by touch were checked on the real 12.3″ display.
 
 ---
 
