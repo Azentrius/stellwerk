@@ -20,12 +20,12 @@ const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 // A stand-in for api.github.com: the demo goes to no network and to no LibreHardwareMonitor.
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const fakeGitHub: Record<string, unknown> = {
-  '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'website' }],
+  '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'customer-portal-frontend' }],
   '/repos/example/shop-api/pulls': [
     { number: 41, title: 'Release 2.3', updated_at: hoursAgo(0.2), user: { login: 'dev' }, head: { sha: 'a'.repeat(40) } },
     { number: 39, title: 'Bump zod from 4.1 to 4.2', updated_at: hoursAgo(5), user: { login: 'dependabot[bot]' }, head: { sha: 'b'.repeat(40) } },
   ],
-  '/repos/example/website/pulls': [
+  '/repos/example/customer-portal-frontend/pulls': [
     { number: 12, title: 'New landing page', draft: true, updated_at: hoursAgo(1), user: { login: 'dev' }, head: { sha: 'c'.repeat(40) } },
   ],
 };

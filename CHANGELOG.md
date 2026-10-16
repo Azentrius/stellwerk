@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 – not released yet
+
+More room for the repository in the list of open pull requests.
+
+- **Checks as an icon:** the state of a pull request's checks stands as its icon alone, in front of the
+  title: passed, failed, or the hourglass while they run; no checks leave the place empty. The word stays
+  as the icon's tooltip and its name for screen readers. The room goes to repository, number and author.
+  The hourglass is PatternFly's own icon under the MIT License (see NOTICE).
+
 ## 0.2.0 – 2026-10-16
 
 The display in four columns and truly full screen; what waits in the app, open pull requests and the

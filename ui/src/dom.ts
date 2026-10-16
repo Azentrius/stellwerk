@@ -41,6 +41,19 @@ export function label(state: State): HTMLSpanElement {
   return node;
 }
 
+/**
+ * A state as its icon alone, where a list has no room for the word: the word stays as the icon's name for
+ * screen readers and as its tooltip. A state without an icon keeps the place, empty.
+ */
+export function stateIcon(state: State): HTMLSpanElement {
+  const node = el('span', `entry__icon entry__icon--${state.tone}`);
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', state.text);
+  node.title = state.text;
+  if (state.icon) node.append(icon(state.icon));
+  return node;
+}
+
 /** An error as the design system's alert: what happened as its title, how to fix it below. */
 export function alert(problem: Problem): HTMLDivElement {
   const node = el('div', 'az-alert az-alert--danger');
@@ -55,14 +68,24 @@ export function alert(problem: Problem): HTMLDivElement {
 
 /**
  * An entry of the agents, answers and pull request lists: the name in bold and a time on top, the details
- * and the state below. With `entry--short` the stylesheet puts it all in one line.
+ * and the state below. With `entry--short` the stylesheet puts it all in one line. With `iconOnly` the
+ * state is only its icon, in front of the name.
  */
-export function entry(className: string, name: string, time: string, details: string, state: State): HTMLLIElement {
+export function entry(
+  className: string,
+  name: string,
+  time: string,
+  details: string,
+  state: State,
+  { iconOnly = false } = {},
+): HTMLLIElement {
   const item = el('li', `entry ${className}`);
   const top = el('span', 'entry__line');
   top.append(el('span', 'entry__name', name), el('span', 'entry__time', time));
   const bottom = el('span', 'entry__line');
-  bottom.append(el('span', 'entry__details', details), label(state));
+  bottom.append(el('span', 'entry__details', details));
+  if (iconOnly) item.append(stateIcon(state));
+  else bottom.append(label(state));
   item.append(top, bottom);
   return item;
 }

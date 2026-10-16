@@ -120,14 +120,16 @@ by your Windows user only, in `%LOCALAPPDATA%\stellwerk\github-token`; the owner
 `config.json`. Only fine-grained tokens (`github_pat_…`) are accepted. Restart the hub afterwards.
 
 Every two minutes the hub then asks `api.github.com` for the owner's repositories (archived ones are
-left out), their open pull requests, and the Actions runs on each pull request's head commit:
+left out), their open pull requests, and the Actions runs on each pull request's head commit. Each pull
+request is one line; the icon in front of its title stands for its checks (its word is the tooltip and
+the name a screen reader reads), so repository, number and author have room:
 
-| State | Checks |
+| Icon | Checks |
 |---|---|
-| Checks passed (green, with a check mark) | all runs passed |
-| Checks failed (red, with an exclamation mark) | a run failed, timed out or was cancelled |
-| Checks running (grey) | runs still going, or waiting for approval |
-| No checks (grey) | no runs |
+| green check mark: passed | all runs passed |
+| red exclamation mark: failed | a run failed, timed out or was cancelled |
+| grey hourglass: running | runs still going, or waiting for approval |
+| none | no runs |
 
 The status column says when the list was last brought up to date, or why that failed (token rejected,
 no access, not reachable) and how to fix it. The token is never logged and never sent to the display.

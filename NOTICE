@@ -21,7 +21,12 @@ Red Hat Mono (ui/static/fonts/RedHatMono/RedHatMonoVF.woff2: RedHatMono-VF.woff2
   Copyright 2021 The Red Hat Project Authors (https://github.com/RedHatOfficial/RedHatFont)
   SIL Open Font License 1.1, see ui/static/fonts/RedHatMono/OFL.txt
 
-Icons (ui/src/icons.ts, built to dist/ui/icons.js): Font Awesome Free 5.15.4 (Solid) by
+Icons except "pending" (ui/src/icons.ts, built to dist/ui/icons.js): Font Awesome Free 5.15.4 (Solid) by
   Fonticons, Inc. (https://fontawesome.com), as shipped in @patternfly/react-icons 6.4.0
   (Red Hat, Inc.); the path data is unchanged.
   Creative Commons Attribution 4.0 International, see ui/CC-BY-4.0-Font-Awesome.txt
+
+Icon "pending" (ui/src/icons.ts, built to dist/ui/icons.js): PatternFly's own icon from
+  @patternfly/react-icons 6.4.0; the path data is unchanged.
+  Copyright (c) 2019 Red Hat, Inc.
+  MIT License, see ui/MIT-PatternFly-Icons.txt

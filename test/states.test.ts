@@ -25,7 +25,7 @@ function assertSpoken(s: State): void {
   assert.ok(s.text.trim().length > 0, 'every state has a word');
   assert.equal(s.text[0], s.text[0]!.toUpperCase(), `a label starts with a capital: ${s.text}`);
   if (s.tone === 'neutral') {
-    assert.ok(s.icon === null || s.icon === 'ban', `neutral states go without an icon or with ban: ${s.icon}`);
+    assert.ok(s.icon === null || s.icon === 'ban' || s.icon === 'pending', `neutral states go without an icon, with ban or pending: ${s.icon}`);
   } else {
     assert.equal(s.icon, FIXED_ICON[s.tone], `${s.tone} has its fixed icon`);
   }
@@ -43,6 +43,14 @@ test('sessions: waiting for approval needs attention, waiting for you is a note,
 test('checks of a pull request: passed is good, failed an error, running and none without judgement', () => {
   const tones = Object.fromEntries(CHECKS.map((checks) => [checks, checksState(checks, en).tone]));
   assert.deepEqual(tones, { passing: 'success', failing: 'danger', pending: 'neutral', none: 'neutral' });
+});
+
+test('checks stand as an icon alone in the list: each but "none" has one, and the word stays', () => {
+  const icons = Object.fromEntries(CHECKS.map((checks) => [checks, checksState(checks, en).icon]));
+  assert.deepEqual(icons, { passing: 'check-circle', failing: 'exclamation-circle', pending: 'pending', none: null });
+  for (const texts of languages) {
+    for (const checks of CHECKS) assert.ok(checksState(checks, texts).text.length > 0, 'the word becomes the icon\'s name');
+  }
 });
 
 test('the hub: connected is good, disconnected an error that says how to fix it', () => {

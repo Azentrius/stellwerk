@@ -1,6 +1,6 @@
-// Open pull requests of the configured owner, one line each: the title, repository and number, author and
-// draft, the state of its Actions runs (passed, failed, running, none), and how long ago it was updated.
-// Most recently updated first (the hub sorts them).
+// Open pull requests of the configured owner, one line each: the state of its Actions runs as an icon
+// (passed, failed, running; none leaves the place empty), the title, repository and number, author and
+// draft, and how long ago it was updated. Most recently updated first (the hub sorts them).
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,7 +15,9 @@ export function renderPulls(list: HTMLElement, pulls: PullRequestView[], now: nu
     ...pulls.map((pr) => {
       const author = pr.author.replace(/\[bot\]$/, '');
       const details = [`${pr.repo} #${pr.number}`, author, pr.draft ? texts.draft : ''].filter(Boolean).join(' · ');
-      return entry('pull entry--short', pr.title, ago(now - pr.updatedAt, texts), details, checksState(pr.checks, texts));
+      return entry('pull entry--short', pr.title, ago(now - pr.updatedAt, texts), details, checksState(pr.checks, texts), {
+        iconOnly: true,
+      });
     }),
   );
 }
