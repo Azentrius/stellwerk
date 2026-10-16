@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 – not released yet
+## 0.2.0 – 2026-10-16
 
 The display in four columns and truly full screen; what waits in the app, open pull requests and the
 hardware are shown too.
