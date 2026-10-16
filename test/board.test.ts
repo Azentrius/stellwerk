@@ -8,7 +8,9 @@ import {
   Board,
   ENDED_VISIBLE_MS,
   IDLE_FORGET_MS,
+  MAX_QUESTION,
   SETTLED_VISIBLE_MS,
+  WRAP_UP_TOOL,
   canonicalJson,
   projectName,
 } from '../src/hub/board.ts';
@@ -267,6 +269,16 @@ describe('what a waiting session waits for', () => {
     assert.equal(waiting(board).waitingFor, 'permission', 'a request the hub never saw');
   });
 
+  test('a question asked with AskUserQuestion is kept for the display while it waits', () => {
+    const board = new Board();
+    board.askUser(request({ questions: [{ question: '  Which   contrast level? ', options: [] }] }, { tool_name: 'AskUserQuestion' }), 1);
+    assert.equal(board.view().sessions[0]?.question, 'Which contrast level?');
+    board.apply(event('PostToolUse', { tool_name: 'AskUserQuestion', tool_input: {} }), 2);
+    assert.equal(board.view().sessions[0]?.question, null, 'answered');
+    board.askUser(request({ questions: 'not a list' }, { tool_name: 'AskUserQuestion' }), 3);
+    assert.deepEqual([waiting(board).waitingFor, board.view().sessions[0]?.question], ['question', null]);
+  });
+
   test('mere idleness does not replace a question', () => {
     const board = new Board();
     board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 1);
@@ -285,6 +297,63 @@ describe('what a waiting session waits for', () => {
     board.apply(event('Notification', { notification_type: 'idle_prompt' }), 1);
     board.addPermission('p1', request(), 2, HOLD);
     assert.deepEqual(waiting(board), { status: 'permission', waitingFor: null, waitingSince: null });
+  });
+});
+
+describe("the app's box at the end of a turn", () => {
+  const wrapUp = (input: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+    event('PostToolUse', { tool_name: WRAP_UP_TOOL, tool_input: { recap: 'Done with the first host.', ...input }, ...extra });
+  const session = (board: Board) => {
+    const s = board.view().sessions[0];
+    return { status: s?.status, waitingFor: s?.waitingFor, waitingSince: s?.waitingSince, question: s?.question };
+  };
+
+  test('with a question, the Stop that ends the turn makes the session wait for the answer', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.apply(wrapUp({ ask: 'Set up the other two hosts the same way?', blocked: true, actions: [{ label: 'Yes', message: 'Yes' }] }), 2);
+    assert.equal(session(board).status, 'working', 'the turn is not over yet');
+    board.apply(event('Stop'), 3);
+    assert.deepEqual(session(board), { status: 'waiting', waitingFor: 'question', waitingSince: 3, question: 'Set up the other two hosts the same way?' });
+    board.apply(event('Notification', { notification_type: 'idle_prompt' }), 4);
+    assert.equal(session(board).waitingFor, 'question', 'idleness does not replace it');
+    board.apply(event('UserPromptSubmit'), 5);
+    assert.deepEqual(session(board), { status: 'working', waitingFor: null, waitingSince: null, question: null });
+    board.apply(event('Stop'), 6);
+    assert.equal(session(board).status, 'done', 'the next turn without a box is done again');
+  });
+
+  test('blocked without a question waits for input; neither means done', () => {
+    const board = new Board();
+    board.apply(wrapUp({ blocked: true, ask: '   ' }), 1);
+    board.apply(event('Stop'), 2);
+    assert.deepEqual(session(board), { status: 'waiting', waitingFor: 'input', waitingSince: 2, question: null });
+    board.apply(event('UserPromptSubmit'), 3);
+    board.apply(wrapUp({ blocked: false }), 4);
+    board.apply(event('Stop'), 5);
+    assert.equal(session(board).status, 'done');
+  });
+
+  test('a long question is cut; a box from a subagent or a failed one does not count', () => {
+    const board = new Board();
+    board.apply(wrapUp({ ask: 'x'.repeat(MAX_QUESTION + 50) }), 1);
+    board.apply(event('Stop'), 2);
+    assert.equal(session(board).question, `${'x'.repeat(MAX_QUESTION)}…`);
+
+    for (const other of [wrapUp({ ask: 'Really?' }, { agent_id: 'a1' }), event('PostToolUseFailure', { tool_name: WRAP_UP_TOOL, tool_input: { ask: 'Really?' } })]) {
+      const b = new Board();
+      b.apply(other, 1);
+      b.apply(event('Stop'), 2);
+      assert.equal(session(b).status, 'done');
+    }
+  });
+
+  test('a session that ends forgets the question', () => {
+    const board = new Board();
+    board.apply(wrapUp({ ask: 'Go on?' }), 1);
+    board.apply(event('SessionEnd'), 2);
+    board.apply(event('Stop'), 3);
+    assert.equal(session(board).status, 'done');
   });
 });
 

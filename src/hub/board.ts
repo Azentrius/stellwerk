@@ -28,6 +28,15 @@ const WAITING_NOTIFICATIONS: Readonly<Record<string, WaitingFor>> = {
  */
 export const QUESTION_TOOLS: ReadonlySet<string> = new Set(['AskUserQuestion']);
 
+/**
+ * The desktop app's box at the end of a turn: a recap, often a question (`ask`) with answers to tap, and
+ * whether the session is `blocked` on the user. It ends the turn, so a Stop follows; with a question the
+ * session then waits for the user instead of being done.
+ */
+export const WRAP_UP_TOOL = 'mcp__ccd_turn__wrap_up';
+/** A question longer than this is cut; the display shows it in one line anyway. */
+export const MAX_QUESTION = 300;
+
 const STATUS_ORDER: Record<SessionStatus, number> = { permission: 0, waiting: 1, working: 2, done: 3, ended: 4 };
 
 /** The status a session has apart from open requests. */
@@ -41,6 +50,10 @@ interface Session {
   /** While base is 'waiting': what for, and since when. */
   waitingFor: WaitingFor | null;
   waitingSince: number | null;
+  /** While waiting for an answer: the question, if known. */
+  question: string | null;
+  /** The end-of-turn box asked something; the Stop that follows makes the session wait. */
+  wrapUp: { reason: 'question' | 'input'; question: string | null } | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
   subagents: Set<string>;
   lastActivity: number;
@@ -52,14 +65,31 @@ function setStatus(session: Session, base: Exclude<BaseStatus, 'waiting'>): void
   session.base = base;
   session.waitingFor = null;
   session.waitingSince = null;
+  session.question = null;
 }
 
 /** The session waits for the user. Mere idleness never replaces a question, an input or a permission. */
-function waitFor(session: Session, reason: WaitingFor, now: number): void {
+function waitFor(session: Session, reason: WaitingFor, now: number, question: string | null = null): void {
   if (reason === 'idle' && session.base === 'waiting' && session.waitingFor !== null && session.waitingFor !== 'idle') return;
   if (session.base !== 'waiting' || session.waitingFor !== reason) session.waitingSince = now;
   session.base = 'waiting';
   session.waitingFor = reason;
+  session.question = reason === 'question' ? question : null;
+}
+
+/** A question as text for the display: trimmed, cut to MAX_QUESTION, null when there is none. */
+function questionText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim().replace(/\s+/g, ' ');
+  if (text === '') return null;
+  return text.length > MAX_QUESTION ? `${text.slice(0, MAX_QUESTION)}…` : text;
+}
+
+/** What the end-of-turn box waits for: an answer to its question, some input, or nothing. */
+function wrapUpOf(input: Record<string, unknown> | undefined): Session['wrapUp'] {
+  const question = questionText(input?.ask);
+  if (question !== null) return { reason: 'question', question };
+  return input?.blocked === true ? { reason: 'input', question: null } : null;
 }
 
 export interface Permission {
@@ -99,16 +129,25 @@ export class Board {
       case 'UserPromptSubmit':
         // A new prompt: whatever the main agent asked before was answered in the app.
         setStatus(session, 'working');
+        session.wrapUp = null;
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === null, 'decided-in-app', now);
 
-      case 'Stop':
-        setStatus(session, 'done');
+      case 'Stop': {
+        // A turn that ended with a question in the app's box waits for the answer; otherwise it is done.
+        const wrapUp = session.wrapUp;
+        session.wrapUp = null;
+        if (wrapUp) waitFor(session, wrapUp.reason, now, wrapUp.question);
+        else setStatus(session, 'done');
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === null, 'decided-in-app', now);
+      }
 
       case 'PostToolUse':
       case 'PostToolUseFailure': {
         // The tool ran, so a matching open request was allowed in the app (and a question answered).
         setStatus(session, 'working');
+        if (event.hook_event_name === 'PostToolUse' && event.tool_name === WRAP_UP_TOOL && agentId === null) {
+          session.wrapUp = wrapUpOf(event.tool_input);
+        }
         const candidates = this.pendingOf(session.id).filter((p) => p.agentId === agentId && p.tool === event.tool_name);
         const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
         const match =
@@ -139,6 +178,7 @@ export class Board {
         setStatus(session, 'ended');
         session.endedAt = now;
         session.subagents.clear();
+        session.wrapUp = null;
         return this.settleWhere((p) => p.sessionId === session.id, 'aborted', now);
 
       default:
@@ -170,7 +210,10 @@ export class Board {
 
   /** A question to the user (see QUESTION_TOOLS): no card, the session waits for the answer in the app. */
   askUser(event: PermissionRequestEvent, now: number): void {
-    waitFor(this.touch(event, now), 'question', now);
+    const questions = event.tool_input.questions;
+    const first: unknown = Array.isArray(questions) ? questions[0] : undefined;
+    const question = typeof first === 'object' && first !== null ? questionText((first as Record<string, unknown>).question) : null;
+    waitFor(this.touch(event, now), 'question', now, question);
   }
 
   /** Notes an event without changing the status. */
@@ -186,6 +229,8 @@ export class Board {
         base: 'done',
         waitingFor: null,
         waitingSince: null,
+        question: null,
+        wrapUp: null,
         subagents: new Set(),
         lastActivity: now,
         endedAt: null,
@@ -260,6 +305,7 @@ export class Board {
         status: this.statusOf(s),
         waitingFor: this.statusOf(s) === 'waiting' ? s.waitingFor : null,
         waitingSince: this.statusOf(s) === 'waiting' ? s.waitingSince : null,
+        question: this.statusOf(s) === 'waiting' ? s.question : null,
         subagents: s.subagents.size,
         lastActivity: s.lastActivity,
         endedAt: s.endedAt,
