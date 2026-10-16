@@ -205,6 +205,12 @@ button { font: inherit; }
 .clock { font-size: 3.4rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .col--status .az-label { white-space: normal; }
 .last-event, .github-state, .hardware-state { color: var(--text-subtle); }
+/* An error says what happened and how to fix it (az-alert), in the display's text size; a little tighter
+   than usual, so that two of them fit in the narrow column. */
+.col--status .az-alert { gap: var(--sp-xs) var(--sp-sm); padding: var(--sp-sm); }
+.col--status .az-alert__icon { font-size: 1rem; line-height: 1.35; }
+.col--status .az-alert__title { font-size: 1rem; }
+.col--status .az-alert code { font-family: var(--font-mono); font-size: 1rem; }
 
 /* Hardware at the foot of the status column: label, load bar and percent, temperature. */
 .hardware { margin-block-start: auto; }

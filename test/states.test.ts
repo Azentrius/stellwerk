@@ -45,16 +45,21 @@ test('checks of a pull request: passed is good, failed an error, running and non
   assert.deepEqual(tones, { passing: 'success', failing: 'danger', pending: 'neutral', none: 'neutral' });
 });
 
-test('the hub: connected is good, disconnected an error', () => {
+test('the hub: connected is good, disconnected an error that says how to fix it', () => {
   assert.deepEqual(hubState(true, en), { tone: 'success', icon: 'check-circle', text: 'Hub connected' });
-  assert.deepEqual(hubState(false, en), { tone: 'danger', icon: 'exclamation-circle', text: 'Hub disconnected, reconnecting' });
+  assert.deepEqual(hubState(false, en), {
+    title: 'Hub disconnected, reconnecting',
+    fix: 'If it does not come back, start the task "Stellwerk hub" and reload the display.',
+  });
 });
 
 test('every state in both languages has its icon and a word, never colour alone', () => {
   for (const texts of languages) {
     for (const status of STATUSES) assertSpoken(sessionState(status, texts));
     for (const checks of CHECKS) assertSpoken(checksState(checks, texts));
-    for (const connected of [true, false]) assertSpoken(hubState(connected, texts));
+    const connected = hubState(true, texts);
+    assert.ok('tone' in connected);
+    assertSpoken(connected);
     for (const reason of Object.values(texts.waitingFor)) assertSpoken(state('info', reason));
   }
 });

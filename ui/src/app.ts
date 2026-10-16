@@ -8,13 +8,13 @@
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { renderAgents } from './agents.ts';
 import { renderAnswers, waitingForAnswer } from './answers.ts';
-import { byId, icon, label } from './dom.ts';
-import { hardwareLine, renderHardware } from './hardware.ts';
+import { alert, byId, icon, label } from './dom.ts';
+import { renderHardware } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
-import { githubLine, renderPulls } from './pulls.ts';
+import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { shouldReload } from './reload.ts';
-import { hubState, state as labelState, type State } from './states.ts';
+import { githubLine, hardwareLine, hubState, type Problem, type State } from './states.ts';
 import { ago, clock } from './time.ts';
 
 const WS_PROTOCOL = 'stellwerk.v1';
@@ -151,23 +151,29 @@ function tick(): void {
   show(hubNode, hubState(connected, texts));
   const last = state?.hub.lastEventAt ?? null;
   lastEvent.textContent = last === null ? texts.noEvent : texts.lastEvent(ago(now - last, texts));
-  const line = githubLine(state?.github ?? null, now, texts);
+  // While the hub is away, its last problems with GitHub and the hardware are old news: only its own
+  // alert shows.
+  const current = <T>(line: T): T | null => (connected || typeof line === 'string' ? line : null);
+  const line = current(githubLine(state?.github ?? null, now, texts));
   githubState.hidden = line === null;
-  if (line) show(githubState, line.problem ? labelState('danger', line.text) : line.text);
+  if (line) show(githubState, line);
   const hardware = state?.hardware ?? null;
   hardwareSection.hidden = hardware === null;
   renderHardware(gauges, hardware, texts);
-  const hardwareNote = hardwareLine(hardware, texts);
+  const hardwareNote = current(hardwareLine(hardware, texts));
   hardwareState.hidden = hardwareNote === null;
-  if (hardwareNote) show(hardwareState, hardwareNote.problem ? labelState('danger', hardwareNote.text) : hardwareNote.text);
+  if (hardwareNote) show(hardwareState, hardwareNote);
 }
 
-/** Puts plain text or a state (as a label with its icon) into a line of the status column, when it changed. */
-function show(node: HTMLElement, content: State | string): void {
-  const key = typeof content === 'string' ? content : `${content.tone}:${content.text}`;
+/**
+ * Puts plain text, a state (as a label with its icon) or a problem (as an alert that says how to fix it)
+ * into a line of the status column, when it changed.
+ */
+function show(node: HTMLElement, content: string | State | Problem): void {
+  const key = JSON.stringify(content);
   if (node.dataset.shown === key) return;
   node.dataset.shown = key;
-  node.replaceChildren(typeof content === 'string' ? content : label(content));
+  node.replaceChildren(typeof content === 'string' ? content : 'fix' in content ? alert(content) : label(content));
 }
 
 function toast(text: string): void {

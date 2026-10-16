@@ -21,13 +21,6 @@ export function renderHardware(list: HTMLElement, hardware: HardwareView | null,
   list.replaceChildren(...rows);
 }
 
-/** The line below the rows: asking, or why there are no values. Null when the values are there. */
-export function hardwareLine(hardware: HardwareView | null, texts: Texts): { text: string; problem: boolean } | null {
-  if (!hardware || hardware.values) return null;
-  if (hardware.problem) return { text: texts.hardware.problem[hardware.problem], problem: true };
-  return { text: texts.hardware.asking, problem: false };
-}
-
 export function isHot(gauge: Gauge): boolean {
   return gauge.temperature !== null && gauge.temperature >= HOT_CELSIUS;
 }

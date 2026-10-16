@@ -130,7 +130,7 @@ left out), their open pull requests, and the Actions runs on each pull request's
 | No checks (grey) | no runs |
 
 The status column says when the list was last brought up to date, or why that failed (token rejected,
-no access, not reachable). The token is never logged and never sent to the display.
+no access, not reachable) and how to fix it. The token is never logged and never sent to the display.
 `stellwerk github remove` deletes it; the hub then opens no connection to GitHub.
 
 ## Hardware values
@@ -164,8 +164,9 @@ reads from LibreHardwareMonitor's settings, and shows at the foot of the status 
 | GPU | load and temperature of the graphics card; a separate card before the one built in |
 | RAM | memory in use, in percent and GB |
 
-From 90 °C on a temperature is marked with the warning triangle. Processor temperatures need the
-[PawnIO](https://pawnio.eu/) driver, which you install yourself; without it the row shows the load only.
+From 90 °C on a temperature is marked with the warning triangle. If the values cannot be read, the status
+column says why and how to fix it. Processor temperatures need the [PawnIO](https://pawnio.eu/) driver,
+which you install yourself; without it the row shows the load only.
 
 The password matters: LibreHardwareMonitor's web server can also set fan speeds and answers any web
 page in a browser on this machine. With the password, a page can neither read the values nor change
