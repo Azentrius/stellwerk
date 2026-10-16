@@ -51,6 +51,9 @@ export interface Texts {
   file: string;
   change: string;
   changes: (n: number) => string;
+  /** The old and the new text of a change. */
+  before: string;
+  after: string;
   content: string;
   replaceAll: string;
   server: string;
@@ -68,11 +71,11 @@ const en: Texts = {
   allClear: 'All signals clear.',
   noSessions: 'No session reported yet.',
   status: {
-    permission: 'waiting for approval',
-    waiting: 'waiting for you',
-    working: 'working',
-    done: 'done',
-    ended: 'ended',
+    permission: 'Waiting for approval',
+    waiting: 'Waiting for you',
+    working: 'Working',
+    done: 'Done',
+    ended: 'Ended',
   },
   waitingFor: {
     question: 'Question',
@@ -82,7 +85,7 @@ const en: Texts = {
   since: (d) => `for ${d}`,
   pullsTitle: 'Open pull requests',
   draft: 'draft',
-  checks: { passing: 'checks passed', failing: 'checks failed', pending: 'checks running', none: 'no checks' },
+  checks: { passing: 'Checks passed', failing: 'Checks failed', pending: 'Checks running', none: 'No checks' },
   github: {
     asking: 'GitHub: asking',
     synced: (ago) => `GitHub: updated ${ago}`,
@@ -129,6 +132,8 @@ const en: Texts = {
   file: 'File',
   change: 'Change',
   changes: (n) => (n === 1 ? '1 change' : `${n} changes`),
+  before: 'Before',
+  after: 'After',
   content: 'Content',
   replaceAll: 'replaces every occurrence',
   server: 'Server',
@@ -146,21 +151,21 @@ const de: Texts = {
   allClear: 'Alle Signale auf Fahrt.',
   noSessions: 'Noch keine Sitzung gemeldet.',
   status: {
-    permission: 'wartet auf Freigabe',
-    waiting: 'wartet auf dich',
-    working: 'arbeitet',
-    done: 'fertig',
-    ended: 'beendet',
+    permission: 'Wartet auf Freigabe',
+    waiting: 'Wartet auf dich',
+    working: 'Arbeitet',
+    done: 'Fertig',
+    ended: 'Beendet',
   },
   waitingFor: {
     question: 'Rückfrage',
-    input: 'braucht eine Eingabe',
+    input: 'Braucht eine Eingabe',
     permission: 'Freigabe',
   },
   since: (d) => `seit ${d}`,
   pullsTitle: 'Offene Pull Requests',
   draft: 'Entwurf',
-  checks: { passing: 'Checks grün', failing: 'Checks rot', pending: 'Checks laufen', none: 'keine Checks' },
+  checks: { passing: 'Checks bestanden', failing: 'Checks fehlgeschlagen', pending: 'Checks laufen', none: 'Keine Checks' },
   github: {
     asking: 'GitHub: wird abgefragt',
     synced: (ago) => `GitHub: aktualisiert ${ago}`,
@@ -207,6 +212,8 @@ const de: Texts = {
   file: 'Datei',
   change: 'Änderung',
   changes: (n) => (n === 1 ? '1 Änderung' : `${n} Änderungen`),
+  before: 'Vorher',
+  after: 'Nachher',
   content: 'Inhalt',
   replaceAll: 'ersetzt jedes Vorkommen',
   server: 'Server',

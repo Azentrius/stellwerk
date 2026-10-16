@@ -140,6 +140,8 @@ describe('the package', { skip: BUILT ? false : 'run "npm run build" first' }, (
       'ui/app.css',
       'ui/azentrius.css',
       'ui/OFL.txt',
+      'ui/CC-BY-4.0-Font-Awesome.txt',
+      'dist/ui/icons.js',
       'ui/static/fonts/RedHatMono/RedHatMonoVF.woff2',
       'ui/static/fonts/RedHatMono/OFL.txt',
     ]) {

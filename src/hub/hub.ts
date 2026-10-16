@@ -41,6 +41,8 @@ export interface HubOptions {
   token: string;
   holdMs: number;
   scale: number;
+  /** Stellwerk's version, named in the display's signature. */
+  version: string;
   sound: boolean;
   auditFile: string;
   /** ui/: index.html, styles, fonts. */
@@ -89,7 +91,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   // Derived from the hook token (which it does not reveal), so an open display reconnects after a restart.
   const sessionToken = createHmac('sha256', options.token).update('stellwerk display session').digest('hex');
   const { files, missingBuild } = loadStaticFiles(options.uiRoot, options.webRoot);
-  const template = loadIndexTemplate(options.uiRoot);
+  // The version is part of the page, so a new version alone also gives a new build.
+  const template = renderIndex(loadIndexTemplate(options.uiRoot), { version: options.version });
   // An open display reloads itself when this differs from the build it was served with.
   const build = displayBuild(template, files);
   const index = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));

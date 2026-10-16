@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Stellwerk's display. The hub fills in {{session}}, {{scale}} and {{build}} when it serves the page.
+<!-- Stellwerk's display. The hub fills in the placeholders (session, scale, build, version) when it serves the page.
      SPDX-License-Identifier: Apache-2.0 -->
 <html lang="en" class="pf-v6-theme-dark">
   <head>
@@ -17,8 +17,8 @@
   <body>
     <main class="board">
       <section class="col col--agents" aria-labelledby="agents-title">
-        <h1 class="col__title" id="agents-title"><span data-text="agentsTitle"></span> <span class="count" id="agents-count"></span></h1>
-        <ul class="agents" id="agents"></ul>
+        <h2 class="col__title" id="agents-title"><span data-text="agentsTitle"></span> <span class="count" id="agents-count"></span></h2>
+        <ul class="entries agents" id="agents"></ul>
         <p class="agents-empty" id="agents-empty" data-text="noSessions" hidden></p>
       </section>
       <section class="col col--waiting" aria-labelledby="waiting-title">
@@ -27,21 +27,21 @@
           <div class="queue" id="queue"></div>
           <section class="answers" id="answers-section" aria-labelledby="answers-title" hidden>
             <h3 class="section-title" id="answers-title" data-text="answersTitle"></h3>
-            <ul class="answers__list" id="answers"></ul>
+            <ul class="entries" id="answers"></ul>
           </section>
           <section class="pulls" id="pulls-section" aria-labelledby="pulls-title" hidden>
             <h3 class="section-title" id="pulls-title" data-text="pullsTitle"></h3>
-            <ul class="pulls__list" id="pulls"></ul>
+            <ul class="entries" id="pulls"></ul>
           </section>
         </div>
-        <div class="all-clear" id="waiting-empty" hidden>
-          <span class="signal signal--working" aria-hidden="true"></span>
-          <p data-text="allClear"></p>
+        <div class="az-empty all-clear" id="waiting-empty" hidden>
+          <span class="az-empty__icon" id="all-clear-icon"></span>
+          <p class="az-empty__title" data-text="allClear"></p>
         </div>
       </section>
       <section class="col col--spare" aria-hidden="true"></section>
       <aside class="col col--status">
-        <p class="wordmark">Stell<span class="wordmark__werk">werk</span></p>
+        <h1 class="wordmark">Stellwerk</h1>
         <p class="clock" id="clock"></p>
         <p class="hub-state" id="hub-state"></p>
         <p class="last-event" id="last-event"></p>
@@ -51,6 +51,10 @@
           <dl class="gauges" id="gauges"></dl>
           <p class="hardware-state" id="hardware-state" hidden></p>
         </section>
+        <footer class="az-signature">
+          <span class="az-signature__mark">Azentrius</span>
+          <span class="az-signature__meta"><span>Stellwerk {{version}}</span></span>
+        </footer>
       </aside>
     </main>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>

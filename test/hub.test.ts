@@ -37,6 +37,7 @@ async function startTestHub(overrides: Partial<HubOptions> = {}) {
     token: TOKEN,
     holdMs: 10_000,
     scale: 1,
+    version: '0.0.0',
     sound: false,
     auditFile,
     uiRoot: path.join(ROOT, 'ui'),
@@ -223,6 +224,19 @@ describe('the display page', () => {
     assert.equal(await build(), before, 'the same files, the same build');
     fs.appendFileSync(path.join(uiRoot, 'app.css'), '\n.changed { color: red; }\n');
     assert.notEqual(await build(), before);
+  });
+
+  test('names the version in its signature, and a new version gives another build', async () => {
+    const page = async (version: string) => {
+      const { port } = await startTestHub({ version });
+      const { body } = await call(port, { method: 'GET', path: '/' }).reply;
+      return { body, build: /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1] };
+    };
+    const first = await page('1.2.3');
+    assert.match(first.body, /<span class="az-signature__mark">Azentrius<\/span>/);
+    assert.match(first.body, /<span>Stellwerk 1\.2\.3<\/span>/);
+    assert.doesNotMatch(first.body, /\{\{\w+\}\}/, 'every placeholder is filled');
+    assert.notEqual((await page('1.2.4')).build, first.build);
   });
 });
 

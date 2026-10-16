@@ -1,11 +1,11 @@
 // The cards in "waiting for you": one per permission request, the oldest on top. Cards are kept by id and
-// updated in place, so an opened fold stays open and only new cards pulse.
+// updated in place, so an opened fold stays open.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, PermissionView } from '../../src/shared/protocol.js';
 import { naming } from './agents.ts';
-import { el } from './dom.ts';
+import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { duration } from './time.ts';
 import { renderToolInput } from './tool-input.ts';
@@ -46,10 +46,7 @@ export class QueueView {
       if (!card) {
         card = this.createCard(view);
         this.cards.set(view.id, card);
-        if (view.outcome === null) {
-          added.push(view.id);
-          card.root.classList.add('card--new');
-        }
+        if (view.outcome === null) added.push(view.id);
       }
       card.view = view;
       if (view.outcome !== null) card.busy = false;
@@ -94,36 +91,37 @@ export class QueueView {
 
   private createCard(view: PermissionView): Card {
     const t = this.texts;
-    const root = el('article', 'card');
+    const root = el('article', 'az-card card');
     root.dataset.id = view.id;
-    root.addEventListener('animationend', () => root.classList.remove('card--new'));
 
     // As in the agents column: the session's name on top, the project below.
     const { name, project } = naming(view.project, view.title, view.sessionId);
     const head = el('header', 'card__head');
+    const line = el('p', 'card__line');
     const wait = el('span', 'card__wait');
-    head.append(el('span', 'card__name', name), el('span', 'card__sep', '·'));
-    head.append(el('span', 'card__tool', view.tool), wait);
-    root.append(head);
-    if (project) root.append(el('p', 'card__project', project));
-    root.append(renderToolInput(view.tool, view.input, view.mcpServer, t));
+    line.append(el('span', 'card__name', name), el('span', 'card__sep', '·'), el('span', 'card__tool', view.tool), wait);
+    head.append(line);
+    if (project) head.append(el('p', 'card__project', project));
+    root.append(head, renderToolInput(view.tool, view.input, view.mcpServer, t));
 
     const hold = el('div', 'card__hold');
     const bar = el('span', 'card__hold-bar');
     hold.append(bar);
     root.append(hold);
 
+    // Allow is the card's main action, the only filled button; deny and leaving it to the app are outlined.
     const actions = el('div', 'card__actions');
     const buttons = (
       [
-        ['allow', t.allow],
-        ['deny', t.deny],
-        ['app', t.inApp],
+        ['allow', t.allow, 'az-btn--primary', 'check'],
+        ['deny', t.deny, 'az-btn--secondary', 'times'],
+        ['app', t.inApp, 'az-btn--secondary', 'external-link-alt'],
       ] as const
-    ).map(([decision, label]) => {
-      const button = el('button', `btn btn--${decision}`, label);
+    ).map(([decision, text, variant, iconName]) => {
+      const button = el('button', `az-btn ${variant} btn`);
       button.type = 'button';
       button.dataset.decision = decision;
+      button.append(icon(iconName), text);
       return button;
     });
     actions.append(...buttons);

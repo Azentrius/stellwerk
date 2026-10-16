@@ -178,6 +178,7 @@ async function serve(
       token,
       holdMs: config.holdSeconds * 1000,
       scale: config.scale,
+      version: VERSION,
       sound: config.sound,
       auditFile: paths.auditFile,
       uiRoot: path.join(ROOT, 'ui'),

@@ -1,13 +1,14 @@
 // Processor, graphics card and memory in the status column, one row each: the load as a bar and in
-// percent, then the temperature (memory: used of all). Hot parts turn red.
+// percent, then the temperature (memory: used of all). A hot part's temperature needs attention.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Gauge, HardwareView, MemoryGauge } from '../../src/shared/protocol.js';
-import { el } from './dom.ts';
+import { el, label } from './dom.ts';
 import type { Texts } from './i18n.ts';
+import { state } from './states.ts';
 
-/** From this temperature on a value is shown in red. */
+/** From this temperature on a value is shown as attention, with the warning triangle. */
 export const HOT_CELSIUS = 90;
 
 export function renderHardware(list: HTMLElement, hardware: HardwareView | null, texts: Texts): void {
@@ -27,7 +28,7 @@ export function hardwareLine(hardware: HardwareView | null, texts: Texts): { tex
   return { text: texts.hardware.asking, problem: false };
 }
 
-function isHot(gauge: Gauge): boolean {
+export function isHot(gauge: Gauge): boolean {
   return gauge.temperature !== null && gauge.temperature >= HOT_CELSIUS;
 }
 
@@ -38,14 +39,17 @@ function memoryText(memory: MemoryGauge, texts: Texts): string {
     : `${texts.number(memory.used, 0)} / ${texts.number(memory.total, 0)} GB`;
 }
 
-function row(label: string, load: number | null, extra: string, hot: boolean, texts: Texts): HTMLElement {
-  const item = el('div', hot ? 'gauge gauge--hot' : 'gauge');
+function row(name: string, load: number | null, extra: string, hot: boolean, texts: Texts): HTMLElement {
+  const item = el('div', 'gauge');
   const bar = el('span', 'gauge__bar');
   const fill = el('span', 'gauge__fill');
   fill.style.transform = `scaleX(${Math.min(100, Math.max(0, load ?? 0)) / 100})`;
   bar.append(fill);
   const loadCell = el('dd', 'gauge__load');
   loadCell.append(bar, el('span', 'gauge__percent', load === null ? '' : `${texts.number(load, 0)} %`));
-  item.append(el('dt', 'gauge__label', label), loadCell, el('dd', 'gauge__extra', extra));
+  const extraCell = el('dd', 'gauge__extra');
+  if (hot) extraCell.append(label(state('warning', extra)));
+  else extraCell.textContent = extra;
+  item.append(el('dt', 'gauge__label', name), loadCell, extraCell);
   return item;
 }

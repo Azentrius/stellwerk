@@ -122,12 +122,12 @@ by your Windows user only, in `%LOCALAPPDATA%\stellwerk\github-token`; the owner
 Every two minutes the hub then asks `api.github.com` for the owner's repositories (archived ones are
 left out), their open pull requests, and the Actions runs on each pull request's head commit:
 
-| Signal | Checks |
+| State | Checks |
 |---|---|
-| green | all runs passed |
-| red | a run failed, timed out or was cancelled |
-| gold ring | runs still going, or waiting for approval |
-| grey | no runs |
+| Checks passed (green, with a check mark) | all runs passed |
+| Checks failed (red, with an exclamation mark) | a run failed, timed out or was cancelled |
+| Checks running (grey) | runs still going, or waiting for approval |
+| No checks (grey) | no runs |
 
 The status column says when the list was last brought up to date, or why that failed (token rejected,
 no access, not reachable). The token is never logged and never sent to the display.
@@ -164,7 +164,7 @@ reads from LibreHardwareMonitor's settings, and shows at the foot of the status 
 | GPU | load and temperature of the graphics card; a separate card before the one built in |
 | RAM | memory in use, in percent and GB |
 
-Temperatures from 90 °C on turn red. Processor temperatures need the
+From 90 °C on a temperature is marked with the warning triangle. Processor temperatures need the
 [PawnIO](https://pawnio.eu/) driver, which you install yourself; without it the row shows the load only.
 
 The password matters: LibreHardwareMonitor's web server can also set fan speeds and answers any web
@@ -337,6 +337,8 @@ What comes next is in [ROADMAP.md](ROADMAP.md).
 ## License
 
 Stellwerk is licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE). The fonts DM
-Sans, DM Serif Display and Red Hat Mono are licensed under the SIL Open Font License 1.1.
+Sans, DM Serif Display and Red Hat Mono are licensed under the SIL Open Font License 1.1. The icons are
+Font Awesome Free 5.15.4 by Fonticons, Inc., taken over through `@patternfly/react-icons` 6.4.0 and
+licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)).
 
 Made by [Azentrius](https://azentrius.de).
