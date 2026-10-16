@@ -22,6 +22,9 @@ hardware are shown too.
   or tool names, no coloured stripes on cards (the old and new text of a change are named "Before" and
   "After"), and new cards no longer pulse. Allow, Deny and In the app are the system's buttons with icons;
   spacing follows its scale. The icons are Font Awesome Free under CC BY 4.0 (see NOTICE).
+- **Errors say how to fix them:** a disconnected hub and problems with GitHub or the hardware stand in
+  the status column as alerts, with what happened and what to do, such as the command to run again.
+  While the hub is away, only its own alert shows.
 - **Open pull requests:** with a fine-grained read-only token (`stellwerk github token --owner NAME`), the
   open pull requests of all the owner's repositories are listed under "Waiting for you", each with the
   state of its Actions runs; the status column says when the list was updated or why that failed. This

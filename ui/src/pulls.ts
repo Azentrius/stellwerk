@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { GitHubView, PullRequestView } from '../../src/shared/protocol.js';
+import type { PullRequestView } from '../../src/shared/protocol.js';
 import { entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { checksState } from './states.ts';
@@ -18,12 +18,4 @@ export function renderPulls(list: HTMLElement, pulls: PullRequestView[], now: nu
       return entry('pull entry--short', pr.title, ago(now - pr.updatedAt, texts), details, checksState(pr.checks, texts));
     }),
   );
-}
-
-/** The line in the status column: when GitHub was last asked, or why it failed. Empty without a token. */
-export function githubLine(github: GitHubView | null, now: number, texts: Texts): { text: string; problem: boolean } | null {
-  if (!github) return null;
-  if (github.problem) return { text: texts.github.problem[github.problem], problem: true };
-  if (github.syncedAt === null) return { text: texts.github.asking, problem: false };
-  return { text: texts.github.synced(ago(now - github.syncedAt, texts)), problem: false };
 }

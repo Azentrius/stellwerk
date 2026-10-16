@@ -1,11 +1,13 @@
 // The design system's language for states, as the display speaks it: five kinds, each with its fixed icon,
-// always with a word. A state never stands in colour alone, and gold is never a state.
+// always with a word. A state never stands in colour alone, and gold is never a state. An error the user
+// can fix says how, below what happened.
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ChecksState, SessionStatus } from '../../src/shared/protocol.js';
+import type { ChecksState, GitHubView, HardwareView, SessionStatus } from '../../src/shared/protocol.js';
 import type { Texts } from './i18n.ts';
 import type { IconName } from './icons.ts';
+import { ago } from './time.ts';
 
 /** Without judgement, good, a note, attention, an error. */
 export type Tone = 'neutral' | 'success' | 'info' | 'warning' | 'danger';
@@ -15,6 +17,12 @@ export interface State {
   /** Neutral states may go without an icon. */
   icon: IconName | null;
   text: string;
+}
+
+/** An error the user can fix: what happened, and how to fix it (commands in backticks). Shown as an alert. */
+export interface Problem {
+  title: string;
+  fix: string;
 }
 
 const TONE_ICON: Record<Exclude<Tone, 'neutral'>, IconName> = {
@@ -57,6 +65,36 @@ export function checksState(checks: ChecksState, texts: Texts): State {
   return state(CHECKS_TONE[checks], texts.checks[checks]);
 }
 
-export function hubState(connected: boolean, texts: Texts): State {
-  return connected ? state('success', texts.hubConnected) : state('danger', texts.hubDisconnected);
+/** Connected is good; disconnected is an error with a way to fix it. */
+export function hubState(connected: boolean, texts: Texts): State | Problem {
+  return connected ? state('success', texts.hubConnected) : { title: texts.hubDisconnected, fix: texts.hubDisconnectedFix };
+}
+
+/**
+ * The GitHub line in the status column: when GitHub was last asked, or what failed and how to fix it. Null
+ * without a token.
+ */
+export function githubLine(github: GitHubView | null, now: number, texts: Texts): string | Problem | null {
+  if (!github) return null;
+  if (github.problem) return { title: texts.github.problem[github.problem], fix: texts.github.fix[github.problem] };
+  if (github.syncedAt === null) return texts.github.asking;
+  return texts.github.synced(ago(now - github.syncedAt, texts));
+}
+
+/**
+ * The line below the hardware rows: asking, or why there are no values and how to fix it. Null when the
+ * values are there.
+ */
+export function hardwareLine(hardware: HardwareView | null, texts: Texts): string | Problem | null {
+  if (!hardware || hardware.values) return null;
+  if (hardware.problem) return { title: texts.hardware.problem[hardware.problem], fix: texts.hardware.fix[hardware.problem] };
+  return texts.hardware.asking;
+}
+
+/** Splits a text at its backticks: what stands between them is a command, the rest plain text. */
+export function splitCode(text: string): Array<{ text: string; code: boolean }> {
+  return text
+    .split('`')
+    .map((part, i) => ({ text: part, code: i % 2 === 1 }))
+    .filter((part) => part.text !== '');
 }

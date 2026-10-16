@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ICONS, type IconName } from './icons.ts';
-import type { State } from './states.ts';
+import { splitCode, type Problem, type State } from './states.ts';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -38,6 +38,18 @@ export function label(state: State): HTMLSpanElement {
   const node = el('span', state.tone === 'neutral' ? 'az-label' : `az-label az-label--${state.tone}`);
   if (state.icon) node.append(icon(state.icon));
   node.append(state.text);
+  return node;
+}
+
+/** An error as the design system's alert: what happened as its title, how to fix it below. */
+export function alert(problem: Problem): HTMLDivElement {
+  const node = el('div', 'az-alert az-alert--danger');
+  node.setAttribute('role', 'alert');
+  const mark = el('span', 'az-alert__icon');
+  mark.append(icon('exclamation-circle'));
+  const body = el('p', 'az-alert__body');
+  for (const part of splitCode(problem.fix)) body.append(part.code ? el('code', undefined, part.text) : part.text);
+  node.append(mark, el('p', 'az-alert__title', problem.title), body);
   return node;
 }
 

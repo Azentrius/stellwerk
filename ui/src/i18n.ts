@@ -28,10 +28,16 @@ export interface Texts {
   pullsTitle: string;
   draft: string;
   checks: Record<ChecksState, string>;
-  github: { asking: string; synced: (ago: string) => string; problem: Record<GitHubProblem, string> };
+  /** A problem says what happened; its fix says how to fix it, commands in backticks. */
+  github: {
+    asking: string;
+    synced: (ago: string) => string;
+    problem: Record<GitHubProblem, string>;
+    fix: Record<GitHubProblem, string>;
+  };
   hardwareTitle: string;
   parts: { cpu: string; gpu: string; memory: string };
-  hardware: { asking: string; problem: Record<HardwareProblem, string> };
+  hardware: { asking: string; problem: Record<HardwareProblem, string>; fix: Record<HardwareProblem, string> };
   /** A number with the given decimals, in the language's way. */
   number: (n: number, decimals: number) => string;
   allow: string;
@@ -40,6 +46,7 @@ export interface Texts {
   outcome: Record<PermissionOutcome, string>;
   hubConnected: string;
   hubDisconnected: string;
+  hubDisconnectedFix: string;
   lastEvent: (ago: string) => string;
   noEvent: string;
   ago: (n: number, unit: TimeUnit) => string;
@@ -96,6 +103,13 @@ const en: Texts = {
       unreachable: 'GitHub: not reachable',
       unexpected: 'GitHub: unexpected answer',
     },
+    fix: {
+      rejected: 'Create a new token and run `stellwerk github token`.',
+      forbidden: 'The token needs "Pull requests: Read" and "Actions: Read". If only the rate limit is reached, it goes on by itself.',
+      'not-found': 'Check the name and set the token again: `stellwerk github token --owner NAME`.',
+      unreachable: 'Check the internet connection; the hub asks again by itself.',
+      unexpected: 'The hub asks again by itself. If it stays, see `hub.log`.',
+    },
   },
   hardwareTitle: 'Hardware',
   parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
@@ -105,6 +119,11 @@ const en: Texts = {
       'not-running': 'Hardware: monitor not running',
       rejected: 'Hardware: password rejected',
       unexpected: 'Hardware: unexpected answer',
+    },
+    fix: {
+      'not-running': 'Start the task "Stellwerk hardware" or sign in again.',
+      rejected: 'Run `stellwerk hardware install` again as administrator.',
+      unexpected: 'Run `stellwerk hardware install` again as administrator.',
     },
   },
   number: (n, decimals) => n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
@@ -121,6 +140,7 @@ const en: Texts = {
   },
   hubConnected: 'Hub connected',
   hubDisconnected: 'Hub disconnected, reconnecting',
+  hubDisconnectedFix: 'If it does not come back, start the task "Stellwerk hub" and reload the display.',
   lastEvent: (ago) => `last event ${ago}`,
   noEvent: 'no event yet',
   ago: (n, unit) => `${n} ${unit} ago`,
@@ -176,6 +196,13 @@ const de: Texts = {
       unreachable: 'GitHub: nicht erreichbar',
       unexpected: 'GitHub: unerwartete Antwort',
     },
+    fix: {
+      rejected: 'Lege einen neuen Token an und führe `stellwerk github token` aus.',
+      forbidden: 'Der Token braucht „Pull requests: Read“ und „Actions: Read“. Ist nur das Limit erreicht, geht es von selbst weiter.',
+      'not-found': 'Prüfe den Namen und lege den Token neu an: `stellwerk github token --owner NAME`.',
+      unreachable: 'Prüfe die Internetverbindung; der Hub fragt von selbst wieder.',
+      unexpected: 'Der Hub fragt von selbst wieder. Bleibt es so, steht mehr in `hub.log`.',
+    },
   },
   hardwareTitle: 'Hardware',
   parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
@@ -185,6 +212,11 @@ const de: Texts = {
       'not-running': 'Hardware: Monitor läuft nicht',
       rejected: 'Hardware: Passwort abgelehnt',
       unexpected: 'Hardware: unerwartete Antwort',
+    },
+    fix: {
+      'not-running': 'Starte die Aufgabe „Stellwerk hardware“ oder melde dich neu an.',
+      rejected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
+      unexpected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
     },
   },
   number: (n, decimals) => n.toLocaleString('de', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
@@ -201,6 +233,7 @@ const de: Texts = {
   },
   hubConnected: 'Hub verbunden',
   hubDisconnected: 'Hub getrennt, verbinde neu',
+  hubDisconnectedFix: 'Kommt er nicht zurück, starte die Aufgabe „Stellwerk hub“ und lade die Anzeige neu.',
   lastEvent: (ago) => `letztes Ereignis ${ago}`,
   noEvent: 'noch kein Ereignis',
   ago: (n, unit) => `vor ${n} ${unit}`,
