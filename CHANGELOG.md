@@ -13,7 +13,15 @@ hardware are shown too.
   fits fades out at the bottom.
 - **Full screen:** the display started with Windows opens in Edge's kiosk mode, without title bar and
   over the taskbar. Run `stellwerk autostart install` again to switch an existing setup.
-- **Word mark:** "Stell" in the text colour, "werk" in gold and italic.
+- **Name and signature:** "Stellwerk." in the text colour with the word mark's dot in gold, nothing in
+  italics; the Azentrius signature with the version at the foot of the status column.
+- **Azentrius design system:** every state carries its icon and a word: waiting for approval needs
+  attention, waiting for you is a note, working, a connected hub and passed checks are good, failed
+  checks, a disconnected hub and problems with GitHub or the hardware are errors, a temperature from 90 °C
+  needs attention. Gold is kept for the dot of the name and the main action: no gold states, counts, bars
+  or tool names, no coloured stripes on cards (the old and new text of a change are named "Before" and
+  "After"), and new cards no longer pulse. Allow, Deny and In the app are the system's buttons with icons;
+  spacing follows its scale. The icons are Font Awesome Free under CC BY 4.0 (see NOTICE).
 - **Open pull requests:** with a fine-grained read-only token (`stellwerk github token --owner NAME`), the
   open pull requests of all the owner's repositories are listed under "Waiting for you", each with the
   state of its Actions runs; the status column says when the list was updated or why that failed. This

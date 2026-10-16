@@ -16,6 +16,7 @@ import { startHub } from '../src/hub/hub.ts';
 const ROOT = path.join(import.meta.dirname, '..');
 const port = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) ?? 4781);
 const token = randomBytes(32).toString('hex');
+const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string };
 // A stand-in for api.github.com: the demo goes to no network and to no LibreHardwareMonitor.
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const fakeGitHub: Record<string, unknown> = {
@@ -71,6 +72,7 @@ const hub = await startHub({
   token,
   holdMs: 30 * 60_000,
   scale: 1,
+  version,
   sound: false,
   auditFile: path.join(demoDir, 'audit.jsonl'),
   uiRoot: path.join(ROOT, 'ui'),

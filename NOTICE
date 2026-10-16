@@ -17,3 +17,8 @@ Red Hat Mono (ui/static/fonts/RedHatMono/RedHatMonoVF.woff2: RedHatMono-VF.woff2
   https://github.com/RedHatOfficial/RedHatFont, commit 6bb1048a6402b0076ea04f42951ec66263cd1437)
   Copyright 2021 The Red Hat Project Authors (https://github.com/RedHatOfficial/RedHatFont)
   SIL Open Font License 1.1, see ui/static/fonts/RedHatMono/OFL.txt
+
+Icons (ui/src/icons.ts, built to dist/ui/icons.js): Font Awesome Free 5.15.4 (Solid) by
+  Fonticons, Inc. (https://fontawesome.com), as shipped in @patternfly/react-icons 6.4.0
+  (Red Hat, Inc.); the path data is unchanged.
+  Creative Commons Attribution 4.0 International, see ui/CC-BY-4.0-Font-Awesome.txt

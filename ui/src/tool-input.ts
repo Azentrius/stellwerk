@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { el } from './dom.ts';
+import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
 
 type Input = Record<string, unknown>;
@@ -29,7 +29,7 @@ export function renderToolInput(tool: string, input: Input, mcpServer: string | 
     const description = take('description');
     if (description) box.append(el('p', 'input__note', description));
     const command = take('command');
-    if (command !== null) box.append(code(command, 'code code--command'));
+    if (command !== null) box.append(code(command));
   } else if (tool === 'Edit') {
     field(texts.file, take('file_path'), true);
     const before = take('old_string');
@@ -38,14 +38,14 @@ export function renderToolInput(tool: string, input: Input, mcpServer: string | 
       shown.add('replace_all');
       box.append(el('p', 'input__note', texts.replaceAll));
     }
-    if (before !== null || after !== null) box.append(fold(texts.change, change(before, after)));
+    if (before !== null || after !== null) box.append(fold(texts.change, change(before, after, texts)));
   } else if (tool === 'MultiEdit') {
     field(texts.file, take('file_path'), true);
     if (Array.isArray(input.edits)) {
       shown.add('edits');
       const edits = input.edits.map((edit) => {
         const e = (edit ?? {}) as Input;
-        return change(typeof e.old_string === 'string' ? e.old_string : null, typeof e.new_string === 'string' ? e.new_string : null);
+        return change(typeof e.old_string === 'string' ? e.old_string : null, typeof e.new_string === 'string' ? e.new_string : null, texts);
       });
       box.append(fold(texts.changes(edits.length), ...edits));
     }
@@ -84,16 +84,19 @@ function code(text: string, className = 'code'): HTMLPreElement {
   return el('pre', className, text);
 }
 
-function change(before: string | null, after: string | null): HTMLElement {
+/** The old and the new text of one change, each named in words, not told apart by colour. */
+function change(before: string | null, after: string | null, texts: Texts): HTMLElement {
   const box = el('div', 'change');
-  if (before !== null) box.append(code(before, 'code code--old'));
-  if (after !== null) box.append(code(after, 'code code--new'));
+  if (before !== null) box.append(el('p', 'input__label', texts.before), code(before));
+  if (after !== null) box.append(el('p', 'input__label', texts.after), code(after));
   return box;
 }
 
 function fold(summary: string, ...content: HTMLElement[]): HTMLDetailsElement {
   const details = el('details', 'fold');
-  details.append(el('summary', undefined, summary), ...content);
+  const head = el('summary');
+  head.append(icon('angle-right', 'az-icon fold__closed'), icon('angle-down', 'az-icon fold__open'), summary);
+  details.append(head, ...content);
   return details;
 }
 

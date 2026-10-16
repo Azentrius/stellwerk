@@ -8,12 +8,13 @@
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { renderAgents } from './agents.ts';
 import { renderAnswers, waitingForAnswer } from './answers.ts';
-import { byId } from './dom.ts';
+import { byId, icon, label } from './dom.ts';
 import { hardwareLine, renderHardware } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { githubLine, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { shouldReload } from './reload.ts';
+import { hubState, state as labelState, type State } from './states.ts';
 import { ago, clock } from './time.ts';
 
 const WS_PROTOCOL = 'stellwerk.v1';
@@ -53,7 +54,7 @@ const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
 const clockNode = byId('clock');
-const hubState = byId('hub-state');
+const hubNode = byId('hub-state');
 const lastEvent = byId('last-event');
 const toastNode = byId('toast');
 
@@ -65,6 +66,8 @@ let connected = false;
 let attempts = 0;
 let toastTimer: number | undefined;
 let audio: AudioContext | null = null;
+
+byId('all-clear-icon').append(icon('check-circle'));
 
 function connect(): void {
   const ws = new WebSocket(`ws://${location.host}/ws`, [WS_PROTOCOL, WS_SESSION_PREFIX + sessionToken]);
@@ -145,25 +148,30 @@ function tick(): void {
   const below = waitingList.scrollHeight - waitingList.scrollTop - waitingList.clientHeight;
   waitingList.classList.toggle('waiting--more', below > 4);
   clockNode.textContent = clock(now);
-  hubState.textContent = connected ? texts.hubConnected : texts.hubDisconnected;
-  hubState.classList.toggle('hub-state--down', !connected);
+  show(hubNode, hubState(connected, texts));
   const last = state?.hub.lastEventAt ?? null;
   lastEvent.textContent = last === null ? texts.noEvent : texts.lastEvent(ago(now - last, texts));
   const line = githubLine(state?.github ?? null, now, texts);
   githubState.hidden = line === null;
-  githubState.textContent = line?.text ?? '';
-  githubState.classList.toggle('github-state--problem', line?.problem ?? false);
+  if (line) show(githubState, line.problem ? labelState('danger', line.text) : line.text);
   const hardware = state?.hardware ?? null;
   hardwareSection.hidden = hardware === null;
   renderHardware(gauges, hardware, texts);
   const hardwareNote = hardwareLine(hardware, texts);
   hardwareState.hidden = hardwareNote === null;
-  hardwareState.textContent = hardwareNote?.text ?? '';
-  hardwareState.classList.toggle('hardware-state--problem', hardwareNote?.problem ?? false);
+  if (hardwareNote) show(hardwareState, hardwareNote.problem ? labelState('danger', hardwareNote.text) : hardwareNote.text);
+}
+
+/** Puts plain text or a state (as a label with its icon) into a line of the status column, when it changed. */
+function show(node: HTMLElement, content: State | string): void {
+  const key = typeof content === 'string' ? content : `${content.tone}:${content.text}`;
+  if (node.dataset.shown === key) return;
+  node.dataset.shown = key;
+  node.replaceChildren(typeof content === 'string' ? content : label(content));
 }
 
 function toast(text: string): void {
-  toastNode.textContent = text;
+  toastNode.replaceChildren(icon('info-circle'), text);
   toastNode.hidden = false;
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => (toastNode.hidden = true), TOAST_MS);
