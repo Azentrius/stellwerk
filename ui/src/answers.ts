@@ -1,6 +1,7 @@
 // Below the cards: sessions that wait for an answer in the app (a question, some input, or a permission
 // whose card is open there). Nothing to decide on the display, but it shows who is waiting, why and how
-// long. One line each, so they still fit below a card or two: name, project, the reason and how long.
+// long. One line each, so they still fit below a card or two: name, the question if known (otherwise the
+// project), the reason and how long.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -26,7 +27,7 @@ export function renderAnswers(list: HTMLElement, sessions: Array<SessionView & {
       const { name, project } = naming(session.project, session.title, session.id);
       const since = session.waitingSince === null ? '' : texts.since(duration(now - session.waitingSince));
       // The same state as "waiting for you" in the agents column: a note, with the reason as its word.
-      return entry('answer entry--short', name, since, project, state('info', texts.waitingFor[session.waitingFor]));
+      return entry('answer entry--short', name, since, session.question ?? project, state('info', texts.waitingFor[session.waitingFor]));
     }),
   );
 }

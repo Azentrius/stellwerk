@@ -21,6 +21,8 @@ export interface SessionView {
   /** Set while the status is 'waiting'. */
   waitingFor: WaitingFor | null;
   waitingSince: number | null;
+  /** While waiting for an answer: the question asked, from AskUserQuestion or the app's end-of-turn box. */
+  question: string | null;
   /** Subagents started and not yet stopped. */
   subagents: number;
   lastActivity: number;

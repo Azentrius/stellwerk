@@ -20,9 +20,10 @@ every train on the track diagram and sets the signals.
 - **The app works as before.** The Claude desktop app shows its own card at the same time, and whichever
   decides first counts. If nobody decides on the display within the hold time (60 s), the request goes
   back to the app. If the hub is not running, Claude Code simply asks in the app, without error messages.
-- **What waits in the app.** When Claude asks you something (multiple choice), needs some input, or has
-  a permission open in the app, the session is listed below the cards under "Answer in the app", with
-  how long it has been waiting. You answer in the app; allow or deny would not answer a question.
+- **What waits in the app.** When Claude asks you something (multiple choice, or in the desktop app's box
+  at the end of a turn), needs some input, or has a permission open in the app, the session is listed
+  below the cards under "Answer in the app", with the question and how long it has been waiting. You
+  answer in the app; allow or deny would not answer a question.
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
   owner (all repositories) are listed too, each with the state of its Actions runs.
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,

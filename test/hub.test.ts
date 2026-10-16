@@ -570,9 +570,38 @@ describe('permission requests', () => {
     assert.ok(Date.now() - started < 1000, 'answered at once');
     const state = await screen.state((s) => s.sessions[0]?.status === 'waiting');
     assert.equal(state.permissions.length, 0);
+    assert.equal(state.sessions[0]?.question, 'Which one?');
     await hook(port, { hook_event_name: 'PostToolUse', tool_name: 'AskUserQuestion', tool_input: {} }).reply;
     await screen.state((s) => s.sessions[0]?.status === 'working');
     assert.deepEqual(auditLines(auditFile), []);
+    screen.close();
+  });
+
+  test("a turn that ends with a question in the app's box waits for the answer, as the app sends it", async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    // As probed on 2026-10-16: PostToolUse of the box (mcp_server as an object), a Stop a few seconds later.
+    const box = await hook(port, {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'mcp__ccd_turn__wrap_up',
+      mcp_server: { name: 'ccd_turn', source: 'sdk' },
+      tool_use_id: 'toolu_1',
+      tool_input: {
+        recap: 'The first host is done.',
+        ask: 'Set up the other two hosts the same way?',
+        blocked: true,
+        actions: [{ label: 'Yes, both', message: 'Yes, both' }, { label: 'Not now', message: 'Not now' }],
+      },
+      tool_response: [{ type: 'text', text: 'Shown in the next-step box.' }],
+    }).reply;
+    assert.equal(box.status, 200);
+    await hook(port, { hook_event_name: 'Stop', stop_hook_active: false }).reply;
+    const state = await screen.state((s) => s.sessions[0]?.status === 'waiting');
+    assert.equal(state.sessions[0]?.waitingFor, 'question');
+    assert.equal(state.sessions[0]?.question, 'Set up the other two hosts the same way?');
+    assert.doesNotMatch(JSON.stringify(state), /first host is done/, 'the recap stays out of the state');
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    await screen.state((s) => s.sessions[0]?.status === 'working' && s.sessions[0]?.question === null);
     screen.close();
   });
 

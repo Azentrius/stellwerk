@@ -2,8 +2,15 @@
 
 ## 0.2.1 – not released yet
 
-More room for the repository in the list of open pull requests.
+More room for the repository in the list of open pull requests; questions in the app's box at the end of
+a turn count as waiting for you.
 
+- **Questions at the end of a turn:** when Claude ends a turn in the desktop app with its box that asks
+  you something (a recap, a question and answers to tap), the session no longer shows as done: it waits
+  for you and is listed under "Answer in the app" with the question, until your next prompt. A box that
+  only says Claude is blocked on you counts as waiting for input.
+- **The question itself:** "Answer in the app" shows the question asked, from that box or from a multiple
+  choice question, instead of the project.
 - **Checks as an icon:** the state of a pull request's checks stands as its icon alone, in front of the
   title: passed, failed, or the hourglass while they run; no checks leave the place empty. The word stays
   as the icon's tooltip and its name for screen readers. The room goes to repository, number and author.
