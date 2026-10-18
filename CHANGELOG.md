@@ -2,13 +2,23 @@
 
 ## 0.4.1 – not released yet
 
-Codex sessions show the name of their chat.
+Sessions are named as their apps name them: Codex chats with their name and project, Claude sessions
+with their title also after a restart of the hub.
 
-- **Names for Codex sessions:** Codex' hook events carry no name, so a Codex session showed its project
+- **Names for Codex sessions:** Codex' hook events carry no name, so a Codex session showed its folder
   in bold and nothing below. The hub now takes the chat's name, as the Codex app shows it, from Codex'
   session index (`%USERPROFILE%\.codex\session_index.jsonl`): the name stands in bold, the project below,
   as for every other session. A renamed chat shows its new name with its next event. The hub reads that
   file from its end and keeps only the names of the sessions it shows.
+- **Codex projects:** below the name stands the project the Codex app files the chat under ("Lautwerk -
+  Codex"), not the folder ("OpenAuto AI"); two projects in one folder stay apart, and a chat the app
+  keeps without a project shows no second line. The hub takes the projects from the app's state file
+  (`%USERPROFILE%\.codex\.codex-global-state.json`), reads it again only after it changed, and keeps
+  nothing of it but the names of projects and which chat belongs to which.
+- **Claude titles after a restart:** not every hook event carries the session's title, so after a
+  restart of the hub a session could show its folder in bold until its next prompt. The hub now also
+  takes the title from the end of the transcript it reads for the context meter, where the desktop app
+  writes it.
 
 ## 0.4.0 – 2026-10-18
 

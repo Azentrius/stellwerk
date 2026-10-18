@@ -3,7 +3,8 @@
 //
 // - Claude Code (~/.claude/projects): the last answer of the main agent carries its usage (input with cache,
 //   and output), which together is what the context holds now. The window is not in the data; it comes
-//   from the model.
+//   from the model. The desktop app also writes the session's title into it (custom-title), which not
+//   every hook event carries.
 // - Codex (~/.codex/sessions): token_count entries carry the last usage and the model's context window,
 //   and the usage of the plan's limits (`rate_limits`). Its latest turn_context also says who approves
 //   (`approvals_reviewer`), which the hub needs to know. Codex' hook events carry no name for the
@@ -39,8 +40,12 @@ export const LARGE_WINDOW = 1_000_000;
 /** The transcript is read backwards in pieces of this size, and no further than MAX_READ from its end. */
 const CHUNK = 256 * 1024;
 const MAX_READ = 8 * 1024 * 1024;
+/** The app writes the title again and again; a transcript without one in its last MB is not searched on. */
+const MAX_TITLE_READ = 1024 * 1024;
 /** At most one read per session in this time; a burst of events gets one read after it. */
 export const CONTEXT_READ_INTERVAL_MS = 2000;
+/** A session's name is cut to this length. */
+const MAX_NAME = 200;
 
 /** The window for a model: configured, known, 1M for a "[1m]" model, else 200k; never below what is used. */
 export function contextWindow(model: string | null, used: number, configured: Readonly<Record<string, number>> = {}): number {
@@ -75,6 +80,15 @@ export function usageOfLine(line: string): { used: number; model: string | null 
   const used = count(u.input_tokens) + count(u.cache_read_input_tokens) + count(u.cache_creation_input_tokens) + count(u.output_tokens);
   if (used === 0) return null;
   return { used, model: typeof model === 'string' && model.length <= 200 ? model : null };
+}
+
+/** A session's title from a Claude Code transcript line: the app writes it as a custom-title entry, often. */
+export function claudeTitleOfLine(line: string): string | null {
+  if (!line.includes('"custom-title"')) return null;
+  const entry = parseObject(line);
+  if (entry?.type !== 'custom-title' || typeof entry.customTitle !== 'string') return null;
+  const title = entry.customTitle.replace(/\s+/g, ' ').trim();
+  return title.length > 0 ? title.slice(0, MAX_NAME) : null;
 }
 
 /** The context of one Codex transcript line, if it is a token_count entry with a window. */
@@ -133,8 +147,6 @@ export function codexSessionIndex(codexHome: string): string {
   return path.join(codexHome, 'session_index.jsonl');
 }
 
-const MAX_NAME = 200;
-
 /** A thread's name from a line of Codex' session index ({id, thread_name, updated_at}), if it is this thread's. */
 export function codexNameOfLine(line: string, sessionId: string): string | null {
   if (!line.includes(sessionId)) return null;
@@ -163,14 +175,14 @@ export async function checkedTranscript(file: string, root: string): Promise<str
   }
 }
 
-/** The first line from the end of the file that `parse` accepts. */
-export async function readLastFromEnd<T>(file: string, parse: (line: string) => T | null): Promise<T | null> {
+/** The first line from the end of the file that `parse` accepts, within `maxRead` bytes from the end. */
+export async function readLastFromEnd<T>(file: string, parse: (line: string) => T | null, maxRead = MAX_READ): Promise<T | null> {
   const handle = await fs.promises.open(file, 'r');
   try {
     const { size } = await handle.stat();
     let end = size;
     let carry = Buffer.alloc(0);
-    while (end > 0 && size - end < MAX_READ) {
+    while (end > 0 && size - end < maxRead) {
       const start = Math.max(0, end - CHUNK);
       const piece = Buffer.alloc(end - start);
       await handle.read(piece, 0, piece.length, start);
@@ -213,7 +225,10 @@ export interface ContextReaderOptions {
   onPlan?: (plan: PlanView) => void;
   /** Codex' session index with the names of its threads; without it, Codex sessions keep no name. */
   codexIndex?: string | null;
-  /** A Codex session's name, as Codex' session index has it last. */
+  /**
+   * A session's name: for Claude Code the transcript's latest title (events do not all carry it), for
+   * Codex the latest in its session index.
+   */
   onName?: (sessionId: string, name: string) => void;
   log?: (line: string) => void;
   intervalMs?: number;
@@ -253,7 +268,7 @@ export class ContextReader {
     this.pending.clear();
   }
 
-  /** Reads one transcript now (also for tests); for a Codex session also its name. */
+  /** Reads one transcript now (also for tests), and the session's name. */
   async read(sessionId: string, file: string, provider: Provider = 'claude'): Promise<ContextUsage | null> {
     if (provider === 'codex') await this.readName(sessionId);
     const checked = await this.checked(file, provider);
@@ -267,6 +282,8 @@ export class ContextReader {
       } else {
         const found = await readContextUsage(checked);
         if (found) usage = { used: found.used, size: contextWindow(found.model, found.used, this.options.windows) };
+        const title = this.options.onName ? await readLastFromEnd(checked, claudeTitleOfLine, MAX_TITLE_READ) : null;
+        if (title && !this.stopped) this.options.onName?.(sessionId, title);
       }
     } catch {
       return null;

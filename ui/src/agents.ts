@@ -10,6 +10,7 @@ import { contextPercent } from './context.ts';
 import { el, entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { meterTone } from './levels.ts';
+import { naming } from './naming.ts';
 import { sessionState } from './states.ts';
 import { elapsed } from './time.ts';
 
@@ -28,15 +29,6 @@ export function renderAgents(list: HTMLElement, sessions: SessionView[], now: nu
   );
 }
 
-/**
- * A session's name (its title) on top, the project below; without a title the project is the name. Used
- * for agents, cards and answers alike.
- */
-export function naming(projectName: string, title: string | null, sessionId: string): { name: string; project: string } {
-  const project = projectName || sessionId.slice(0, 8);
-  const trimmed = title?.trim();
-  return trimmed && trimmed !== project ? { name: trimmed, project } : { name: project, project: '' };
-}
 
 /** The percentage over a thin line; its words are its name and tooltip. Empty while not known. */
 function contextMeter(usage: ContextUsage | null, texts: Texts): HTMLSpanElement {

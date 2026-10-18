@@ -553,6 +553,27 @@ describe('Codex', () => {
     screen.close();
   });
 
+  test('the project is the one the Codex app files the chat under, not the folder', async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const codexStateFile = path.join(path.dirname(codexRoot), '.codex-global-state.json');
+    fs.writeFileSync(
+      codexStateFile,
+      JSON.stringify({
+        'local-projects': { p1: { name: 'Lautwerk - Codex', rootPaths: ['C:\\Projekte\\OpenAuto AI'] } },
+        'thread-project-assignments': { 'codex-1': { projectKind: 'local', projectId: 'p1' } },
+      }),
+    );
+    const { port } = await startTestHub({ codexHoldMs: 30_000, codexStateFile, context: { root: codexRoot, codexRoot } });
+    const screen = await display(port);
+    const pending = codexHook(port, { hook_event_name: 'PermissionRequest', transcript_path: transcript, tool_name: 'Bash', tool_input: { command: 'ls' } });
+    const state = await screen.state((s) => s.sessions[0]?.project === 'Lautwerk - Codex' && s.permissions.length > 0);
+    assert.equal(state.permissions[0]?.project, 'Lautwerk - Codex', 'the card too');
+    assert.equal(state.sessions[0]?.cwd, 'C:\\Projekte\\OpenAuto AI');
+    screen.decide(state.permissions[0]!.id, 'app');
+    await pending.reply;
+    screen.close();
+  });
+
   test("the usage of the plan's limits comes from the transcript and is there again after a restart", async () => {
     const resetsAt = Math.round(Date.now() / 1000) + 3600;
     const { codexRoot, transcript } = codexRollout('user', 182_031, {

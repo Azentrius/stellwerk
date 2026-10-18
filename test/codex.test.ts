@@ -13,6 +13,7 @@ import { describe, test } from 'node:test';
 import { CODEX_HOOK_PATH, CODEX_PERMISSION_TIMEOUT_S } from '../src/config.ts';
 import { ANSWER_MARGIN_MS, STATUS_TIMEOUT_MS, forwardEvent, timeoutFor } from '../src/codex/hook.ts';
 import { parseCodexInput } from '../src/hub/codex-input.ts';
+import { CODEX_STATE_CHECK_MS, CodexProjects, parseCodexState, projectOf } from '../src/hub/codex-projects.ts';
 import {
   ContextReader,
   codexNameOfLine,
@@ -188,6 +189,48 @@ describe('Codex transcripts', () => {
     await reader.read(id, file, 'claude');
     assert.deepEqual(names, [`${id}: Planning & Concept`], 'the renamed one, only for Codex, only when named');
     reader.stop();
+  });
+
+  test("a session's project is the one the Codex app files the chat under", () => {
+    const state = JSON.stringify({
+      'electron-persisted-atom-state': { drafts: 'a secret draft' },
+      'local-projects': {
+        p1: { id: 'p1', name: 'Lautwerk - Codex', rootPaths: ['C:\\Projekte\\OpenAuto AI'] },
+        p2: { id: 'p2', name: 'Custarium - Codex', rootPaths: ['C:\\Projekte\\Custarium'] },
+        p3: { id: 'p3', name: 'Custarium - ChatGPT', rootPaths: ['C:\\Projekte\\Custarium'] },
+      },
+      'thread-project-assignments': { t1: { projectKind: 'local', projectId: 'p1' }, t2: { projectKind: 'local', projectId: 'p3' }, t9: { projectId: 'gone' } },
+      'projectless-thread-ids': ['t3'],
+    });
+    const projects = parseCodexState(state)!;
+    assert.equal(projectOf(projects, 't1', 'C:\\Projekte\\OpenAuto AI'), 'Lautwerk - Codex', 'assigned, the folder has another name');
+    assert.equal(projectOf(projects, 't2', 'C:\\Projekte\\Custarium'), 'Custarium - ChatGPT', 'assigned, of two projects in one folder');
+    assert.equal(projectOf(projects, 't3', 'C:\\Users\\dev\\Documents\\Codex'), '', 'kept without a project');
+    assert.equal(projectOf(projects, 't4', 'c:\\projekte\\openauto ai\\'), process.platform === 'win32' ? 'Lautwerk - Codex' : null, 'not assigned: the one project of the folder');
+    assert.equal(projectOf(projects, 't5', 'C:\\Projekte\\Custarium'), null, 'two projects in the folder: not known');
+    assert.equal(projectOf(projects, 't9', 'C:\\elsewhere'), null, 'assigned to a project that is gone');
+    assert.doesNotMatch(JSON.stringify([...projects.names.values()]), /secret/);
+    assert.equal(parseCodexState('{"local-projects": '), null, 'half written');
+    assert.equal(parseCodexState('{"local-projects": {"p": {"name": 5}}}'), null);
+  });
+
+  test('the app state is read again only after it changed, and a half-written file keeps the last projects', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-codex-p-')), '.codex-global-state.json');
+    const write = (name: string) =>
+      fs.writeFileSync(file, JSON.stringify({ 'local-projects': { p1: { name, rootPaths: [] } }, 'thread-project-assignments': { t1: { projectId: 'p1' } } }));
+    let clock = 0;
+    const projects = new CodexProjects(file, () => clock);
+    assert.equal(await projects.projectOf('t1', undefined), null, 'no file yet');
+    clock += CODEX_STATE_CHECK_MS;
+    write('Lautwerk');
+    assert.equal(await projects.projectOf('t1', undefined), 'Lautwerk');
+    fs.writeFileSync(file, '{"local-projects": {"p1": ');
+    assert.equal(await projects.projectOf('t1', undefined), 'Lautwerk', 'within the check interval nothing is read');
+    clock += CODEX_STATE_CHECK_MS;
+    assert.equal(await projects.projectOf('t1', undefined), 'Lautwerk', 'half written: the last good projects');
+    clock += CODEX_STATE_CHECK_MS;
+    write('Lautwerk - Codex');
+    assert.equal(await projects.projectOf('t1', undefined), 'Lautwerk - Codex', 'renamed in the app');
   });
 
   test('are read only under the Codex folder, with the long-path prefix as the app sends it', async () => {

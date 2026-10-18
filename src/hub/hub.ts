@@ -19,6 +19,7 @@ import { CODEX_HOOK_PATH, HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
 import { parseCodexInput } from './codex-input.ts';
+import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
@@ -81,6 +82,8 @@ export interface HubOptions {
   } | null;
   /** Where the hub remembers the usage of the plans' limits between runs; without it, in memory only. */
   plansFile?: string | null;
+  /** The Codex app's state file, for the projects it files its chats under; without it, the folder shows. */
+  codexStateFile?: string | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -165,6 +168,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   hardware?.start();
   const plans = new PlanBook(options.plansFile ?? null, log);
   plans.load();
+  const codexProjects = options.codexStateFile ? new CodexProjects(options.codexStateFile, now) : null;
   const context = options.context
     ? new ContextReader({
         ...options.context,
@@ -270,6 +274,13 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     }
     // How full the session's context is: read from its transcript a little later, outside this request.
     context?.note(event.session_id, event.transcript_path, provider);
+    // The project the Codex app files the chat under, also outside this request.
+    if (provider === 'codex' && codexProjects) {
+      const { session_id: sessionId, cwd } = event;
+      void codexProjects.projectOf(sessionId, cwd).then((project) => {
+        if (project !== null && board.setProject(sessionId, project)) scheduleBroadcast();
+      });
+    }
     if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res, provider);
 
     for (const { permission, outcome } of board.apply(event, now(), provider)) closeOut(permission, outcome);

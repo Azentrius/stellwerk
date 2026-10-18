@@ -43,6 +43,20 @@ describe('sessions', () => {
     assert.equal(board.lastEventAt, 1000);
   });
 
+  test("a name and a project from the agent's app replace what the events give, also when found first", () => {
+    const board = new Board();
+    assert.equal(board.setProject(SESSION, 'Lautwerk - Codex'), false, 'no session yet: kept for it');
+    board.addPermission('r1', request(), 1000, HOLD, 'codex');
+    assert.equal(board.setTitle(SESSION, 'Implementation'), true);
+    assert.equal(board.setTitle(SESSION, 'Implementation'), false, 'unchanged');
+    const view = board.view();
+    assert.deepEqual([view.sessions[0]?.title, view.sessions[0]?.project, view.permissions[0]?.project], ['Implementation', 'Lautwerk - Codex', 'Lautwerk - Codex']);
+    board.apply(event('Stop'), 2000);
+    assert.equal(board.view().sessions[0]?.title, 'Implementation', 'an event without a title keeps it');
+    assert.equal(board.setProject(SESSION, ''), true, 'kept without a project');
+    assert.equal(board.view().sessions[0]?.project, '');
+  });
+
   test('prompt, stop and notifications move the status', () => {
     const board = new Board();
     board.apply(event('UserPromptSubmit'), 1);

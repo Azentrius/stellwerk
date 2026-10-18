@@ -61,6 +61,8 @@ interface Session {
   provider: Provider;
   cwd: string;
   title: string | null;
+  /** The project as the agent's app names it (Codex); '' for none; null: the last part of cwd. */
+  project: string | null;
   base: BaseStatus;
   /** While base is 'waiting': what for, and since when. */
   waitingFor: WaitingFor | null;
@@ -143,6 +145,8 @@ export interface Settlement {
 export class Board {
   readonly sessions = new Map<string, Session>();
   readonly permissions = new Map<string, Permission>();
+  /** Projects found before their session appeared (a request as its first event); taken when it does. */
+  private readonly projectsAhead = new Map<string, string>();
   lastEventAt: number | null = null;
 
   /** Applies a hook event other than PermissionRequest. Returns the open requests it settles. */
@@ -243,11 +247,26 @@ export class Board {
   }
 
   /** How full a session's context is now. Returns false for a session the board does not know (any more). */
-  /** A name from elsewhere than the session's events (Codex' session index); true when it changed. */
+  /** A name from elsewhere than the session's events (a transcript, Codex' session index); true when it changed. */
   setTitle(sessionId: string, title: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session || session.title === title) return false;
     session.title = title;
+    return true;
+  }
+
+  /** The project as the agent's app names it ('' for none) instead of the folder; true when it changed. */
+  setProject(sessionId: string, project: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      // Kept for the session's first event; bounded like the sessions.
+      this.projectsAhead.delete(sessionId);
+      this.projectsAhead.set(sessionId, project);
+      if (this.projectsAhead.size > MAX_SESSIONS) this.projectsAhead.delete(this.projectsAhead.keys().next().value!);
+      return false;
+    }
+    if (session.project === project) return false;
+    session.project = project;
     return true;
   }
 
@@ -269,6 +288,7 @@ export class Board {
         provider,
         cwd: event.cwd ?? '',
         title: null,
+        project: this.projectsAhead.get(event.session_id) ?? null,
         base: 'done',
         waitingFor: null,
         waitingSince: null,
@@ -280,6 +300,7 @@ export class Board {
         endedAt: null,
       };
       this.sessions.set(session.id, session);
+      this.projectsAhead.delete(session.id);
     }
     if (event.cwd) session.cwd = event.cwd;
     if (event.session_title) session.title = event.session_title;
@@ -344,7 +365,7 @@ export class Board {
       .map((s): SessionView => ({
         id: s.id,
         provider: s.provider,
-        project: projectName(s.cwd),
+        project: s.project ?? projectName(s.cwd),
         cwd: s.cwd,
         title: s.title,
         status: this.statusOf(s),
@@ -367,7 +388,7 @@ export class Board {
         id: p.id,
         sessionId: p.sessionId,
         provider: session?.provider ?? 'claude',
-        project: projectName(session?.cwd ?? ''),
+        project: session?.project ?? projectName(session?.cwd ?? ''),
         title: session?.title ?? null,
         tool: p.tool,
         input: p.input,

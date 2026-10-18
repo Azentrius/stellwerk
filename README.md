@@ -217,6 +217,8 @@ How Codex differs:
 - Codex' hook events carry no name for the session. The hub takes the name the Codex app shows for the
   chat from Codex' session index, so it stands in bold above the project, as for every other session.
   A new chat gets its name a few seconds after the first prompt, a renamed one its new name.
+- The project below is the one the Codex app files the chat under, from the app's state file, not the
+  folder; a chat without a project shows no second line.
 - The context meter uses the window Codex records with its token counts.
 - With its token counts Codex also records how much of your plan's limits is used (see
   [Plan usage](#plan-usage)).
@@ -343,13 +345,16 @@ Restart the hub after a change.
   data and pull request titles as text, never as HTML.
 - For the context meters the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
   and `%USERPROFILE%\.codex\sessions` (a path elsewhere in a hook event is ignored), only from their end,
-  and only the token counts, the model, the context window and, for Codex, who approves and the usage of
-  the plan's limits. Prompts, code and answers in them are not read into the hub's state and never reach
+  and only the token counts, the model, the context window, the session's title and, for Codex, who
+  approves and the usage of the plan's limits. Prompts, code and answers in them are not read into the hub's state and never reach
   the display.
 - Of what tools return, the hub looks only at the desktop app's answer to `get_usage`, and keeps only
   the plan's limits from it (percent, window, reset, the model of a model's own limit).
 - For the names of Codex sessions the hub reads Codex' session index
   (`%USERPROFILE%\.codex\session_index.jsonl`) from its end, and only the name of a session it shows.
+  For their projects it reads the Codex app's state file (`%USERPROFILE%\.codex\.codex-global-state.json`)
+  when it changed, and keeps only the names of projects and which chat belongs to which; the rest of the
+  file (the app's drafts and window state) is not kept.
 - Codex events come through Stellwerk's forwarder to their own endpoint, with the same checks as the
   others (token, content type, `Host`). The forwarder reads the hook token from the token file, talks
   only to `127.0.0.1` and prints only the hub's answer.
