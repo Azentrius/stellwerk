@@ -610,6 +610,30 @@ describe('context usage', () => {
   });
 });
 
+describe("the plan's limits", () => {
+  test("come from a session's call of the desktop app's usage tool, never its context", async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    const answer = {
+      plan: { status: 'ok', windows: [{ label: '5-hour limit', percentUsed: 28, resetsAt: '2026-10-18T05:10:00.295Z' }] },
+      context: { status: 'ok', tokensUsed: 328_671, categories: [{ name: 'secret category', tokens: 1 }] },
+    };
+    const reply = await hook(port, {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'mcp__ccd_session_mgmt__get_usage',
+      tool_input: {},
+      tool_response: [{ type: 'text', text: JSON.stringify(answer) }],
+    }).reply;
+    assert.equal(reply.status, 200);
+    const state = await screen.state((s) => s.plans.length > 0);
+    assert.equal(state.plans[0]?.provider, 'claude');
+    assert.deepEqual(state.plans[0]?.limits, [{ used: 28, windowMinutes: 300, resetsAt: Date.parse('2026-10-18T05:10:00.295Z') }]);
+    assert.equal(state.sessions[0]?.status, 'working', 'the event counts as usual');
+    assert.doesNotMatch(JSON.stringify(state), /secret|328671/);
+    screen.close();
+  });
+});
+
 describe('status hooks', () => {
   test('are answered at once with an empty body, and the display shows the session', async () => {
     const { port } = await startTestHub();

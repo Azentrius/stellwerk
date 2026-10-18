@@ -138,6 +138,8 @@ export interface PlanLimit {
   windowMinutes: number;
   /** When the window starts again; null when not recorded. */
   resetsAt: number | null;
+  /** A model's own limit ("Fable"); absent for the limit of all models. */
+  model?: string;
 }
 
 /** How much of a plan's usage limits is used, as the agent recorded it last. */

@@ -2,20 +2,25 @@
 
 ## 0.4.0 – not released yet
 
-How much of the plan's Codex limits is used, in the status column; a nearly full context turns red.
+How much of the Claude and Codex plans' limits is used, in the status column, from local sources only; a
+nearly full context turns red.
 
-- **Plan usage:** below the hardware, "Codex plan usage" shows each limit of your plan (5 h, Week, as the
-  plan has them) like the hardware values: a bar, the percent used and when the window starts again;
-  from 80 % it needs attention, from 90 % it is red, and a window whose time is up counts from zero.
-  Codex records these
-  values with its token counts; the hub takes them from the same transcripts it reads for the context
-  meter and keeps the latest in `%LOCALAPPDATA%\stellwerk\plans.json`, so they show again after a
-  restart. Claude's limits are not shown: the Claude apps keep them nowhere on this machine that the hub
-  could read.
+- **Plan usage:** below the hardware, per provider a title with how old the values are ("Claude plan
+  usage · 2 min ago") and each limit like the hardware values: the window (5 h, Week), a bar, the percent
+  used and when the window starts again. From 80 % it needs attention, from 90 % it is red; a window
+  whose time is up counts from zero. The hub keeps the latest values in
+  `%LOCALAPPDATA%\stellwerk\plans.json`, so they show again after a restart. No connection and no login:
+- **Claude's limits** come from the desktop app's tool `get_usage`: when a session calls it, the
+  `PostToolUse` hook carries the answer, and the hub keeps only the limits. A line in your own
+  instructions for Claude Code has sessions call it at the start of each task (see the README). A model's own weekly limit ("Fable")
+  shows only once it needs attention.
+- **Codex' limits** come from the transcripts the hub reads for the context meter, where Codex records
+  them with its token counts.
 - **Red when little is left:** the context meter in front of an agent stays grey up to 79 %, needs
   attention from 80 % and is red from 90 %; the app compacts the context at about 97 %.
 - **One grid for the gauges:** the rows of hardware and plan usage share their columns, so the bars line
-  up.
+  up. When an alert above leaves too little room, the gauges fade out at the bottom instead of pushing
+  the signature off the screen.
 
 ## 0.3.0 – 2026-10-18
 

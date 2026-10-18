@@ -53,12 +53,11 @@ from Uptime Kuma, in the column kept free.
 
 ## Stage 3 – Usage of Claude and ChatGPT
 
-How much of the plans' limits is used. For the ChatGPT plan: the Codex limits, which Codex records in its
-transcripts; in 0.4.0, below the hardware. Still open: Claude's limits. The Claude desktop app asks for
-them every 15 minutes but writes them to disk only when it quits, so the hub would have to ask claude.ai
-itself, with the browser's session cookie, through an unofficial endpoint (as the Stream Deck plugins
-do). That is a new destination and a credential to the whole account; it needs a decision and a review
-first, and it can break at any time, so it must fail quietly.
+How much of the plans' limits is used: in 0.4.0, below the hardware, from local sources only. Claude's
+limits from the desktop app's tool `get_usage`, whose answer the `PostToolUse` hook carries when a session
+calls it; Codex' limits (those of the ChatGPT plan for Codex) from its transcripts. Not possible without
+a connection to another machine: the limits of chats in ChatGPT, and Claude's limits for Claude Code in a
+terminal without the desktop app.
 
 ---
 

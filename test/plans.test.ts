@@ -1,5 +1,5 @@
-// The usage of the plans' limits: what the hub takes from Codex' transcripts, how it keeps and remembers
-// the newest values, and how the display shows them.
+// The usage of the plans' limits: what the hub takes from Codex' transcripts and from the desktop app's
+// usage tool, how it keeps and remembers the newest values, and how the display shows them.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,10 +10,10 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import type { PlanView } from '../src/shared/protocol.js';
 import { ContextReader, codexPlanOfLine } from '../src/hub/context.ts';
-import { PlanBook } from '../src/hub/plans.ts';
+import { CLAUDE_USAGE_TOOL, PlanBook, claudePlanOfHook } from '../src/hub/plans.ts';
 import { pickTexts } from '../ui/src/i18n.ts';
 import { meterTone } from '../ui/src/levels.ts';
-import { currentLimits, resetText } from '../ui/src/plans.ts';
+import { currentLimits, limitName, resetText } from '../ui/src/plans.ts';
 
 const AT = '2026-10-18T03:11:28.392Z';
 const tokenCount = (rateLimits: unknown, timestamp: unknown = AT) =>
@@ -81,6 +81,61 @@ describe('Codex transcripts', () => {
   });
 });
 
+describe("The desktop app's usage tool", () => {
+  /** A PostToolUse of get_usage as the hook carries it: the answer as JSON in a text block. */
+  const usageHook = (answer: unknown, extra: Record<string, unknown> = {}) => ({
+    hook_event_name: 'PostToolUse',
+    session_id: 's',
+    tool_name: CLAUDE_USAGE_TOOL,
+    tool_input: {},
+    tool_response: [{ type: 'text', text: JSON.stringify(answer, null, 2) }],
+    ...extra,
+  });
+  const answer = {
+    plan: {
+      status: 'ok',
+      plan: 'Max',
+      windows: [
+        { label: 'Weekly · all models', percentUsed: 57, resetsAt: '2026-10-21T01:00:00.295Z', resetsIn: '2d 21h' },
+        { label: 'Weekly · Fable', percentUsed: 16, resetsAt: '2026-10-21T01:00:00.295Z', resetsIn: '2d 21h' },
+        { label: '5-hour limit', percentUsed: 28, resetsAt: '2026-10-18T05:10:00.295Z', resetsIn: '1h 24m' },
+      ],
+      extraUsage: { enabled: false, currency: 'USD' },
+    },
+    context: { session: 'self', status: 'ok', tokensUsed: 328_671, contextWindow: 1_000_000, categories: [{ name: 'Messages', tokens: 1 }] },
+  };
+
+  test('gives the limits: five hours, the week of all models, the week of one model', () => {
+    assert.deepEqual(claudePlanOfHook(usageHook(answer), 1234), {
+      provider: 'claude',
+      limits: [
+        { used: 28, windowMinutes: 300, resetsAt: Date.parse('2026-10-18T05:10:00.295Z') },
+        { used: 57, windowMinutes: 10_080, resetsAt: Date.parse('2026-10-21T01:00:00.295Z') },
+        { used: 16, windowMinutes: 10_080, resetsAt: Date.parse('2026-10-21T01:00:00.295Z'), model: 'Fable' },
+      ],
+      recordedAt: 1234,
+    });
+  });
+
+  test('takes nothing from other tools, failures, unknown windows or an answer without limits', () => {
+    assert.equal(claudePlanOfHook(usageHook(answer, { tool_name: 'mcp__other__get_usage' }), 1), null);
+    assert.equal(claudePlanOfHook(usageHook(answer, { hook_event_name: 'PostToolUseFailure' }), 1), null);
+    assert.equal(claudePlanOfHook(usageHook({ plan: { status: 'not_applicable' } }), 1), null);
+    assert.equal(claudePlanOfHook(usageHook({ plan: { status: 'unavailable', note: 'try again' } }), 1), null);
+    assert.equal(claudePlanOfHook(usageHook(answer, { tool_response: [{ type: 'text', text: 'Error: no plan' }] }), 1), null);
+    assert.equal(claudePlanOfHook(usageHook(answer, { tool_response: undefined }), 1), null);
+    const odd = { plan: { status: 'ok', windows: [{ label: 'Extra usage', percentUsed: 5 }, { label: 'Weekly · <b>x</b>', percentUsed: 5 }] } };
+    assert.equal(claudePlanOfHook(usageHook(odd), 1), null);
+    assert.equal(claudePlanOfHook(null, 1), null);
+  });
+
+  test("the answer may also come as the object itself; nothing of the session's context is kept", () => {
+    const plan = claudePlanOfHook(usageHook(answer, { tool_response: answer }), 1);
+    assert.equal(plan?.limits.length, 3);
+    assert.doesNotMatch(JSON.stringify(plan), /Messages|328671|Max/);
+  });
+});
+
 describe('The plan book', () => {
   test('keeps the newest values per provider', () => {
     const book = new PlanBook(null);
@@ -98,10 +153,12 @@ describe('The plan book', () => {
     assert.deepEqual(book.view(), [], 'no file yet');
     book.offer(plan(40, 2000));
     book.offer(plan(45, 3000));
+    const claude: PlanView = { provider: 'claude', limits: [{ used: 81, windowMinutes: 10_080, resetsAt: 9000, model: 'Fable' }], recordedAt: 5 };
+    book.offer(claude);
     await book.flush();
     const next = new PlanBook(file);
     next.load();
-    assert.deepEqual(next.view(), [plan(45, 3000)]);
+    assert.deepEqual(next.view(), [claude, plan(45, 3000)], 'Claude first, then Codex');
 
     fs.writeFileSync(file, JSON.stringify([{ provider: 'someone', limits: [], recordedAt: 1 }]));
     const lines: string[] = [];
@@ -130,6 +187,19 @@ describe('The display', () => {
       { used: 84, windowMinutes: 10_080, resetsAt: 9000 },
     ]);
     assert.deepEqual([84, 92].map(meterTone), ['warning', 'danger'], 'attention from 80 %, red from 90 %, as for the context');
+  });
+
+  test("a model's own limit shows only once it needs attention, named by the model", () => {
+    const view = (fable: number): PlanView => ({
+      provider: 'claude',
+      limits: [
+        { used: 57, windowMinutes: 10_080, resetsAt: null },
+        { used: fable, windowMinutes: 10_080, resetsAt: null, model: 'Fable' },
+      ],
+      recordedAt: 0,
+    });
+    assert.deepEqual(currentLimits(view(16), 0).map((l) => limitName(l, texts)), ['Woche']);
+    assert.deepEqual(currentLimits(view(81), 0).map((l) => limitName(l, texts)), ['Woche', 'Fable']);
   });
 
   test('names the window and when it starts again: the time within a day, else the weekday', () => {

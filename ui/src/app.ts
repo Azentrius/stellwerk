@@ -51,6 +51,7 @@ const hardwareSection = byId('hardware');
 const gauges = byId('gauges');
 const hardwareState = byId('hardware-state');
 const plansNode = byId('plans');
+const gaugeSections = byId('gauge-sections');
 const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
@@ -167,6 +168,7 @@ function tick(): void {
   const plans = state?.plans ?? [];
   plansNode.hidden = plans.length === 0;
   renderPlans(plansNode, plans, now, texts);
+  gaugeSections.classList.toggle('gauge-sections--more', gaugeSections.scrollHeight - gaugeSections.clientHeight > 4);
 }
 
 /**
@@ -209,3 +211,6 @@ function chime(): void {
 connect();
 render();
 window.setInterval(tick, 1000);
+// What fits in the columns depends on the fonts and the window; measure again when they change.
+void document.fonts.ready.then(() => tick());
+window.addEventListener('resize', () => tick());

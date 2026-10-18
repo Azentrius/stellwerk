@@ -233,7 +233,9 @@ button { font: inherit; }
 
 /* Hardware and the plans' usage at the foot of the status column: label, bar and percent, then a value
    (temperature, memory, when a limit starts again). All rows share one grid, so the bars line up. */
-.gauge-sections { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-md); margin-block-start: auto; }
+.gauge-sections { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-content: start; gap: var(--sp-sm) var(--sp-md); min-height: 0; overflow: hidden; margin-block-start: auto; }
+/* Short of room (an alert above): the gauges give way and fade out at the bottom, like a full column. */
+.gauge-sections--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
 .plans { display: contents; }
 .gauge-section { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
 .gauge-section > :not(.gauges) { grid-column: 1 / -1; }
@@ -249,7 +251,7 @@ button { font: inherit; }
 .gauge__percent { min-width: 2.6rem; }
 
 /* The Azentrius signature below everything, without a link: the display is a kiosk. */
-.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-lg); padding-block-start: var(--sp-md); font-size: 1rem; }
+.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-md); padding-block-start: var(--sp-md); font-size: 1rem; }
 .az-signature__mark { font-size: 1.3rem; }
 
 /* ---------- toast: a note, with its icon ---------- */

@@ -1,7 +1,8 @@
 // The gauges in the status column, one row each with a bar and its percent. Processor, graphics card and
 // memory: the load, then the temperature (memory: used of all); a hot part's temperature needs attention.
-// Below them the plans' limits, under a title per provider: the window, how much is used, then when the
-// window starts again; a limit nearly used up needs attention, from 90 % it is red.
+// Below them the plans' limits, under a title per provider with how old the values are: the window, how
+// much is used, then when the window starts again; a limit nearly used up needs attention, from 90 % it is
+// red.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,8 +10,9 @@ import type { Gauge, HardwareView, MemoryGauge, PlanView } from '../../src/share
 import { el, label } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { meterTone } from './levels.ts';
-import { currentLimits, resetText } from './plans.ts';
+import { currentLimits, limitName, resetText } from './plans.ts';
 import { state } from './states.ts';
+import { ago } from './time.ts';
 
 /** From this temperature on a value is shown as attention, with the warning triangle. */
 export const HOT_CELSIUS = 90;
@@ -37,9 +39,10 @@ export function renderPlans(container: HTMLElement, plans: readonly PlanView[], 
         const used = percent(limit.used, texts);
         const tone = meterTone(limit.used);
         const shown = tone === 'neutral' ? used : label(state(tone, used));
-        list.append(gaugeRow(texts.planWindow(limit.windowMinutes), limit.used, shown, resetText(limit.resetsAt, now, texts)));
+        list.append(gaugeRow(limitName(limit, texts), limit.used, shown, resetText(limit.resetsAt, now, texts)));
       }
-      section.append(el('h2', 'section-title', texts.planTitle(texts.providers[plan.provider])), list);
+      const title = `${texts.planTitle(texts.providers[plan.provider])} · ${ago(now - plan.recordedAt, texts)}`;
+      section.append(el('h2', 'section-title', title), list);
       return section;
     }),
   );

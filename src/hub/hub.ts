@@ -1,7 +1,9 @@
 // The hub: receives Claude Code's hook requests, holds permission requests until the display or the hold
 // time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
 // no programs. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
-// (when set up). Besides its own files it reads only transcripts named in hook events.
+// (when set up). Besides its own files it reads only transcripts named in hook events. The usage of the
+// plans' limits comes from the same local sources: Codex' transcripts and the desktop app's answer to a
+// session that asked for it (plans.ts).
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,7 +23,7 @@ import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
-import { PlanBook } from './plans.ts';
+import { PlanBook, claudePlanOfHook } from './plans.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -252,6 +254,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         return send(res, 400);
       }
       event = parsed.event;
+      // A session asked the desktop app how much of the plan's limits is used: the answer is in this event.
+      const plan = claudePlanOfHook(body, now());
+      if (plan && plans.offer(plan)) scheduleBroadcast();
     }
     // How full the session's context is: read from its transcript a little later, outside this request.
     context?.note(event.session_id, event.transcript_path, provider);

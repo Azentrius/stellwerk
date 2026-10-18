@@ -95,10 +95,7 @@ fs.writeFileSync(
       payload: {
         type: 'token_count',
         info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 },
-        rate_limits: {
-          primary: { used_percent: 38, window_minutes: 300, resets_at: inSeconds(2.4) },
-          secondary: { used_percent: 84, window_minutes: 10_080, resets_at: inSeconds(100) },
-        },
+        rate_limits: { primary: { used_percent: 84, window_minutes: 10_080, resets_at: inSeconds(100) }, secondary: null },
       },
     })}\n`,
 );
@@ -148,6 +145,28 @@ send('pipeline', 'data-pipeline', { hook_event_name: 'UserPromptSubmit', session
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a2', agent_type: 'Plan' });
 send('firmware', 'car-firmware', { hook_event_name: 'UserPromptSubmit', model: 'gpt-6-astra', prompt: 'Update the CAN driver' }, true);
+// A session asks the desktop app how much of the plan is used; the hook carries the answer.
+const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+send('pipeline', 'data-pipeline', {
+  hook_event_name: 'PostToolUse',
+  tool_name: 'mcp__ccd_session_mgmt__get_usage',
+  tool_input: {},
+  tool_response: [
+    {
+      type: 'text',
+      text: JSON.stringify({
+        plan: {
+          status: 'ok',
+          windows: [
+            { label: '5-hour limit', percentUsed: 28, resetsAt: inHours(1.4) },
+            { label: 'Weekly · all models', percentUsed: 57, resetsAt: inHours(69) },
+            { label: 'Weekly · Fable', percentUsed: 16, resetsAt: inHours(69) },
+          ],
+        },
+      }),
+    },
+  ],
+});
 // Waiting for an answer in the app: a question, and a permission the app shows itself.
 send('design', 'design-tokens', {
   hook_event_name: 'PermissionRequest',
