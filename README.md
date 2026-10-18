@@ -109,10 +109,13 @@ adding them. Both start at logon, without administrator rights:
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens. After an update, restarting the hub is enough: the open
 display notices that the hub serves a newer version and loads itself again.
+
+Stop or start a task in the Task Scheduler or with `schtasks /End /TN "Stellwerk hub"` and
+`schtasks /Run /TN "Stellwerk hub"`; the hub ends together with its task. `stellwerk autostart uninstall`
+removes both tasks.
+
 **Updating from 0.4.1 or older:** run `stellwerk autostart install` again, so that the display task
-opens the start file, then restart both tasks; until then the display shows that it is not signed in. Stop or start a task in the Task Scheduler or with
-`schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
-its task. `stellwerk autostart uninstall` removes both tasks.
+opens the start file, then restart both tasks; until then the display shows that it is not signed in.
 
 ## Open pull requests
 
