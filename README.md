@@ -1,10 +1,8 @@
 # Stellwerk
 
-*A signal box for your AI agents.*
-
-A desk display for a wide second screen (made for 1920×720, ready for touch) that shows every running
-Claude Code and Codex session and lets you answer their permission requests right there. Like a
-dispatcher who sees every train on the track diagram and sets the signals.
+A signal box for your AI agents: a desk display for a wide second screen (made for 1920×720, ready
+for touch) that shows every running Claude Code and Codex session and lets you answer their permission
+requests right there. Like a dispatcher who sees every train on the track diagram and sets the signals.
 
 ![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, room for monitoring, clock, hub, hardware and plan usage on the right](docs/display.png)
 
