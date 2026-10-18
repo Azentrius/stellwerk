@@ -14,6 +14,8 @@ const common = {
   /** Present when the event comes from a subagent. */
   agent_id: text(200).optional(),
   agent_type: text(200).optional(),
+  /** The session's transcript; the hub reads only the token counts of its last answer from it. */
+  transcript_path: text(4096).optional(),
 };
 
 const toolName = z.string().min(1).max(500);

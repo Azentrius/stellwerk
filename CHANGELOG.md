@@ -2,9 +2,14 @@
 
 ## 0.2.1 – not released yet
 
-More room for the repository in the list of open pull requests; questions in the app's box at the end of
-a turn count as waiting for you.
+How full each session's context is; more room for the repository in the list of open pull requests;
+questions in the app's box at the end of a turn count as waiting for you.
 
+- **Context ring:** a ring in front of each agent shows how much of its context window is used, 0 to
+  100 %, as in the Claude app; from 80 % it needs attention. The hub takes the token counts of the last
+  answer from the session's transcript, only under `%USERPROFILE%\.claude\projects` and only those
+  numbers. Opus 5.5 has a window of 1M; other models can be set with `contextWindows` in `config.json`.
+- **Columns:** 25 % agents, 35 % waiting for you, 20 % kept free for monitoring, 20 % status.
 - **Questions at the end of a turn:** when Claude ends a turn in the desktop app with its box that asks
   you something (a recap, a question and answers to tap), the session no longer shows as done: it waits
   for you and is listed under "Answer in the app" with the question, until your next prompt. A box that

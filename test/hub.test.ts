@@ -448,6 +448,40 @@ describe('hardware values', () => {
   });
 });
 
+describe('context usage', () => {
+  test('the display gets how full a session is from its transcript, never its content', async () => {
+    const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-hub-ctx-')), 'projects');
+    fs.mkdirSync(path.join(root, 'C--Projekte-shop-api'), { recursive: true });
+    const transcript = path.join(root, 'C--Projekte-shop-api', 'session-1.jsonl');
+    fs.writeFileSync(
+      transcript,
+      `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'a secret prompt' } })}\n` +
+        `${JSON.stringify({
+          type: 'assistant',
+          message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'a secret answer' }], usage: { input_tokens: 4, cache_read_input_tokens: 590_000, output_tokens: 1_496 } },
+        })}\n`,
+    );
+    const { port } = await startTestHub({ context: { root, intervalMs: 20 } });
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'Stop', transcript_path: transcript }).reply;
+    const state = await screen.state((s) => s.sessions[0]?.context !== null && s.sessions[0]?.context !== undefined);
+    assert.deepEqual(state.sessions[0]?.context, { used: 591_500, size: 1_000_000 });
+    assert.doesNotMatch(JSON.stringify(state), /secret|session-1\.jsonl/);
+    screen.close();
+  });
+
+  test('a transcript outside the transcripts folder is not read', async () => {
+    const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-hub-ctx-')), 'projects');
+    fs.mkdirSync(root, { recursive: true });
+    const outside = path.join(path.dirname(root), 'other.jsonl');
+    fs.writeFileSync(outside, `${JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 100 } } })}\n`);
+    const { port, hub } = await startTestHub({ context: { root, intervalMs: 20 } });
+    await hook(port, { hook_event_name: 'Stop', transcript_path: outside }).reply;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(hub.board.view().sessions[0]?.context, null);
+  });
+});
+
 describe('status hooks', () => {
   test('are answered at once with an empty body, and the display shows the session', async () => {
     const { port } = await startTestHub();

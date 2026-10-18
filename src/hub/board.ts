@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { PermissionOutcome, PermissionView, SessionStatus, SessionView, WaitingFor } from '../shared/protocol.js';
+import type { ContextUsage, PermissionOutcome, PermissionView, SessionStatus, SessionView, WaitingFor } from '../shared/protocol.js';
 import { isOther, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 
 /** Ended sessions disappear after this time. */
@@ -54,6 +54,8 @@ interface Session {
   question: string | null;
   /** The end-of-turn box asked something; the Stop that follows makes the session wait. */
   wrapUp: { reason: 'question' | 'input'; question: string | null } | null;
+  /** How full the context is, from the transcript; null until read. */
+  context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
   subagents: Set<string>;
   lastActivity: number;
@@ -216,6 +218,14 @@ export class Board {
     waitFor(this.touch(event, now), 'question', now, question);
   }
 
+  /** How full a session's context is now. Returns false for a session the board does not know (any more). */
+  setContext(sessionId: string, usage: ContextUsage): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    session.context = { used: usage.used, size: usage.size };
+    return true;
+  }
+
   /** Notes an event without changing the status. */
   touch(event: HookEvent, now: number): Session {
     this.lastEventAt = now;
@@ -231,6 +241,7 @@ export class Board {
         waitingSince: null,
         question: null,
         wrapUp: null,
+        context: null,
         subagents: new Set(),
         lastActivity: now,
         endedAt: null,
@@ -306,6 +317,7 @@ export class Board {
         waitingFor: this.statusOf(s) === 'waiting' ? s.waitingFor : null,
         waitingSince: this.statusOf(s) === 'waiting' ? s.waitingSince : null,
         question: this.statusOf(s) === 'waiting' ? s.question : null,
+        context: s.context,
         subagents: s.subagents.size,
         lastActivity: s.lastActivity,
         endedAt: s.endedAt,

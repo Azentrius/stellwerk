@@ -52,6 +52,11 @@ reachable only from the machine it runs on and only by the display it serves:
   for `data.json`, when the hardware monitor is set up, with the password
   from LibreHardwareMonitor's settings file, and never sends that password
   to the display;
+- for the context rings the hub reads session transcripts named in hook
+  events, only under `%USERPROFILE%\.claude\projects` (after following
+  links), only from their end, and keeps only the token counts and the model
+  of the last answer; nothing else of a transcript reaches its state or the
+  display;
 - `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
   archive, pinned in the code by URL, size and SHA-256, unpacks it only into
   its own folder in Program Files (refusing any file name that would leave
@@ -75,6 +80,8 @@ Reports are particularly welcome for:
   file other than its own,
 - the hub connecting anywhere but `api.github.com` and LibreHardwareMonitor on
   `127.0.0.1:8085`, or to them without being set up,
+- a hook event that makes the hub read a file outside the transcripts folder,
+  or anything of a transcript beyond its token counts reaching the display,
 - `stellwerk hardware install` accepting another file than the pinned one,
   writing outside its folder, or leaving LibreHardwareMonitor's web server
   reachable without the password or from other machines,

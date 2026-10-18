@@ -23,7 +23,18 @@ test('without a file every setting has its default', () => {
     debugRawLog: false,
     githubIntervalSeconds: 120,
     hardwareMonitor: false,
+    contextWindows: {},
   });
+});
+
+test('context windows can be given per model, within sensible bounds', () => {
+  const file = path.join(tempDir(), 'config.json');
+  fs.writeFileSync(file, '{ "contextWindows": { "claude-sonnet-5-5": 1000000 } }');
+  assert.deepEqual(loadConfig(file).contextWindows, { 'claude-sonnet-5-5': 1000000 });
+  for (const bad of ['{ "contextWindows": { "m": 10 } }', '{ "contextWindows": { "m": "large" } }', '{ "contextWindows": [] }']) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => loadConfig(file), bad);
+  }
 });
 
 test('the GitHub owner must be a valid name, the interval at least a minute', () => {
