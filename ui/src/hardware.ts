@@ -1,14 +1,15 @@
 // The gauges in the status column, one row each with a bar and its percent. Processor, graphics card and
 // memory: the load, then the temperature (memory: used of all); a hot part's temperature needs attention.
 // Below them the plans' limits, under a title per provider: the window, how much is used, then when the
-// window starts again; a limit nearly used up needs attention.
+// window starts again; a limit nearly used up needs attention, from 90 % it is red.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Gauge, HardwareView, MemoryGauge, PlanView } from '../../src/shared/protocol.js';
 import { el, label } from './dom.ts';
 import type { Texts } from './i18n.ts';
-import { PLAN_FULL, currentLimits, resetText } from './plans.ts';
+import { meterTone } from './levels.ts';
+import { currentLimits, resetText } from './plans.ts';
 import { state } from './states.ts';
 
 /** From this temperature on a value is shown as attention, with the warning triangle. */
@@ -34,7 +35,8 @@ export function renderPlans(container: HTMLElement, plans: readonly PlanView[], 
       const list = el('dl', 'gauges');
       for (const limit of currentLimits(plan, now)) {
         const used = percent(limit.used, texts);
-        const shown = limit.used >= PLAN_FULL ? label(state('warning', used)) : used;
+        const tone = meterTone(limit.used);
+        const shown = tone === 'neutral' ? used : label(state(tone, used));
         list.append(gaugeRow(texts.planWindow(limit.windowMinutes), limit.used, shown, resetText(limit.resetsAt, now, texts)));
       }
       section.append(el('h2', 'section-title', texts.planTitle(texts.providers[plan.provider])), list);

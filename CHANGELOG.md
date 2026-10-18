@@ -2,15 +2,18 @@
 
 ## 0.4.0 – not released yet
 
-How much of the plan's Codex limits is used, in the status column.
+How much of the plan's Codex limits is used, in the status column; a nearly full context turns red.
 
 - **Plan usage:** below the hardware, "Codex plan usage" shows each limit of your plan (5 h, Week, as the
   plan has them) like the hardware values: a bar, the percent used and when the window starts again;
-  from 80 % it needs attention, and a window whose time is up counts from zero. Codex records these
+  from 80 % it needs attention, from 90 % it is red, and a window whose time is up counts from zero.
+  Codex records these
   values with its token counts; the hub takes them from the same transcripts it reads for the context
   meter and keeps the latest in `%LOCALAPPDATA%\stellwerk\plans.json`, so they show again after a
   restart. Claude's limits are not shown: the Claude apps keep them nowhere on this machine that the hub
   could read.
+- **Red when little is left:** the context meter in front of an agent stays grey up to 79 %, needs
+  attention from 80 % and is red from 90 %; the app compacts the context at about 97 %.
 - **One grid for the gauges:** the rows of hardware and plan usage share their columns, so the bars line
   up.
 

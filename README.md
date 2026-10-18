@@ -15,7 +15,8 @@ dispatcher who sees every train on the track diagram and sets the signals.
   ("Claude", "Codex", all alike), the number of running subagents and the time of the last activity. The
   most urgent first.
 - **How full the context is.** In front of each session the percentage of its context window that is
-  used, 0 to 100 %, over a thin line; from 80 % it needs attention. The hub takes the token counts of
+  used, 0 to 100 %, over a thin line; from 80 % it needs attention, from 90 % it is red (the app
+  compacts the context at about 97 %). The hub takes the token counts of
   the last answer from the session's transcript.
 - **Permission requests on the display.** Each request becomes a card with the complete input: a shell
   command in full, a file change with path and content, an MCP call with server, tool and parameters.
@@ -214,7 +215,8 @@ How Codex differs:
 - The context meter uses the window Codex records with its token counts.
 - With its token counts Codex also records how much of your plan's limits is used. The status column
   shows that below the hardware, under "Codex plan usage": one row per window your plan has (5 h, Week),
-  in percent, with when the window starts again; from 80 % it needs attention. The hub keeps the latest
+  in percent, with when the window starts again; from 80 % it needs attention, from 90 % it is red. The
+  hub keeps the latest
   values in `plans.json`, so they are there after a restart before Codex works again. Claude's limits are
   not shown: the Claude apps keep them nowhere on this machine that the hub could read.
 

@@ -12,7 +12,8 @@ import type { PlanView } from '../src/shared/protocol.js';
 import { ContextReader, codexPlanOfLine } from '../src/hub/context.ts';
 import { PlanBook } from '../src/hub/plans.ts';
 import { pickTexts } from '../ui/src/i18n.ts';
-import { PLAN_FULL, currentLimits, resetText } from '../ui/src/plans.ts';
+import { meterTone } from '../ui/src/levels.ts';
+import { currentLimits, resetText } from '../ui/src/plans.ts';
 
 const AT = '2026-10-18T03:11:28.392Z';
 const tokenCount = (rateLimits: unknown, timestamp: unknown = AT) =>
@@ -128,7 +129,7 @@ describe('The display', () => {
       { used: 0, windowMinutes: 300, resetsAt: null },
       { used: 84, windowMinutes: 10_080, resetsAt: 9000 },
     ]);
-    assert.ok(84 >= PLAN_FULL, 'such a limit needs attention');
+    assert.deepEqual([84, 92].map(meterTone), ['warning', 'danger'], 'attention from 80 %, red from 90 %, as for the context');
   });
 
   test('names the window and when it starts again: the time within a day, else the weekday', () => {
