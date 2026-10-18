@@ -496,4 +496,4 @@ Font Awesome Free 5.15.4 by Fonticons, Inc., taken over through `@patternfly/rea
 licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)). The Stellwerk
 sign (`ui/icon.svg`) is a mark of Azentrius and is not licensed under the Apache License.
 
-Made by [Azentrius](https://azentrius.de).
+Made by [Azentrius](https://azentrius.com).
