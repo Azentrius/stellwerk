@@ -6,7 +6,7 @@
 import type { Decision, PermissionView } from '../../src/shared/protocol.js';
 import { naming } from './agents.ts';
 import { el, icon } from './dom.ts';
-import type { Texts } from './i18n.ts';
+import { providerTag, type Texts } from './i18n.ts';
 import { duration } from './time.ts';
 import { renderToolInput } from './tool-input.ts';
 
@@ -101,7 +101,8 @@ export class QueueView {
     const wait = el('span', 'card__wait');
     line.append(el('span', 'card__name', name), el('span', 'card__sep', '·'), el('span', 'card__tool', view.tool), wait);
     head.append(line);
-    if (project) head.append(el('p', 'card__project', project));
+    const below = [providerTag(view.provider, t), project].filter(Boolean).join(' · ');
+    if (below) head.append(el('p', 'card__project', below));
     root.append(head, renderToolInput(view.tool, view.input, view.mcpServer, t));
 
     const hold = el('div', 'card__hold');

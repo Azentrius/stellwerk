@@ -58,9 +58,9 @@ stage begins with its own security review.
 
 ## Stage 5 – Codex agents
 
-Codex has hooks of its own, permission requests included. Before starting, check against the official
-documentation whether the ChatGPT app for Windows runs them, the same way stage 1 began with a probe of
-the Claude desktop app.
+The Codex app for Windows: in 0.2.1, after a probe of the app (it runs command hooks once they are
+allowed, and shows its own approval card only after the hook). Still open: the Codex command line, and
+the usage of the plan, which Codex records in its transcripts (`rate_limits`).
 
 ---
 

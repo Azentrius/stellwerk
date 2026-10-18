@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ChecksState, SessionStatus } from '../src/shared/protocol.js';
-import { pickTexts } from '../ui/src/i18n.ts';
+import { pickTexts, providerTag } from '../ui/src/i18n.ts';
 import { ICONS } from '../ui/src/icons.ts';
 import { checksState, hubState, sessionState, state, type State } from '../ui/src/states.ts';
 
@@ -50,6 +50,13 @@ test('checks stand as an icon alone in the list: each but "none" has one, and th
   assert.deepEqual(icons, { passing: 'check-circle', failing: 'exclamation-circle', pending: 'pending', none: null });
   for (const texts of languages) {
     for (const checks of CHECKS) assert.ok(checksState(checks, texts).text.length > 0, 'the word becomes the icon\'s name');
+  }
+});
+
+test('every agent but Claude, the usual one, says whose it is, in both languages', () => {
+  for (const texts of languages) {
+    assert.equal(providerTag('claude', texts), '');
+    assert.equal(providerTag('codex', texts), 'Codex');
   }
 });
 

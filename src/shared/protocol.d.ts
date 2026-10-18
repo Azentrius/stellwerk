@@ -11,6 +11,9 @@ export type SessionStatus = 'permission' | 'waiting' | 'working' | 'done' | 'end
  */
 export type WaitingFor = 'question' | 'input' | 'permission' | 'idle';
 
+/** Whose agent a session is: Claude Code (the Claude app or CLI) or Codex (the Codex app). */
+export type Provider = 'claude' | 'codex';
+
 /** Tokens in a session's context now, and its model's context window. */
 export interface ContextUsage {
   used: number;
@@ -19,6 +22,7 @@ export interface ContextUsage {
 
 export interface SessionView {
   id: string;
+  provider: Provider;
   /** Last part of the working directory. */
   project: string;
   cwd: string;
@@ -49,6 +53,7 @@ export type PermissionOutcome =
 export interface PermissionView {
   id: string;
   sessionId: string;
+  provider: Provider;
   project: string;
   title: string | null;
   tool: string;

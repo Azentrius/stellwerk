@@ -23,8 +23,18 @@ test('without a file every setting has its default', () => {
     debugRawLog: false,
     githubIntervalSeconds: 120,
     hardwareMonitor: false,
+    codexHoldSeconds: 30,
     contextWindows: {},
   });
+});
+
+test('the Codex hold time stays at least 10 s below its hook timeout of 45 s', () => {
+  const file = path.join(tempDir(), 'config.json');
+  fs.writeFileSync(file, '{ "codexHoldSeconds": 36 }');
+  assert.throws(() => loadConfig(file), /codexHoldSeconds/);
+  fs.writeFileSync(file, '{ "codexHoldSeconds": 35 }');
+  assert.equal(loadConfig(file).codexHoldSeconds, 35);
+  assert.equal(defaultPaths({ CODEX_HOME: 'D:\\codex' }).codexHome, 'D:\\codex');
 });
 
 test('context windows can be given per model, within sensible bounds', () => {

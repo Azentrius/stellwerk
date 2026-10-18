@@ -2,8 +2,17 @@
 
 ## 0.2.1 – not released yet
 
-How full each session's context is; more room for the repository in the list of open pull requests;
-questions in the app's box at the end of a turn count as waiting for you.
+Codex joins; how full each session's context is; more room for the repository in the list of open pull
+requests; questions in the app's box at the end of a turn count as waiting for you.
+
+- **Codex:** `stellwerk codex install` adds command hooks to Codex' `hooks.json` that run Stellwerk's
+  forwarder; after allowing them in the Codex app, its sessions and approvals appear among the others,
+  marked "Codex". A Codex request waits on the display for 30 s (`codexHoldSeconds`), since the Codex
+  app shows its own card only after the hook; with "Approve for me" nothing is held. Codex' questions
+  are listed under "Answer in the app"; the app's helper sessions are not shown; the context ring uses
+  the window Codex records. `stellwerk codex uninstall` removes exactly these hooks.
+- **Whose agent:** sessions, answers and cards of other agents than Claude Code carry their name, e.g.
+  "Codex", in front of their details.
 
 - **Context ring:** a ring in front of each agent shows how much of its context window is used, 0 to
   100 %, as in the Claude app; from 80 % it needs attention. The hub takes the token counts of the last

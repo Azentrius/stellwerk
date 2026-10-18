@@ -11,7 +11,7 @@ import path from 'node:path';
 import { after, describe, test } from 'node:test';
 import { WebSocket } from 'ws';
 import type { ServerMessage, StateMessage } from '../src/shared/protocol.js';
-import { HOOK_PATH } from '../src/config.ts';
+import { CODEX_HOOK_PATH, HOOK_PATH } from '../src/config.ts';
 import { appSettingsXml } from '../src/hub/hardware.ts';
 import {
   DENY_MESSAGE,
@@ -445,6 +445,105 @@ describe('hardware values', () => {
     assert.doesNotMatch(JSON.stringify(state), /secret-password/);
     assert.deepEqual(calls, ['http://127.0.0.1:8085/data.json']);
     screen.close();
+  });
+});
+
+describe('Codex', () => {
+  /** A Codex transcript folder with one rollout whose last turn has the given approval reviewer. */
+  function codexRollout(reviewer: string, tokens = 182_031): { codexRoot: string; transcript: string } {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-codex-'));
+    const codexRoot = path.join(home, 'sessions');
+    const day = path.join(codexRoot, '2026', '10', '18');
+    fs.mkdirSync(day, { recursive: true });
+    const transcript = path.join(day, 'rollout-2026-10-18T01-00-00-abc.jsonl');
+    fs.writeFileSync(
+      transcript,
+      `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: reviewer, cwd: 'C:\\x' } })}\n` +
+        `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: tokens }, model_context_window: 258_400 } } })}\n`,
+    );
+    return { codexRoot, transcript };
+  }
+  const codexHook = (port: number, body: Record<string, unknown>, extra: { timeoutMs?: number } = {}) =>
+    call(port, {
+      path: CODEX_HOOK_PATH,
+      headers: AUTH,
+      body: { session_id: 'codex-1', cwd: 'C:\\Projekte\\OpenAuto AI', model: 'gpt-6-astra', permission_mode: 'default', ...body },
+      ...extra,
+    });
+
+  test('a request is held on the display and the decision goes back in the shape Codex reads', async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const { port } = await startTestHub({ codexHoldMs: 30_000, context: { root: path.join(codexRoot, 'none'), codexRoot, intervalMs: 20 } });
+    const screen = await display(port);
+    // The Codex app names transcripts with the long-path prefix.
+    const pending = codexHook(port, {
+      hook_event_name: 'PermissionRequest',
+      transcript_path: `\\\\?\\${transcript}`,
+      turn_id: 't1',
+      tool_name: 'Bash',
+      tool_input: { command: 'git fetch', description: 'Fetch the latest state' },
+    });
+    const state = await screen.state((s) => s.permissions.some((p) => p.outcome === null));
+    const card = state.permissions[0]!;
+    assert.equal(card.provider, 'codex');
+    assert.equal(state.sessions[0]?.provider, 'codex');
+    assert.deepEqual(card.input, { command: 'git fetch', description: 'Fetch the latest state' });
+    screen.decide(card.id, 'allow');
+    const reply = await pending.reply;
+    assert.deepEqual(JSON.parse(reply.body), { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } });
+    const ring = await screen.state((s) => s.sessions[0]?.context !== null);
+    assert.deepEqual(ring.sessions[0]?.context, { used: 182_031, size: 258_400 }, 'the window comes from the transcript');
+    screen.close();
+  });
+
+  test('after its own hold time the request goes back empty, so the Codex app shows its card', async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const { port } = await startTestHub({ codexHoldMs: 150, context: { root: codexRoot, codexRoot } });
+    const started = Date.now();
+    const reply = await codexHook(port, { hook_event_name: 'PermissionRequest', transcript_path: transcript, tool_name: 'Bash', tool_input: { command: 'ls' } }).reply;
+    assert.equal(reply.body, '');
+    assert.ok(Date.now() - started < 5_000, 'the short hold, not the hold of 10 s for the other agents');
+  });
+
+  test('with "approve for me" Codex decides itself: no card, no waiting', async () => {
+    const { codexRoot, transcript } = codexRollout('auto_review');
+    const { port, hub } = await startTestHub({ codexHoldMs: 30_000, context: { root: codexRoot, codexRoot } });
+    const reply = await codexHook(port, { hook_event_name: 'PermissionRequest', transcript_path: transcript, tool_name: 'Bash', tool_input: { command: 'ls' } }, { timeoutMs: 3000 }).reply;
+    assert.equal(reply.status, 200);
+    assert.equal(reply.body, '');
+    assert.equal(hub.board.pendingCount(), 0);
+  });
+
+  test("the app's helper sessions (no transcript) are no agents; a question waits until the answer", async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const { port, hub } = await startTestHub({ context: { root: codexRoot, codexRoot } });
+    for (const name of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
+      assert.equal((await codexHook(port, { session_id: 'helper', hook_event_name: name, transcript_path: null, source: 'fork' }).reply).status, 200);
+    }
+    assert.equal(hub.board.sessions.has('helper'), false);
+
+    await codexHook(port, { hook_event_name: 'UserPromptSubmit', transcript_path: transcript, prompt: 'a secret prompt' }).reply;
+    await codexHook(port, {
+      hook_event_name: 'PostToolUse',
+      transcript_path: transcript,
+      tool_name: 'request_user_input_async',
+      tool_input: { questions: [{ title: 'Fetch the latest state?', options: ['Yes', 'No'] }] },
+    }).reply;
+    const waiting = hub.board.view().sessions[0];
+    assert.deepEqual([waiting?.status, waiting?.waitingFor, waiting?.question], ['waiting', 'question', 'Fetch the latest state?']);
+    await codexHook(port, { hook_event_name: 'Interrupt', transcript_path: transcript }).reply;
+    assert.equal(hub.board.view().sessions[0]?.status, 'done', 'an interrupt ends the turn');
+    assert.doesNotMatch(JSON.stringify(hub.board.view()), /secret/);
+  });
+
+  test('the Codex endpoint has the same checks: token, content type, host', async () => {
+    const { port } = await startTestHub();
+    const body = { session_id: 'c', hook_event_name: 'Stop', transcript_path: 'C:\\x.jsonl' };
+    assert.equal((await call(port, { path: CODEX_HOOK_PATH, headers: { 'Content-Type': 'application/json' }, body }).reply).status, 401);
+    assert.equal((await call(port, { path: CODEX_HOOK_PATH, headers: { ...AUTH, Authorization: 'Bearer wrong' }, body }).reply).status, 401);
+    assert.equal((await call(port, { path: CODEX_HOOK_PATH, headers: { Authorization: AUTH.Authorization, 'Content-Type': 'text/plain' }, body }).reply).status, 415);
+    assert.equal((await call(port, { path: CODEX_HOOK_PATH, host: 'evil.example:80', headers: AUTH, body }).reply).status, 403);
+    assert.equal((await call(port, { path: CODEX_HOOK_PATH, headers: AUTH, body: { hook_event_name: 'Stop' } }).reply).status, 400);
   });
 });
 

@@ -12,14 +12,15 @@ import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { z } from 'zod';
-import type { Decision, DecisionResultMessage, PermissionOutcome, StateMessage } from '../shared/protocol.js';
-import { HOOK_PATH, HOST } from '../config.ts';
+import type { Decision, DecisionResultMessage, PermissionOutcome, Provider, StateMessage } from '../shared/protocol.js';
+import { CODEX_HOOK_PATH, HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
+import { parseCodexInput } from './codex-input.ts';
 import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
-import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
+import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -41,6 +42,11 @@ export interface HubOptions {
   /** Claude Code sends it as `Authorization: Bearer <token>`. */
   token: string;
   holdMs: number;
+  /**
+   * Hold time for Codex requests; shorter, since the Codex app shows its own card only after the hook.
+   * Defaults to holdMs.
+   */
+  codexHoldMs?: number;
   scale: number;
   /** Stellwerk's version, named in the display's signature. */
   version: string;
@@ -62,7 +68,7 @@ export interface HubOptions {
    * How full each session's context is: the token counts of the last answer in its transcript, read only
    * under `root` (~/.claude/projects). Windows by model from the configuration.
    */
-  context?: { root: string; windows?: Record<string, number>; intervalMs?: number } | null;
+  context?: { root: string; codexRoot?: string | null; windows?: Record<string, number>; intervalMs?: number } | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -165,12 +171,12 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       return send(res, 403);
     }
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-    if (pathname === HOOK_PATH) {
+    if (pathname === HOOK_PATH || pathname === CODEX_HOOK_PATH) {
       if (req.method !== 'POST') {
         reject('hook method', `${quote(req.method)} request to the hook endpoint (405)`);
         return send(res, 405);
       }
-      return onHook(req, res);
+      return onHook(req, res, pathname === CODEX_HOOK_PATH ? 'codex' : 'claude');
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
     if (pathname === '/' || pathname === '/index.html') return send(res, 200, index, 'text/html; charset=utf-8');
@@ -179,22 +185,26 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     send(res, 404);
   }
 
-  async function onHook(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  async function onHook(req: http.IncomingMessage, res: http.ServerResponse, provider: Provider): Promise<void> {
     const authorization = req.headers.authorization ?? '';
     // An unset STELLWERK_TOKEN arrives as "Bearer " with nothing after it.
     if (authorization.replace(/^Bearer\b/i, '').trim() === '') {
       reject(
-        'no token',
-        'hook request without a token (401). Run "stellwerk hooks install" and restart the Claude app, ' +
-          'so that it has STELLWERK_TOKEN.',
+        provider === 'codex' ? 'no token (codex)' : 'no token',
+        provider === 'codex'
+          ? 'Codex hook request without a token (401). Is the token file there? Run "stellwerk serve" once.'
+          : 'hook request without a token (401). Run "stellwerk hooks install" and restart the Claude app, ' +
+              'so that it has STELLWERK_TOKEN.',
       );
       return send(res, 401);
     }
     if (!authorized(authorization)) {
       reject(
-        'wrong token',
-        'hook request with a wrong token (401). If the token file was renewed, run "stellwerk hooks install" ' +
-          'again and restart the Claude app.',
+        provider === 'codex' ? 'wrong token (codex)' : 'wrong token',
+        provider === 'codex'
+          ? 'Codex hook request with a wrong token (401). The forwarder reads the token file; restart the hub.'
+          : 'hook request with a wrong token (401). If the token file was renewed, run "stellwerk hooks install" ' +
+              'again and restart the Claude app.',
       );
       return send(res, 401);
     }
@@ -217,34 +227,64 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       return send(res, 400);
     }
     if (options.rawLogFile) appendRawLog(options.rawLogFile, body);
-    const parsed = parseHookInput(body);
-    if (!parsed.ok) {
-      reject('hook input', `hook data without the expected fields (400): ${parsed.error.replace(/\s*\n\s*/g, '; ')}`);
-      return send(res, 400);
+    let event: HookEvent;
+    if (provider === 'codex') {
+      const parsed = parseCodexInput(body);
+      if (!parsed.ok) {
+        reject('codex input', `Codex hook data without the expected fields (400): ${parsed.error.replace(/\s*\n\s*/g, '; ')}`);
+        return send(res, 400);
+      }
+      // The app's helper sessions (no transcript) are no agents.
+      if (parsed.helper) return send(res, 200);
+      event = parsed.event;
+    } else {
+      const parsed = parseHookInput(body);
+      if (!parsed.ok) {
+        reject('hook input', `hook data without the expected fields (400): ${parsed.error.replace(/\s*\n\s*/g, '; ')}`);
+        return send(res, 400);
+      }
+      event = parsed.event;
     }
-    const event = parsed.event;
     // How full the session's context is: read from its transcript a little later, outside this request.
-    context?.note(event.session_id, event.transcript_path);
-    if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res);
+    context?.note(event.session_id, event.transcript_path, provider);
+    if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res, provider);
 
-    for (const { permission, outcome } of board.apply(event, now())) closeOut(permission, outcome);
+    for (const { permission, outcome } of board.apply(event, now(), provider)) closeOut(permission, outcome);
     scheduleBroadcast();
     if (options.simulateHang) return; // Claude Code gives up after the hook's timeout
     send(res, 200);
   }
 
-  function holdPermission(event: PermissionRequestEvent, res: http.ServerResponse): void {
-    const at = now();
-    if (QUESTION_TOOLS.has(event.tool_name)) {
+  function holdPermission(event: PermissionRequestEvent, res: http.ServerResponse, provider: Provider): void {
+    if (provider === 'claude' && QUESTION_TOOLS.has(event.tool_name)) {
       // A question, not a permission: straight back to the app, which asks the user.
-      board.askUser(event, at);
+      board.askUser(event, now());
       scheduleBroadcast();
       return send(res, 200);
     }
+    if (provider === 'codex') {
+      // The Codex app waits for this hook before it shows anything. With "approve for me" its own reviewer
+      // decides and nobody looks at a card, so the request goes straight back.
+      void (context?.codexReviewer(event.transcript_path ?? null) ?? Promise.resolve(null)).then((reviewer) => {
+        if (res.writableEnded || res.destroyed) return;
+        if (reviewer === 'auto_review') {
+          board.touch(event, now(), 'codex');
+          scheduleBroadcast();
+          return send(res, 200);
+        }
+        hold(event, res, provider, options.codexHoldMs ?? options.holdMs);
+      });
+      return;
+    }
+    hold(event, res, provider, options.holdMs);
+  }
+
+  function hold(event: PermissionRequestEvent, res: http.ServerResponse, provider: Provider, holdMs: number): void {
+    const at = now();
     const tooMany = board.pendingCount() >= MAX_OPEN_PERMISSIONS;
     const id = randomUUID();
-    board.addPermission(id, event, at, options.holdMs);
-    const timer = setTimeout(() => finish(id, 'timed-out'), options.holdMs);
+    board.addPermission(id, event, at, holdMs, provider);
+    const timer = setTimeout(() => finish(id, 'timed-out'), holdMs);
     held.set(id, { res, timer });
     res.on('close', () => {
       // Closed before an answer: the request was answered in the app (allowed, rejected or cancelled with

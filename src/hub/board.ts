@@ -3,7 +3,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ContextUsage, PermissionOutcome, PermissionView, SessionStatus, SessionView, WaitingFor } from '../shared/protocol.js';
+import type {
+  ContextUsage,
+  PermissionOutcome,
+  PermissionView,
+  Provider,
+  SessionStatus,
+  SessionView,
+  WaitingFor,
+} from '../shared/protocol.js';
 import { isOther, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 
 /** Ended sessions disappear after this time. */
@@ -29,6 +37,12 @@ const WAITING_NOTIFICATIONS: Readonly<Record<string, WaitingFor>> = {
 export const QUESTION_TOOLS: ReadonlySet<string> = new Set(['AskUserQuestion']);
 
 /**
+ * Tools that ask the user something and return at once (Codex' question card): after their PostToolUse
+ * the session waits for the answer, which comes as the next prompt.
+ */
+export const ASYNC_QUESTION_TOOLS: ReadonlySet<string> = new Set(['request_user_input_async']);
+
+/**
  * The desktop app's box at the end of a turn: a recap, often a question (`ask`) with answers to tap, and
  * whether the session is `blocked` on the user. It ends the turn, so a Stop follows; with a question the
  * session then waits for the user instead of being done.
@@ -44,6 +58,7 @@ type BaseStatus = Exclude<SessionStatus, 'permission'>;
 
 interface Session {
   id: string;
+  provider: Provider;
   cwd: string;
   title: string | null;
   base: BaseStatus;
@@ -87,6 +102,15 @@ function questionText(value: unknown): string | null {
   return text.length > MAX_QUESTION ? `${text.slice(0, MAX_QUESTION)}…` : text;
 }
 
+/** The first question of a question tool's input: `questions[0]`, its `question` or its `title`. */
+function firstQuestion(input: Record<string, unknown> | undefined): string | null {
+  const questions = input?.questions;
+  const first: unknown = Array.isArray(questions) ? questions[0] : undefined;
+  if (typeof first !== 'object' || first === null) return null;
+  const q = first as Record<string, unknown>;
+  return questionText(q.question) ?? questionText(q.title);
+}
+
 /** What the end-of-turn box waits for: an answer to its question, some input, or nothing. */
 function wrapUpOf(input: Record<string, unknown> | undefined): Session['wrapUp'] {
   const question = questionText(input?.ask);
@@ -122,8 +146,8 @@ export class Board {
   lastEventAt: number | null = null;
 
   /** Applies a hook event other than PermissionRequest. Returns the open requests it settles. */
-  apply(event: HookEvent, now: number): Settlement[] {
-    const session = this.touch(event, now);
+  apply(event: HookEvent, now: number, provider: Provider = 'claude'): Settlement[] {
+    const session = this.touch(event, now, provider);
     if (isOther(event)) return [];
     const agentId = event.agent_id ?? null;
 
@@ -149,6 +173,9 @@ export class Board {
         setStatus(session, 'working');
         if (event.hook_event_name === 'PostToolUse' && event.tool_name === WRAP_UP_TOOL && agentId === null) {
           session.wrapUp = wrapUpOf(event.tool_input);
+        }
+        if (event.hook_event_name === 'PostToolUse' && ASYNC_QUESTION_TOOLS.has(event.tool_name) && agentId === null) {
+          waitFor(session, 'question', now, firstQuestion(event.tool_input));
         }
         const candidates = this.pendingOf(session.id).filter((p) => p.agentId === agentId && p.tool === event.tool_name);
         const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
@@ -189,8 +216,8 @@ export class Board {
   }
 
   /** Puts a permission request on the display. */
-  addPermission(id: string, event: PermissionRequestEvent, now: number, holdMs: number): Permission {
-    const session = this.touch(event, now);
+  addPermission(id: string, event: PermissionRequestEvent, now: number, holdMs: number, provider: Provider = 'claude'): Permission {
+    const session = this.touch(event, now, provider);
     // Asking for a permission means working; while the card is open the status shows 'permission'.
     if (session.base !== 'ended') setStatus(session, 'working');
     const permission: Permission = {
@@ -211,11 +238,8 @@ export class Board {
   }
 
   /** A question to the user (see QUESTION_TOOLS): no card, the session waits for the answer in the app. */
-  askUser(event: PermissionRequestEvent, now: number): void {
-    const questions = event.tool_input.questions;
-    const first: unknown = Array.isArray(questions) ? questions[0] : undefined;
-    const question = typeof first === 'object' && first !== null ? questionText((first as Record<string, unknown>).question) : null;
-    waitFor(this.touch(event, now), 'question', now, question);
+  askUser(event: PermissionRequestEvent, now: number, provider: Provider = 'claude'): void {
+    waitFor(this.touch(event, now, provider), 'question', now, firstQuestion(event.tool_input));
   }
 
   /** How full a session's context is now. Returns false for a session the board does not know (any more). */
@@ -227,13 +251,14 @@ export class Board {
   }
 
   /** Notes an event without changing the status. */
-  touch(event: HookEvent, now: number): Session {
+  touch(event: HookEvent, now: number, provider: Provider = 'claude'): Session {
     this.lastEventAt = now;
     let session = this.sessions.get(event.session_id);
     if (!session) {
       this.makeRoom();
       session = {
         id: event.session_id,
+        provider,
         cwd: event.cwd ?? '',
         title: null,
         base: 'done',
@@ -310,6 +335,7 @@ export class Board {
     const sessions = [...this.sessions.values()]
       .map((s): SessionView => ({
         id: s.id,
+        provider: s.provider,
         project: projectName(s.cwd),
         cwd: s.cwd,
         title: s.title,
@@ -332,6 +358,7 @@ export class Board {
       return {
         id: p.id,
         sessionId: p.sessionId,
+        provider: session?.provider ?? 'claude',
         project: projectName(session?.cwd ?? ''),
         title: session?.title ?? null,
         tool: p.tool,

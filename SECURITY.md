@@ -53,10 +53,15 @@ reachable only from the machine it runs on and only by the display it serves:
   from LibreHardwareMonitor's settings file, and never sends that password
   to the display;
 - for the context rings the hub reads session transcripts named in hook
-  events, only under `%USERPROFILE%\.claude\projects` (after following
-  links), only from their end, and keeps only the token counts and the model
-  of the last answer; nothing else of a transcript reaches its state or the
-  display;
+  events, only under `%USERPROFILE%\.claude\projects` and
+  `%USERPROFILE%\.codex\sessions` (after following links), only from their
+  end, and keeps only the token counts, the model, the context window and,
+  for Codex, who approves; nothing else of a transcript reaches its state or
+  the display;
+- Codex events reach the hub through Stellwerk's forwarder, which Codex runs
+  as a command hook: it reads the hook token from the token file, posts to
+  `127.0.0.1` only, prints only the hub's answer and ends at once without a
+  hub; the hub checks these events like all others;
 - `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
   archive, pinned in the code by URL, size and SHA-256, unpacks it only into
   its own folder in Program Files (refusing any file name that would leave
@@ -80,8 +85,11 @@ Reports are particularly welcome for:
   file other than its own,
 - the hub connecting anywhere but `api.github.com` and LibreHardwareMonitor on
   `127.0.0.1:8085`, or to them without being set up,
-- a hook event that makes the hub read a file outside the transcripts folder,
+- a hook event that makes the hub read a file outside the transcripts folders,
   or anything of a transcript beyond its token counts reaching the display,
+- the forwarder printing anything but the hub's answer, sending the token
+  elsewhere, or making Codex wait beyond its hook timeout; `stellwerk codex
+  install` or `uninstall` changing more of Codex' hooks than Stellwerk's own,
 - `stellwerk hardware install` accepting another file than the pinned one,
   writing outside its folder, or leaving LibreHardwareMonitor's web server
   reachable without the password or from other machines,

@@ -3,16 +3,17 @@
 *A signal box for your AI agents.*
 
 A desk display for a wide second screen (made for 1920×720, ready for touch) that shows every running
-Claude Code session and lets you answer their permission requests right there. Like a dispatcher who sees
-every train on the track diagram and sets the signals.
+Claude Code and Codex session and lets you answer their permission requests right there. Like a
+dispatcher who sees every train on the track diagram and sets the signals.
 
 ![The display at 1920×720: the sessions with their context rings on the left, what waits for you next to them, room for monitoring, clock, hub and hardware on the right](docs/display.png)
 
 ## What it does
 
-- **Every session at a glance.** In the left column, each session with its name (bold) and project and
+- **Every session at a glance.** In the left column, each session with its name (bold) and project, and
   its status: waiting for approval, waiting for you, working, done, ended. With the number of running
-  subagents and the time of the last activity. The most urgent first.
+  subagents and the time of the last activity. The most urgent first. Sessions of other agents than
+  Claude Code say whose they are, e.g. "Codex".
 - **How full the context is.** A ring in front of each session shows how much of its context window is
   used, from 0 to 100 %, as the ring in the Claude app does; from 80 % it needs attention. The hub takes
   the token counts of the last answer from the session's transcript.
@@ -27,6 +28,8 @@ every train on the track diagram and sets the signals.
   at the end of a turn), needs some input, or has a permission open in the app, the session is listed
   below the cards under "Answer in the app", with the question and how long it has been waiting. You
   answer in the app; allow or deny would not answer a question.
+- **Codex, if you like.** The Codex app's sessions and approvals appear among the others, marked
+  "Codex" (see [Codex](#codex)).
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
   owner (all repositories) are listed too, each with the state of its Actions runs.
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
@@ -182,6 +185,36 @@ A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its versio
 `stellwerk hardware install` again after updating. `stellwerk hardware uninstall` stops it and removes
 the task, the firewall rule and the folder.
 
+## Codex
+
+Optional. Stellwerk shows the sessions of the Codex app too, marked "Codex", and lets you answer their
+approvals on the display:
+
+```powershell
+stellwerk codex install
+```
+
+It shows what it adds to `%USERPROFILE%\.codex\hooks.json` and asks first: for each Codex event a
+command hook that runs Stellwerk's forwarder (`node …\dist\codex\hook.js`). Then restart the Codex app
+and allow the new hooks: the hook symbol in its input field opens "Review hooks". Codex runs hooks only
+after that, and again after any change to them.
+
+How Codex differs:
+
+- Codex' hooks are commands. The forwarder passes each event to the hub on `127.0.0.1` with the hook
+  token from the token file and prints the hub's answer. Without a hub it ends at once, and Codex asks
+  as usual.
+- The Codex app shows its own approval card only after the hook has answered. So a Codex request waits
+  on the display for 30 s (`codexHoldSeconds`, 10 to 35) and then goes to the app; **In the app** hands
+  it over at once.
+- With "Approve for me" Codex' own reviewer decides. Stellwerk then holds nothing and shows no card; it
+  reads that setting from the session's transcript.
+- Questions Codex asks you are listed under "Answer in the app". The app's short helper sessions, which
+  have no transcript, are not shown.
+- The context ring uses the window Codex records with its token counts.
+
+`stellwerk codex uninstall` removes exactly these hooks.
+
 ## How a permission request goes
 
 1. Claude Code wants to run a tool that needs your permission and sends the request to the hub.
@@ -241,7 +274,8 @@ session appears with its first event, which in the desktop app is the first prom
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
 | `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
-| `contextWindows` | Context windows by model id for the rings, for models Stellwerk does not know, e.g. `{ "claude-sonnet-5-5": 1000000 }`. Known: Opus 5.5 with 1M. Otherwise 200k, or 1M once more than 200k are in use. |
+| `contextWindows` | Context windows by model id for the rings, for models Stellwerk does not know, e.g. `{ "claude-sonnet-5-5": 1000000 }`. Known: Opus 5.5 with 1M. Otherwise 200k, or 1M once more than 200k are in use. Codex records its window itself. |
+| `codexHoldSeconds` | How long a Codex request waits on the display before the Codex app shows its own card: 10 to 35, 30 by default. |
 
 Restart the hub after a change.
 
@@ -262,6 +296,7 @@ Restart the hub after a change.
 | Firewall rule `Stellwerk-block-inbound-4780` | Blocks the port for other machines |
 | `C:\Program Files\Stellwerk\LibreHardwareMonitor\` | LibreHardwareMonitor with its settings, if set up |
 | Task `Stellwerk hardware`, firewall rule `Stellwerk-block-inbound-8085` | Its start at logon, and its port closed to other machines |
+| `%USERPROFILE%\.codex\hooks.json` | Codex' hooks with Stellwerk's forwarder, if set up; backups next to it as `hooks.json.stellwerk-….bak` |
 
 ## Safety
 
@@ -279,9 +314,12 @@ Restart the hub after a change.
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
 - For the context rings the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
-  (a path elsewhere in a hook event is ignored), only from their end, and only the token counts and the
-  model of the last answer. Prompts, code and answers in them are not read into the hub's state and
-  never reach the display.
+  and `%USERPROFILE%\.codex\sessions` (a path elsewhere in a hook event is ignored), only from their end,
+  and only the token counts, the model, the context window and, for Codex, who approves. Prompts, code
+  and answers in them are not read into the hub's state and never reach the display.
+- Codex events come through Stellwerk's forwarder to their own endpoint, with the same checks as the
+  others (token, content type, `Host`). The forwarder reads the hook token from the token file, talks
+  only to `127.0.0.1` and prints only the hub's answer.
 - `stellwerk hardware install` downloads one file, pinned by size and SHA-256, and unpacks it only into
   its own folder in Program Files. LibreHardwareMonitor runs with administrator rights; its web server
   needs a password and is closed to other machines by a firewall rule.
@@ -310,6 +348,7 @@ If the console stays silent, Claude Code sends nothing: check that the hooks are
 stellwerk autostart uninstall
 stellwerk github remove
 stellwerk hooks uninstall
+stellwerk codex uninstall
 stellwerk hardware uninstall # as administrator: LibreHardwareMonitor, its task and firewall rule
 stellwerk uninstall          # as administrator: removes the firewall rule
 npm rm -g stellwerk          # if you used npm link

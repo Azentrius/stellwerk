@@ -1,13 +1,13 @@
 // The agents column: every session with the ring of its context in front, its name (bold) and how long ago
-// it was active on top, its project (and subagents) and its state below; the most urgent first (the hub
-// sorts them).
+// it was active on top; below whose agent it is if not Claude's (e.g. "Codex"), its project (and
+// subagents) and its state; the most urgent first (the hub sorts them).
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ContextUsage, SessionView } from '../../src/shared/protocol.js';
 import { CONTEXT_FULL, contextPercent } from './context.ts';
 import { el, entry } from './dom.ts';
-import type { Texts } from './i18n.ts';
+import { providerTag, type Texts } from './i18n.ts';
 import { sessionState } from './states.ts';
 import { ago } from './time.ts';
 
@@ -19,7 +19,9 @@ export function renderAgents(list: HTMLElement, sessions: SessionView[], now: nu
   list.replaceChildren(
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);
-      const details = [project, session.subagents > 0 ? texts.subagents(session.subagents) : ''].filter(Boolean).join(' · ');
+      const details = [providerTag(session.provider, texts), project, session.subagents > 0 ? texts.subagents(session.subagents) : '']
+        .filter(Boolean)
+        .join(' · ');
       const item = entry(`agent agent--${session.status} entry--ring`, name, ago(now - session.lastActivity, texts), details, sessionState(session.status, texts));
       item.title = session.cwd;
       item.prepend(contextRing(session.context, texts));
