@@ -80,10 +80,11 @@ interface Session {
   /**
    * Requests of subagents that went to the app's own card (handed over, or the hold time ran out), by
    * request id. Kept apart from the main agent's status: they show only while the main agent waits for
-   * nothing else (its question or input comes first), and end with the subagent's next event, its stop,
-   * the end of the turn or a new prompt.
+   * nothing else (its question or input comes first), and end with the run of their own tool, the
+   * subagent's stop, the end of the turn or a new prompt. `order` is the request's place in the order of
+   * arrival (Permission.order), `since` when it went to the app.
    */
-  subagentAppRequests: Map<string, { agentId: string; tool: string; inputKey: string; since: number }>;
+  subagentAppRequests: Map<string, { agentId: string; tool: string; inputKey: string; order: number; since: number }>;
   /** How full the context is, from the transcript; null until read. */
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
@@ -142,6 +143,8 @@ export interface Permission {
   input: Record<string, unknown>;
   /** The input in a canonical form, to recognise it in PostToolUse. */
   inputKey: string;
+  /** Counts up with every request, so the older of two is known even when they arrived in the same ms. */
+  order: number;
   mcpServer: string | null;
   receivedAt: number;
   holdUntil: number;
@@ -160,6 +163,7 @@ export class Board {
   readonly permissions = new Map<string, Permission>();
   /** Projects found before their session appeared (a request as its first event); taken when it does. */
   private readonly projectsAhead = new Map<string, string>();
+  private requestsReceived = 0;
   lastEventAt: number | null = null;
 
   /** Applies a hook event other than PermissionRequest. Returns the open requests it settles. */
@@ -167,18 +171,12 @@ export class Board {
     const session = this.touch(event, now, provider);
     if (isOther(event)) return [];
     const agentId = event.agent_id ?? null;
-    // A subagent's request at the app's card is over when its own tool ran or failed (same agent, tool and
-    // input, matched like a held request), when the subagent stops, at the end of the turn or a new prompt.
+    // A subagent's request at the app's card is over when the subagent stops, at the end of the turn or a
+    // new prompt; or when its own tool ran or failed (matched together with the held requests, below).
     const name = event.hook_event_name;
     if (name === 'UserPromptSubmit' || name === 'Stop' || name === 'SessionEnd') session.subagentAppRequests.clear();
     else if (agentId !== null && name === 'SubagentStop') {
       for (const [id, request] of session.subagentAppRequests) if (request.agentId === agentId) session.subagentAppRequests.delete(id);
-    } else if (agentId !== null && (name === 'PostToolUse' || name === 'PostToolUseFailure')) {
-      const candidates = [...session.subagentAppRequests].filter(([, r]) => r.agentId === agentId && r.tool === event.tool_name);
-      const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
-      // Without the input, only a single candidate is sure; with it, the oldest request with that input.
-      const match = inputKey !== null ? candidates.find(([, r]) => r.inputKey === inputKey) : candidates.length === 1 ? candidates[0] : undefined;
-      if (match) session.subagentAppRequests.delete(match[0]);
     }
 
     switch (event.hook_event_name) {
@@ -210,11 +208,7 @@ export class Board {
         if (event.hook_event_name === 'PostToolUse' && ASYNC_QUESTION_TOOLS.has(event.tool_name) && agentId === null) {
           session.openQuestion = { question: firstQuestion(event.tool_input), since: now };
         }
-        const candidates = this.pendingOf(session.id).filter((p) => p.agentId === agentId && p.tool === event.tool_name);
-        const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
-        const match =
-          inputKey !== null ? candidates.find((p) => p.inputKey === inputKey) : candidates.length === 1 ? candidates[0] : undefined;
-        return match ? this.settleWhere((p) => p === match, 'decided-in-app', now) : [];
+        return this.endToolRequest(session, agentId, event.tool_name, event.tool_input, now);
       }
 
       case 'Notification': {
@@ -262,6 +256,7 @@ export class Board {
       tool: event.tool_name,
       input: event.tool_input,
       inputKey: canonicalJson(event.tool_input),
+      order: ++this.requestsReceived,
       mcpServer: event.mcp_server?.name ?? null,
       receivedAt: now,
       holdUntil: now + holdMs,
@@ -366,6 +361,7 @@ export class Board {
           agentId: permission.agentId,
           tool: permission.tool,
           inputKey: permission.inputKey,
+          order: permission.order,
           since: now,
         });
       }
@@ -455,6 +451,33 @@ export class Board {
     if (session.base === 'ended') return 'ended';
     if (this.pendingOf(session.id).length > 0) return 'permission';
     return waitingOf(session) ? 'waiting' : session.base;
+  }
+
+  /**
+   * A tool ran or failed: it ends at most one request of the same agent and tool, still held or already at
+   * the app's card, in one choice over both. With the input it is the oldest request with that input; a
+   * second one with the same input stays open. Without the input it is the only candidate there is; with
+   * more than one, the match is unsure and nothing ends. A held request ends as decided in the app.
+   */
+  private endToolRequest(session: Session, agentId: string | null, tool: string, input: Record<string, unknown> | undefined, now: number): Settlement[] {
+    type Candidate = { order: number; inputKey: string; end: () => Settlement[] };
+    const held = this.pendingOf(session.id)
+      .filter((p) => p.agentId === agentId && p.tool === tool)
+      .map((p): Candidate => ({ order: p.order, inputKey: p.inputKey, end: () => this.settleWhere((q) => q === p, 'decided-in-app', now) }));
+    const atApp = [...session.subagentAppRequests]
+      .filter(([, r]) => r.agentId === agentId && r.tool === tool)
+      .map(([id, r]): Candidate => ({
+        order: r.order,
+        inputKey: r.inputKey,
+        end: () => {
+          session.subagentAppRequests.delete(id);
+          return [];
+        },
+      }));
+    const candidates = [...held, ...atApp].sort((a, b) => a.order - b.order);
+    const inputKey = input ? canonicalJson(input) : null;
+    const match = inputKey !== null ? candidates.find((c) => c.inputKey === inputKey) : candidates.length === 1 ? candidates[0] : undefined;
+    return match ? match.end() : [];
   }
 
   private pendingOf(sessionId: string): Permission[] {

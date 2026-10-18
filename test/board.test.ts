@@ -13,6 +13,7 @@ import {
   WRAP_UP_TOOL,
   canonicalJson,
   projectName,
+  type Settlement,
 } from '../src/hub/board.ts';
 import type { HookEvent, PermissionRequestEvent } from '../src/hub/hook-input.ts';
 
@@ -550,6 +551,87 @@ describe('subagents', () => {
         board.apply(ran({ command: 'echo one' }), 30);
         const s = board.view().sessions[0];
         assert.deepEqual([s?.status, s?.waitingFor, s?.question, s?.waitingSince], ['waiting', 'question', 'Which branch?', 2]);
+      });
+
+      describe('next to a request of the same tool still held', () => {
+        const SAME = { command: 'echo same' };
+        /**
+         * Subagent a1's Bash request 'app' at the app's card from 10 and its request 'held' still on the
+         * display; 'app' asked first (at 5, 'held' at 11), with heldFirst 'held' (at 5, 'app' at 6).
+         */
+        const appAndHeld = (appInput: Record<string, unknown>, heldInput: Record<string, unknown>, options: { heldFirst?: boolean; withQuestion?: boolean } = {}) => {
+          const board = new Board();
+          board.apply(event('UserPromptSubmit'), 1);
+          if (options.withQuestion) board.askUser(request({ questions: [{ question: 'Which branch?' }] }, { tool_name: 'AskUserQuestion' }), 2);
+          if (options.heldFirst) board.addPermission('held', request(heldInput, { agent_id: 'a1' }), 5, HOLD);
+          board.addPermission('app', request(appInput, { agent_id: 'a1' }), options.heldFirst ? 6 : 5, HOLD);
+          board.settle('app', outcome, 10);
+          if (!options.heldFirst) board.addPermission('held', request(heldInput, { agent_id: 'a1' }), 11, HOLD);
+          /** Which of the two are still open: 'held' on the display, 'app' at the app's card. */
+          const open = () => ({
+            held: board.permissions.get('held')?.outcome === null,
+            app: board.sessions.get(SESSION)?.subagentAppRequests.has('app') ?? false,
+          });
+          const shown = () => {
+            const s = board.view().sessions[0];
+            return [s?.status, s?.waitingFor, s?.waitingSince];
+          };
+          return { board, open, shown };
+        };
+        const ended = (settled: Settlement[]) => settled.map((s) => [s.permission.id, s.outcome]);
+
+        for (const name of ['PostToolUse', 'PostToolUseFailure']) {
+          test(`${name} with the input both have ends only the older one, the one at the app's card`, () => {
+            const { board, open, shown } = appAndHeld(SAME, SAME);
+            assert.deepEqual(ended(board.apply(ran(SAME, {}, name), 20)), [], 'the held request gets no answer');
+            assert.deepEqual(open(), { held: true, app: false });
+            assert.equal(statusOf(board), 'permission');
+            // The next run with that input is the held request's.
+            assert.deepEqual(ended(board.apply(ran(SAME, {}, name), 21)), [['held', 'decided-in-app']]);
+            assert.deepEqual(shown(), ['working', null, null]);
+          });
+
+          test(`${name} with the input both have ends only the older one, the held one`, () => {
+            const { board, open, shown } = appAndHeld(SAME, SAME, { heldFirst: true });
+            assert.deepEqual(ended(board.apply(ran(SAME, {}, name), 20)), [['held', 'decided-in-app']]);
+            assert.deepEqual(open(), { held: false, app: true });
+            assert.deepEqual(shown(), ['waiting', 'permission', 10]);
+          });
+
+          test(`${name} without input, with one candidate in each state, ends neither, also after the sweep`, () => {
+            const { board, open, shown } = appAndHeld({ command: 'echo one' }, { command: 'echo two' });
+            board.sweep(10 + SETTLED_VISIBLE_MS + 1);
+            assert.deepEqual(ended(board.apply(ran(undefined, {}, name), 10 + SETTLED_VISIBLE_MS + 2)), []);
+            assert.deepEqual(open(), { held: true, app: true });
+            // Once the held one is decided on the display, the one at the app's card is the only candidate.
+            board.settle('held', 'allowed', 10 + SETTLED_VISIBLE_MS + 3);
+            assert.deepEqual(shown(), ['waiting', 'permission', 10]);
+            board.apply(ran(undefined, {}, name), 10 + SETTLED_VISIBLE_MS + 4);
+            assert.deepEqual(open(), { held: false, app: false });
+            assert.deepEqual(shown(), ['working', null, null]);
+          });
+
+          test(`${name} with an input only one of them has ends just that one, whatever its state`, () => {
+            const first = appAndHeld({ command: 'echo one' }, { command: 'echo two' });
+            assert.deepEqual(ended(first.board.apply(ran({ command: 'echo one' }, {}, name), 20)), []);
+            assert.deepEqual(first.open(), { held: true, app: false });
+            const second = appAndHeld({ command: 'echo one' }, { command: 'echo two' });
+            assert.deepEqual(ended(second.board.apply(ran({ command: 'echo two' }, {}, name), 20)), [['held', 'decided-in-app']]);
+            assert.deepEqual(second.open(), { held: false, app: true });
+          });
+
+          test(`${name} after the sweep keeps the main agent's question, and the remaining request ends with its own run`, () => {
+            const { board, open } = appAndHeld(SAME, SAME, { withQuestion: true });
+            const later = 10 + SETTLED_VISIBLE_MS + 1;
+            board.sweep(later);
+            assert.deepEqual(board.view().permissions.map((p) => p.id), ['held'], "the card of the one at the app's card is gone");
+            assert.deepEqual(ended(board.apply(ran(SAME, {}, name), later + 1)), []);
+            assert.deepEqual(open(), { held: true, app: false });
+            assert.deepEqual(ended(board.apply(ran(SAME, {}, name), later + 2)), [['held', 'decided-in-app']]);
+            const s = board.view().sessions[0];
+            assert.deepEqual([s?.status, s?.waitingFor, s?.question, s?.waitingSince], ['waiting', 'question', 'Which branch?', 2]);
+          });
+        }
       });
     });
   }

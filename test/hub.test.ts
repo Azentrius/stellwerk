@@ -965,6 +965,43 @@ describe('permission requests', () => {
     screen.close();
   });
 
+  for (const { outcome, name, withInput } of [
+    { outcome: 'handed-to-app', name: 'PostToolUse', withInput: true },
+    { outcome: 'timed-out', name: 'PostToolUseFailure', withInput: false },
+  ] as const) {
+    test(`a subagent's request ${outcome}, one of the same tool held: one ${name} ${withInput ? 'with the same input' : 'without input'} leaves the held one to the display`, async () => {
+      const { port, auditFile } = await startTestHub({ holdMs: 1500 });
+      const screen = await display(port);
+      await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+      const bash = (command: string) => ({ agent_id: 'a1', tool_name: 'Bash', tool_input: { command } });
+      const first = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo same') });
+      const firstId = await openRequestId(screen);
+      if (outcome === 'handed-to-app') screen.decide(firstId, 'app');
+      assert.equal((await first.reply).body, '', outcome);
+      const second = hook(port, { hook_event_name: 'PermissionRequest', ...bash(withInput ? 'echo same' : 'echo other') });
+      const held = await screen.state((s) => s.permissions.some((p) => p.outcome === null && p.id !== firstId));
+      const id = held.permissions.find((p) => p.outcome === null)!.id;
+      const event = withInput ? bash('echo same') : { agent_id: 'a1', tool_name: 'Bash' };
+      assert.equal((await hook(port, { hook_event_name: name, ...event }).reply).status, 200);
+      // The held request is still the display's to decide: the decision reaches the agent.
+      screen.decide(id, 'deny');
+      const reply = await second.reply;
+      assert.equal(reply.status, 200);
+      assert.equal(JSON.parse(reply.body).hookSpecificOutput.decision.behavior, 'deny');
+      await eventually(() => auditLines(auditFile).length === 2);
+      assert.deepEqual(
+        auditLines(auditFile).map((line) => line.result),
+        [outcome, 'denied'],
+        'nothing was decided in the app',
+      );
+      // Its tool ran (with the input) or the match was unsure (without): the one at the app's card is over,
+      // or still waits there.
+      const state = await screen.state((s) => s.permissions.some((p) => p.id === id && p.outcome === 'denied'));
+      assert.deepEqual([state.sessions[0]?.status, state.sessions[0]?.waitingFor], withInput ? ['working', null] : ['waiting', 'permission']);
+      screen.close();
+    });
+  }
+
   test('a question to the user (AskUserQuestion) goes straight back to the app: no card, no audit entry', async () => {
     const { port, auditFile } = await startTestHub();
     const screen = await display(port);
