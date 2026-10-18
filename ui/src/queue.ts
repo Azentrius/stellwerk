@@ -101,7 +101,7 @@ export class QueueView {
     const wait = el('span', 'card__wait');
     line.append(el('span', 'card__name', name), el('span', 'card__sep', '·'), el('span', 'card__tool', view.tool), wait);
     head.append(line);
-    if (project) head.append(el('p', 'card__project', project));
+    head.append(el('p', 'card__project', [t.providers[view.provider], project].filter(Boolean).join(' · ')));
     root.append(head, renderToolInput(view.tool, view.input, view.mcpServer, t));
 
     const hold = el('div', 'card__hold');

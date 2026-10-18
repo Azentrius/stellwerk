@@ -25,7 +25,10 @@ export function renderAnswers(list: HTMLElement, sessions: Array<SessionView & {
   list.replaceChildren(
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);
-      const since = session.waitingSince === null ? '' : texts.since(duration(now - session.waitingSince));
+      // Whose agent it is, with how long it has been waiting ("Codex · 0:42").
+      const since = [texts.providers[session.provider], session.waitingSince === null ? '' : duration(now - session.waitingSince)]
+        .filter(Boolean)
+        .join(' · ');
       // The same state as "waiting for you" in the agents column: a note, with the reason as its word.
       return entry('answer entry--short', name, since, session.question ?? project, state('info', texts.waitingFor[session.waitingFor]));
     }),

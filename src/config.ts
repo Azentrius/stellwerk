@@ -10,6 +10,13 @@ import { z } from 'zod';
 /** The hub listens on this address only. Fixed on purpose: only the port can be configured. */
 export const HOST = '127.0.0.1';
 export const HOOK_PATH = '/hooks/claude-code';
+/** Codex' hooks are commands; its forwarder (dist/codex/hook.js) posts their events here. */
+export const CODEX_HOOK_PATH = '/hooks/codex';
+/**
+ * Timeout of Codex' PermissionRequest hook, in seconds. The Codex app shows its own approval card only
+ * after the hook, so the hold time is kept short (`codexHoldSeconds`) and at least 10 s below this.
+ */
+export const CODEX_PERMISSION_TIMEOUT_S = 45;
 /** Timeout of the PermissionRequest hook in Claude Code's settings, in seconds. */
 export const PERMISSION_HOOK_TIMEOUT_S = 90;
 /** The hold time stays at least this much shorter than the hook timeout. */
@@ -31,6 +38,8 @@ export interface Paths {
    * administrators can change it: it runs with their rights.
    */
   hardwareDir: string;
+  /** Codex' home: its hooks.json, and its transcripts under sessions/. */
+  codexHome: string;
 }
 
 /** %APPDATA%\stellwerk for the configuration, %LOCALAPPDATA%\stellwerk for everything the hub writes. */
@@ -47,6 +56,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
     hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),
+    codexHome: env.CODEX_HOME || path.join(home, '.codex'),
   };
 }
 
@@ -69,6 +79,16 @@ const configSchema = z.strictObject({
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
   /** Show CPU, memory and graphics card from LibreHardwareMonitor (set by `stellwerk hardware install`). */
   hardwareMonitor: z.boolean().default(false),
+  /**
+   * How long a Codex request waits on the display before the Codex app shows its own card. Short, since
+   * the app waits for it; at least 10 s below Codex' hook timeout of 45 s.
+   */
+  codexHoldSeconds: z
+    .number()
+    .int()
+    .min(10)
+    .max(CODEX_PERMISSION_TIMEOUT_S - HOLD_MARGIN_S)
+    .default(30),
   /** Context windows by model id, for models Stellwerk does not know (e.g. "claude-sonnet-5-5": 1000000). */
   contextWindows: z.record(z.string().min(1).max(200), z.number().int().min(1000).max(100_000_000)).default({}),
 });

@@ -1,6 +1,6 @@
-// The agents column: every session with the ring of its context in front, its name (bold) and how long ago
-// it was active on top, its project (and subagents) and its state below; the most urgent first (the hub
-// sorts them).
+// The agents column: every session with the ring of its context in front, its name (bold), whose agent it
+// is and how long ago it was active on top ("Claude · 12 s"), its project (and subagents) and its state
+// below; the most urgent first (the hub sorts them). All agents look alike.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,7 +9,7 @@ import { CONTEXT_FULL, contextPercent } from './context.ts';
 import { el, entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { sessionState } from './states.ts';
-import { ago } from './time.ts';
+import { elapsed } from './time.ts';
 
 const SVG = 'http://www.w3.org/2000/svg';
 /** A circle of this radius in a 36 × 36 box is 100 units around, so a percentage is its own dash length. */
@@ -20,7 +20,9 @@ export function renderAgents(list: HTMLElement, sessions: SessionView[], now: nu
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);
       const details = [project, session.subagents > 0 ? texts.subagents(session.subagents) : ''].filter(Boolean).join(' · ');
-      const item = entry(`agent agent--${session.status} entry--ring`, name, ago(now - session.lastActivity, texts), details, sessionState(session.status, texts));
+      // Whose agent it is, for every session alike, with the time, which is kept short for it ("12 s").
+      const time = `${texts.providers[session.provider]} · ${elapsed(now - session.lastActivity, texts)}`;
+      const item = entry(`agent agent--${session.status} entry--ring`, name, time, details, sessionState(session.status, texts));
       item.title = session.cwd;
       item.prepend(contextRing(session.context, texts));
       return item;

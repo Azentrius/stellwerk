@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { HOOK_PATH } from '../src/config.ts';
+import { CODEX_HOOK_PATH, HOOK_PATH } from '../src/config.ts';
 import { startHub } from '../src/hub/hub.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -81,6 +81,15 @@ for (const [session, tokens] of Object.entries(CONTEXT_TOKENS)) {
   const line = { type: 'assistant', message: { model: 'claude-opus-5-5', usage: { input_tokens: 2, cache_read_input_tokens: tokens - 1_002, output_tokens: 1_000 } } };
   fs.writeFileSync(path.join(transcripts, 'demo', `${session}.jsonl`), `${JSON.stringify(line)}\n`);
 }
+// And one Codex session, whose rollout has a token_count with its window.
+const codexSessions = path.join(demoDir, 'codex', 'sessions');
+fs.mkdirSync(path.join(codexSessions, '2026'), { recursive: true });
+const codexRollout = path.join(codexSessions, '2026', 'rollout-demo.jsonl');
+fs.writeFileSync(
+  codexRollout,
+  `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: 'user' } })}\n` +
+    `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 } } })}\n`,
+);
 
 const hub = await startHub({
   port,
@@ -94,19 +103,23 @@ const hub = await startHub({
   webRoot: path.join(ROOT, 'dist', 'ui'),
   github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
-  context: { root: transcripts, intervalMs: 300 },
+  context: { root: transcripts, codexRoot: codexSessions, intervalMs: 300 },
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
 
-function send(session: string, project: string, body: Record<string, unknown>): void {
-  const transcript = session in CONTEXT_TOKENS ? { transcript_path: path.join(transcripts, 'demo', `${session}.jsonl`) } : {};
+function send(session: string, project: string, body: Record<string, unknown>, codex = false): void {
+  const transcript = codex
+    ? { transcript_path: codexRollout }
+    : session in CONTEXT_TOKENS
+      ? { transcript_path: path.join(transcripts, 'demo', `${session}.jsonl`) }
+      : {};
   const payload = JSON.stringify({ session_id: session, cwd: `C:\\Projects\\${project}`, ...transcript, ...body });
   const req = http.request({
     host: '127.0.0.1',
     port: hub.port,
     method: 'POST',
-    path: HOOK_PATH,
+    path: codex ? CODEX_HOOK_PATH : HOOK_PATH,
     agent: false,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
   });
@@ -122,7 +135,7 @@ send('mobile', 'mobile-app', { hook_event_name: 'SessionEnd', reason: 'other' })
 send('pipeline', 'data-pipeline', { hook_event_name: 'UserPromptSubmit', session_title: 'Nightly import' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a2', agent_type: 'Plan' });
-send('website', 'website', { hook_event_name: 'Notification', notification_type: 'idle_prompt', session_title: 'New landing page' });
+send('firmware', 'car-firmware', { hook_event_name: 'UserPromptSubmit', model: 'gpt-6-astra', prompt: 'Update the CAN driver' }, true);
 // Waiting for an answer in the app: a question, and a permission the app shows itself.
 send('design', 'design-tokens', {
   hook_event_name: 'PermissionRequest',

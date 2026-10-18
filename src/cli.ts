@@ -18,7 +18,8 @@ import {
   appSettingsXml,
   parseAppSettings,
 } from './hub/hardware.ts';
-import { defaultTranscriptsRoot } from './hub/context.ts';
+import { codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
+import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
 import { startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -113,6 +114,11 @@ Usage:
       (as administrator).
   stellwerk hardware uninstall [--yes]
       Remove it again (as administrator).
+  stellwerk codex install [--yes]
+      Show the Codex app's sessions and approvals too: add Stellwerk's hooks to Codex' hooks.json.
+      Then restart the Codex app and allow the hooks there.
+  stellwerk codex uninstall [--yes]
+      Remove exactly these hooks.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -149,6 +155,7 @@ async function main(): Promise<void> {
   }
   if (command === 'github' && (action === 'token' || action === 'remove')) return githubToken(action, values.owner);
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
+  if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -178,6 +185,7 @@ async function serve(
       port: config.port,
       token,
       holdMs: config.holdSeconds * 1000,
+      codexHoldMs: config.codexHoldSeconds * 1000,
       scale: config.scale,
       version: VERSION,
       sound: config.sound,
@@ -188,7 +196,7 @@ async function serve(
       simulateHang,
       github,
       hardware,
-      context: { root: defaultTranscriptsRoot(), windows: config.contextWindows },
+      context: { root: defaultTranscriptsRoot(), codexRoot: codexTranscriptsRoot(paths.codexHome), windows: config.contextWindows },
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
@@ -369,6 +377,53 @@ async function githubToken(action: 'token' | 'remove', owner: string | undefined
   saveGitHubToken(paths.githubTokenFile, token);
   if (owner && owner !== config.githubOwner) setConfigValue(paths.configFile, 'githubOwner', owner);
   console.log(`Saved to ${paths.githubTokenFile} (readable by you only). Restart the hub to show the pull requests.`);
+}
+
+async function codex(action: 'install' | 'uninstall', yes: boolean): Promise<void> {
+  const paths = defaultPaths();
+  const file = codexHooksFile(paths.codexHome);
+  const script = path.join(ROOT, 'dist', 'codex', 'hook.js');
+  if (action === 'install' && !fs.existsSync(script)) throw new Error('dist/codex/hook.js is missing. Run "npm run build" first.');
+  const exists = fs.existsSync(file);
+  const before = exists ? fs.readFileSync(file, 'utf8') : '';
+  const current = exists ? readJsonFile(file) : {};
+  if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+    throw new Error(`${file} does not hold a JSON object. Nothing changed.`);
+  }
+  const hooks = current as Record<string, unknown>;
+  const next = action === 'install' ? withStellwerkCodexHooks(hooks, script) : withoutStellwerkCodexHooks(hooks);
+  const after = Object.keys(next).length === 0 && action === 'uninstall' ? '' : formatSettings(next);
+  if (normalize(after) === normalize(before)) return void console.log('Nothing to change.');
+
+  console.log(`${file}\n`);
+  console.log(colorDiff(lineDiff(before, after)));
+  console.log();
+  if (action === 'install') {
+    console.log('Codex runs the forwarder for each event; it passes the event to the hub on 127.0.0.1 with the');
+    console.log('hook token from the token file. Without a hub it ends at once and Codex asks as usual.');
+  }
+  if (!(await confirm(yes))) return void console.log('Nothing changed.');
+
+  if (action === 'install') ensureToken(paths.tokenFile);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (exists) {
+    const backup = `${file}.stellwerk-${new Date().toISOString().replace(/[:.]/g, '-')}.bak`;
+    fs.copyFileSync(file, backup);
+    console.log(`Backup: ${backup}`);
+  }
+  if (after === '') {
+    fs.rmSync(file);
+    console.log(`Removed: ${file} (it held only Stellwerk's hooks)`);
+  } else {
+    fs.writeFileSync(file, after);
+    console.log(`Written: ${file}`);
+  }
+  console.log(
+    action === 'install'
+      ? 'Restart the Codex app and allow the new hooks there (the hook symbol in the input field, "Review hooks").\n' +
+          'Codex runs them only after that, and again after any change to them.'
+      : 'Restart the Codex app so that the change applies.',
+  );
 }
 
 async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<void> {
