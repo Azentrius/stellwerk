@@ -19,7 +19,7 @@ nearly full context turns red.
 - **Red when little is left:** the context meter in front of an agent stays grey up to 79 %, needs
   attention from 80 % and is red from 90 %; the app compacts the context at about 97 %.
 - **One grid for the gauges:** the rows of hardware and plan usage share their columns, so the bars line
-  up. When an alert above leaves too little room, the gauges fade out at the bottom instead of pushing
+  up, and each section stands under the same line as the signature. When an alert above leaves too little room, the gauges fade out at the bottom instead of pushing
   the signature off the screen.
 
 ## 0.3.0 – 2026-10-18

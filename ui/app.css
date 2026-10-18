@@ -237,7 +237,8 @@ button { font: inherit; }
 /* Short of room (an alert above): the gauges give way and fade out at the bottom, like a full column. */
 .gauge-sections--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
 .plans { display: contents; }
-.gauge-section { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
+/* Each section under the same line as the signature. */
+.gauge-section { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; padding-block-start: var(--sp-sm); border-block-start: 1px solid var(--line); }
 .gauge-section > :not(.gauges) { grid-column: 1 / -1; }
 .gauges { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; row-gap: var(--sp-sm); margin: 0; }
 .gauge { display: contents; }
