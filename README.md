@@ -6,13 +6,16 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code session and lets you answer their permission requests right there. Like a dispatcher who sees
 every train on the track diagram and sets the signals.
 
-![The display at 1920×720: the sessions on the left, what waits for you next to them, room for more, clock, hub and hardware on the right](docs/display.png)
+![The display at 1920×720: the sessions with their context rings on the left, what waits for you next to them, room for monitoring, clock, hub and hardware on the right](docs/display.png)
 
 ## What it does
 
 - **Every session at a glance.** In the left column, each session with its name (bold) and project and
   its status: waiting for approval, waiting for you, working, done, ended. With the number of running
   subagents and the time of the last activity. The most urgent first.
+- **How full the context is.** A ring in front of each session shows how much of its context window is
+  used, from 0 to 100 %, as the ring in the Claude app does; from 80 % it needs attention. The hub takes
+  the token counts of the last answer from the session's transcript.
 - **Permission requests on the display.** Each request becomes a card with the complete input: a shell
   command in full, a file change with path and content, an MCP call with server, tool and parameters.
   **Allow**, **Deny**, or **In the app** to leave it to the Claude app. The oldest request is on top; the
@@ -238,6 +241,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
 | `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
+| `contextWindows` | Context windows by model id for the rings, for models Stellwerk does not know, e.g. `{ "claude-sonnet-5-5": 1000000 }`. Known: Opus 5.5 with 1M. Otherwise 200k, or 1M once more than 200k are in use. |
 
 Restart the hub after a change.
 
@@ -274,6 +278,10 @@ Restart the hub after a change.
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
+- For the context rings the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
+  (a path elsewhere in a hook event is ignored), only from their end, and only the token counts and the
+  model of the last answer. Prompts, code and answers in them are not read into the hub's state and
+  never reach the display.
 - `stellwerk hardware install` downloads one file, pinned by size and SHA-256, and unpacks it only into
   its own folder in Program Files. LibreHardwareMonitor runs with administrator rights; its web server
   needs a password and is closed to other machines by a firewall rule.

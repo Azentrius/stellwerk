@@ -69,6 +69,8 @@ const configSchema = z.strictObject({
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
   /** Show CPU, memory and graphics card from LibreHardwareMonitor (set by `stellwerk hardware install`). */
   hardwareMonitor: z.boolean().default(false),
+  /** Context windows by model id, for models Stellwerk does not know (e.g. "claude-sonnet-5-5": 1000000). */
+  contextWindows: z.record(z.string().min(1).max(200), z.number().int().min(1000).max(100_000_000)).default({}),
 });
 
 export type Config = z.infer<typeof configSchema>;

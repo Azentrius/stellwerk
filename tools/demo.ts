@@ -66,6 +66,21 @@ const demoHardwareFetch = (async () =>
     { status: 200 },
   )) as typeof fetch;
 const demoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-'));
+// Made-up transcripts with nothing but the token counts of one answer, for the context rings.
+const transcripts = path.join(demoDir, 'projects');
+fs.mkdirSync(path.join(transcripts, 'demo'), { recursive: true });
+const CONTEXT_TOKENS: Record<string, number> = {
+  shop: 591_500,
+  infra: 142_000,
+  design: 860_000,
+  website: 330_000,
+  pipeline: 470_000,
+  docs: 95_000,
+};
+for (const [session, tokens] of Object.entries(CONTEXT_TOKENS)) {
+  const line = { type: 'assistant', message: { model: 'claude-opus-5-5', usage: { input_tokens: 2, cache_read_input_tokens: tokens - 1_002, output_tokens: 1_000 } } };
+  fs.writeFileSync(path.join(transcripts, 'demo', `${session}.jsonl`), `${JSON.stringify(line)}\n`);
+}
 
 const hub = await startHub({
   port,
@@ -79,12 +94,14 @@ const hub = await startHub({
   webRoot: path.join(ROOT, 'dist', 'ui'),
   github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
+  context: { root: transcripts, intervalMs: 300 },
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
 
 function send(session: string, project: string, body: Record<string, unknown>): void {
-  const payload = JSON.stringify({ session_id: session, cwd: `C:\\Projects\\${project}`, ...body });
+  const transcript = session in CONTEXT_TOKENS ? { transcript_path: path.join(transcripts, 'demo', `${session}.jsonl`) } : {};
+  const payload = JSON.stringify({ session_id: session, cwd: `C:\\Projects\\${project}`, ...transcript, ...body });
   const req = http.request({
     host: '127.0.0.1',
     port: hub.port,

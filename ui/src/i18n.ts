@@ -52,6 +52,9 @@ export interface Texts {
   ago: (n: number, unit: TimeUnit) => string;
   justNow: string;
   subagents: (n: number) => string;
+  /** The context ring of an agent: how full, as its name and tooltip; or not known yet. */
+  context: (percent: string) => string;
+  contextUnknown: string;
   alreadyDecided: string;
   notOpen: string;
   command: string;
@@ -146,6 +149,8 @@ const en: Texts = {
   ago: (n, unit) => `${n} ${unit} ago`,
   justNow: 'just now',
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
+  context: (percent) => `Context ${percent} used`,
+  contextUnknown: 'Context not known yet',
   alreadyDecided: 'Already decided.',
   notOpen: 'This request is no longer open.',
   command: 'Command',
@@ -239,6 +244,8 @@ const de: Texts = {
   ago: (n, unit) => `vor ${n} ${unit}`,
   justNow: 'gerade eben',
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
+  context: (percent) => `Kontext ${percent} genutzt`,
+  contextUnknown: 'Kontext noch unbekannt',
   alreadyDecided: 'Bereits entschieden.',
   notOpen: 'Diese Anfrage ist nicht mehr offen.',
   command: 'Befehl',

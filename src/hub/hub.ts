@@ -16,6 +16,7 @@ import type { Decision, DecisionResultMessage, PermissionOutcome, StateMessage }
 import { HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
+import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { isOther, parseHookInput, type PermissionRequestEvent } from './hook-input.ts';
@@ -57,6 +58,11 @@ export interface HubOptions {
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
   hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch } | null;
+  /**
+   * How full each session's context is: the token counts of the last answer in its transcript, read only
+   * under `root` (~/.claude/projects). Windows by model from the configuration.
+   */
+  context?: { root: string; windows?: Record<string, number>; intervalMs?: number } | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -139,6 +145,15 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     ? new HardwareWatcher({ ...options.hardware, now, onChange: () => scheduleBroadcast(), log })
     : null;
   hardware?.start();
+  const context = options.context
+    ? new ContextReader({
+        ...options.context,
+        log,
+        onUsage: (sessionId, usage) => {
+          if (board.setContext(sessionId, usage)) scheduleBroadcast();
+        },
+      })
+    : null;
 
   // ---------- HTTP ----------
 
@@ -208,6 +223,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       return send(res, 400);
     }
     const event = parsed.event;
+    // How full the session's context is: read from its transcript a little later, outside this request.
+    context?.note(event.session_id, event.transcript_path);
     if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res);
 
     for (const { permission, outcome } of board.apply(event, now())) closeOut(permission, outcome);
@@ -419,6 +436,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       clearInterval(sweepTimer);
       github?.stop();
       hardware?.stop();
+      context?.stop();
       if (broadcastTimer) clearTimeout(broadcastTimer);
       // Whatever is still held goes back to the app's own card.
       for (const id of [...held.keys()]) finish(id, 'handed-to-app', 'hub stopped');

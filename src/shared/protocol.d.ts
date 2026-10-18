@@ -11,6 +11,12 @@ export type SessionStatus = 'permission' | 'waiting' | 'working' | 'done' | 'end
  */
 export type WaitingFor = 'question' | 'input' | 'permission' | 'idle';
 
+/** Tokens in a session's context now, and its model's context window. */
+export interface ContextUsage {
+  used: number;
+  size: number;
+}
+
 export interface SessionView {
   id: string;
   /** Last part of the working directory. */
@@ -23,6 +29,8 @@ export interface SessionView {
   waitingSince: number | null;
   /** While waiting for an answer: the question asked, from AskUserQuestion or the app's end-of-turn box. */
   question: string | null;
+  /** How full the context is, from the transcript's token counts; null until known. */
+  context: ContextUsage | null;
   /** Subagents started and not yet stopped. */
   subagents: number;
   lastActivity: number;

@@ -18,6 +18,7 @@ import {
   appSettingsXml,
   parseAppSettings,
 } from './hub/hardware.ts';
+import { defaultTranscriptsRoot } from './hub/context.ts';
 import { startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -187,6 +188,7 @@ async function serve(
       simulateHang,
       github,
       hardware,
+      context: { root: defaultTranscriptsRoot(), windows: config.contextWindows },
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {

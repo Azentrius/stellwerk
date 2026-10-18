@@ -31,10 +31,10 @@ body {
 
 button { font: inherit; }
 
-/* ---------- four columns: agents, what waits for you, room for later, status ---------- */
+/* ---------- four columns: agents, what waits for you, room for monitoring, status ---------- */
 .board {
   display: grid;
-  grid-template-columns: 25fr 40fr 15fr 20fr;
+  grid-template-columns: 25fr 35fr 20fr 20fr;
   height: 100vh;
 }
 
@@ -195,6 +195,19 @@ button { font: inherit; }
 .entry__icon--success { color: var(--status-success); }
 .entry__icon--danger { color: var(--status-danger); }
 .agent--ended .entry__name { color: var(--text-disabled); font-weight: 400; }
+/* The context ring in front of an agent, over both lines: how full its context is, 0 to 100 %. Grey while
+   there is room, attention from 80 %. */
+.entry--ring { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--sp-md); align-items: center; }
+.entry--ring > .ring { grid-row: 1 / span 2; }
+.entry--ring > .entry__line { grid-column: 2; }
+.ring { position: relative; display: inline-grid; place-items: center; inline-size: 3.3rem; block-size: 3.3rem; }
+.ring__svg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; }
+.ring__track, .ring__fill { fill: none; stroke-width: 3.2; }
+.ring__track { stroke: var(--line); }
+.ring__fill { stroke: var(--text-subtle); stroke-linecap: round; }
+.ring--full .ring__fill { stroke: var(--status-warning); }
+.ring__value { position: relative; font-size: 1rem; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.agent--ended .ring { opacity: 0.5; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 
 /* More below than fits: the bottom fades out. */
