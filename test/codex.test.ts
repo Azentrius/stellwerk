@@ -13,7 +13,14 @@ import { describe, test } from 'node:test';
 import { CODEX_HOOK_PATH, CODEX_PERMISSION_TIMEOUT_S } from '../src/config.ts';
 import { ANSWER_MARGIN_MS, STATUS_TIMEOUT_MS, forwardEvent, timeoutFor } from '../src/codex/hook.ts';
 import { parseCodexInput } from '../src/hub/codex-input.ts';
-import { ContextReader, codexReviewerOfLine, codexUsageOfLine, plainPath } from '../src/hub/context.ts';
+import {
+  ContextReader,
+  codexNameOfLine,
+  codexReviewerOfLine,
+  codexSessionIndex,
+  codexUsageOfLine,
+  plainPath,
+} from '../src/hub/context.ts';
 import {
   forwarderCommand,
   isStellwerkCodexHandler,
@@ -156,6 +163,31 @@ describe('Codex transcripts', () => {
     assert.equal(codexReviewerOfLine('{"type":"event_msg","payload":{"type":"turn_context"}}'), null);
     assert.equal(plainPath('\\\\?\\C:\\Users\\dev\\x.jsonl'), 'C:\\Users\\dev\\x.jsonl');
     assert.equal(plainPath('C:\\x.jsonl'), 'C:\\x.jsonl');
+  });
+
+  test("a session's name is the newest one in Codex' session index", async () => {
+    const id = '01a14189-2c7f-7903-8308-7a024fe537df';
+    const named = (threadId: string, name: unknown) => JSON.stringify({ id: threadId, thread_name: name, updated_at: '2026-10-18T03:22:47Z' });
+    assert.equal(codexNameOfLine(named(id, '  Planning\n& Concept '), id), 'Planning & Concept');
+    assert.equal(codexNameOfLine(named('other', 'Planning'), id), null);
+    assert.equal(codexNameOfLine(named(id, 42), id), null);
+    assert.equal(codexNameOfLine(named(id, '   '), id), null);
+    assert.equal(codexNameOfLine(named(id, 'x'.repeat(500)), id)?.length, 200);
+
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-codex-n-'));
+    const codexRoot = path.join(home, 'sessions');
+    fs.mkdirSync(codexRoot);
+    const file = path.join(codexRoot, 'rollout.jsonl');
+    fs.writeFileSync(file, `${tokenCount(100_000, 258_400)}\n`);
+    const index = codexSessionIndex(home);
+    fs.writeFileSync(index, [named(id, 'Planing'), named('other', 'Something else'), named(id, 'Planning & Concept'), named('third', 'Last')].join('\n') + '\n');
+    const names: string[] = [];
+    const reader = new ContextReader({ root: path.join(home, 'claude'), codexRoot, codexIndex: index, onUsage: () => {}, onName: (s, n) => names.push(`${s}: ${n}`) });
+    await reader.read(id, file, 'codex');
+    await reader.read('unnamed', file, 'codex');
+    await reader.read(id, file, 'claude');
+    assert.deepEqual(names, [`${id}: Planning & Concept`], 'the renamed one, only for Codex, only when named');
+    reader.stop();
   });
 
   test('are read only under the Codex folder, with the long-path prefix as the app sends it', async () => {

@@ -18,7 +18,7 @@ import {
   appSettingsXml,
   parseAppSettings,
 } from './hub/hardware.ts';
-import { codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
+import { codexSessionIndex, codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
 import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
 import { startHub } from './hub/hub.ts';
 import {
@@ -196,7 +196,12 @@ async function serve(
       simulateHang,
       github,
       hardware,
-      context: { root: defaultTranscriptsRoot(), codexRoot: codexTranscriptsRoot(paths.codexHome), windows: config.contextWindows },
+      context: {
+        root: defaultTranscriptsRoot(),
+        codexRoot: codexTranscriptsRoot(paths.codexHome),
+        codexIndex: codexSessionIndex(paths.codexHome),
+        windows: config.contextWindows,
+      },
       plansFile: paths.plansFile,
     });
   } catch (err) {

@@ -214,6 +214,9 @@ How Codex differs:
   reads that setting from the session's transcript.
 - Questions Codex asks you are listed under "Answer in the app". The app's short helper sessions, which
   have no transcript, are not shown.
+- Codex' hook events carry no name for the session. The hub takes the name the Codex app shows for the
+  chat from Codex' session index, so it stands in bold above the project, as for every other session.
+  A new chat gets its name a few seconds after the first prompt, a renamed one its new name.
 - The context meter uses the window Codex records with its token counts.
 - With its token counts Codex also records how much of your plan's limits is used (see
   [Plan usage](#plan-usage)).
@@ -345,6 +348,8 @@ Restart the hub after a change.
   the display.
 - Of what tools return, the hub looks only at the desktop app's answer to `get_usage`, and keeps only
   the plan's limits from it (percent, window, reset, the model of a model's own limit).
+- For the names of Codex sessions the hub reads Codex' session index
+  (`%USERPROFILE%\.codex\session_index.jsonl`) from its end, and only the name of a session it shows.
 - Codex events come through Stellwerk's forwarder to their own endpoint, with the same checks as the
   others (token, content type, `Host`). The forwarder reads the hook token from the token file, talks
   only to `127.0.0.1` and prints only the hub's answer.

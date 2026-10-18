@@ -60,6 +60,9 @@ reachable only from the machine it runs on and only by the display it serves:
   a transcript reaches its state, the display or its file `plans.json`;
 - of what tools return, the hub looks only at the desktop app's answer to
   `get_usage` in a `PostToolUse` hook and keeps only the plan's limits from it;
+- for the names of Codex sessions the hub reads Codex' session index
+  (`%USERPROFILE%\.codex\session_index.jsonl`, a fixed path, never one from
+  hook data) from its end and keeps only the name of a session it shows;
 - Codex events reach the hub through Stellwerk's forwarder, which Codex runs
   as a command hook: it reads the hook token from the token file, posts to
   `127.0.0.1` only, prints only the hub's answer and ends at once without a
