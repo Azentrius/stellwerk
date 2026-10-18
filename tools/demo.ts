@@ -17,7 +17,8 @@ const ROOT = path.join(import.meta.dirname, '..');
 const port = Number(process.argv.slice(2).find((arg) => /^\d+$/.test(arg)) ?? 4781);
 const token = randomBytes(32).toString('hex');
 const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string };
-// A stand-in for api.github.com: the demo goes to no network and to no LibreHardwareMonitor.
+// A stand-in for api.github.com: the demo goes to no network, to no LibreHardwareMonitor and to no Uptime
+// Kuma.
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const fakeGitHub: Record<string, unknown> = {
   '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'customer-portal-frontend' }],
@@ -65,6 +66,27 @@ const demoHardwareFetch = (async () =>
     }),
     { status: 200 },
   )) as typeof fetch;
+// And one for Uptime Kuma's /metrics: everything up at first, then a server down and a site retrying.
+const KUMA_MONITORS = [
+  ...['Server - web-1', 'Server - web-2', 'Server - build', 'Server - vpn'].map((name) => ({ name, type: 'ping' })),
+  ...['web-1', 'web-2', 'build', 'vpn'].map((host) => ({ name: `Backup - ${host}`, type: 'push' })),
+  ...['Shop', 'Shop API', 'Customer portal', 'Status page', 'Docs', 'Analytics', 'Forms', 'Mail', 'Calendar', 'Files', 'Chat', 'Wiki']
+    .map((name) => ({ name, type: 'http' })),
+  { name: 'Payments sandbox', type: 'http' },
+];
+let kumaRounds = 0;
+const demoKumaFetch = (async () => {
+  const round = kumaRounds++;
+  const status = (name: string) =>
+    round === 0 ? 1 : name === 'Server - build' ? 0 : name === 'Customer portal' ? 2 : name === 'Payments sandbox' ? 3 : 1;
+  const lines = KUMA_MONITORS.map(
+    (m, i) =>
+      `monitor_status{monitor_id="${i + 1}",monitor_name="${m.name}",monitor_type="${m.type}",monitor_url="https://",monitor_hostname="null",monitor_port="null"} ${status(m.name)}`,
+  );
+  return new Response(`# HELP monitor_status Monitor Status (1 = UP, 0= DOWN, 2= PENDING, 3= MAINTENANCE)\n# TYPE monitor_status gauge\n${lines.join('\n')}\n`, {
+    status: 200,
+  });
+}) as typeof fetch;
 const demoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-'));
 // Made-up transcripts with nothing but the token counts of one answer, for the context rings.
 const transcripts = path.join(demoDir, 'projects');
@@ -125,6 +147,7 @@ const hub = await startHub({
   webRoot: path.join(ROOT, 'dist', 'ui'),
   github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
+  uptimeKuma: { url: 'http://192.0.2.10:3001', key: `uk1_${'demo'.repeat(10)}`, intervalMs: 2000, fetch: demoKumaFetch },
   context: { root: transcripts, codexRoot: codexSessions, codexIndex, intervalMs: 300 },
   codexStateFile,
   // Made-up data with a token of its own: the demo's display needs no sign-in.

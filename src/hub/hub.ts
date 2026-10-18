@@ -1,8 +1,10 @@
 // The hub: receives Claude Code's hook requests, holds permission requests until the display or the hold
 // time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
-// no programs. The display signs in with a start file only the user can read; page and WebSocket need
-// the cookie it gets, so the address alone gives nobody the decisions. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
-// (when set up). Besides its own files it reads only transcripts named in hook events. The usage of the
+// no programs. The display signs in with a start file only the user can read; only the answer to it
+// carries the page token the WebSocket needs, so the address alone gives nobody the decisions. It asks
+// only api.github.com (with a token set up), LibreHardwareMonitor on 127.0.0.1 and Uptime Kuma's
+// /metrics at the address set up (each only when set up). Besides its own files it reads only
+// transcripts named in hook events. The usage of the
 // plans' limits comes from the same local sources: Codex' transcripts and the desktop app's answer to a
 // session that asked for it (plans.ts).
 //
@@ -24,6 +26,7 @@ import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
+import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 import { PlanBook, claudePlanOfHook } from './plans.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
@@ -76,6 +79,8 @@ export interface HubOptions {
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
   hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch } | null;
+  /** The monitors of Uptime Kuma: its /metrics at the address set up, with its API key. */
+  uptimeKuma?: { url: string; key: string; intervalMs: number; fetch?: typeof fetch } | null;
   /**
    * How full each session's context is: the token counts of the last answer in its transcript, read only
    * under `root` (~/.claude/projects). Windows by model from the configuration.
@@ -201,6 +206,10 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     ? new HardwareWatcher({ ...options.hardware, now, onChange: () => scheduleBroadcast(), log })
     : null;
   hardware?.start();
+  const uptimeKuma = options.uptimeKuma
+    ? new UptimeKumaWatcher({ ...options.uptimeKuma, now, onChange: () => scheduleBroadcast(), log })
+    : null;
+  uptimeKuma?.start();
   const plans = new PlanBook(options.plansFile ?? null, log);
   plans.load();
   const codexProjects = options.codexStateFile ? new CodexProjects(options.codexStateFile, now) : null;
@@ -511,6 +520,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
+      uptimeKuma: uptimeKuma?.view() ?? null,
       plans: plans.view(),
     };
   }
@@ -581,6 +591,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       clearInterval(sweepTimer);
       github?.stop();
       hardware?.stop();
+      uptimeKuma?.stop();
       context?.stop();
       if (broadcastTimer) clearTimeout(broadcastTimer);
       // Whatever is still held goes back to the app's own card.

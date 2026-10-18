@@ -1,6 +1,7 @@
 // The secrets Stellwerk keeps: the token Claude Code sends with every hook request, the display's start
 // file with the key that signs the display in, and (optionally) a read-only GitHub token for the list of
-// open pull requests. All live in files only the current user can read, and none is ever logged.
+// open pull requests and an API key of Uptime Kuma for its monitors. All live in files only the current
+// user can read, and none is ever logged.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,6 +17,8 @@ const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
  * and Actions. Classic tokens (ghp_…) carry far more rights and are refused.
  */
 const GITHUB_TOKEN_PATTERN = /^github_pat_[A-Za-z0-9_]{22,255}$/;
+/** Uptime Kuma's API keys: "uk", the key's number, "_" and 40 random characters (2.x). */
+const UPTIME_KUMA_KEY_PATTERN = /^uk\d{1,9}_[A-Za-z0-9_-]{20,128}$/;
 
 export function readToken(file: string): string | null {
   if (!fs.existsSync(file)) return null;
@@ -71,6 +74,31 @@ export function writeDisplayStart(file: string, page: string): boolean {
 
 /** Deletes the GitHub token. Returns false if there was none. */
 export function removeGitHubToken(file: string): boolean {
+  return removeSecret(file);
+}
+
+export function isUptimeKumaKey(value: string): boolean {
+  return UPTIME_KUMA_KEY_PATTERN.test(value);
+}
+
+export function readUptimeKumaKey(file: string): string | null {
+  if (!fs.existsSync(file)) return null;
+  const key = fs.readFileSync(file, 'utf8').trim();
+  if (!isUptimeKumaKey(key)) throw new Error(`${file} does not hold an API key of Uptime Kuma. Run "stellwerk kuma key" again.`);
+  return key;
+}
+
+export function saveUptimeKumaKey(file: string, key: string): void {
+  if (!isUptimeKumaKey(key)) throw new Error('That is not an API key of Uptime Kuma (it starts with "uk" and a number).');
+  writeSecret(file, key, { onlyIfNew: false });
+}
+
+/** Deletes the API key of Uptime Kuma. Returns false if there was none. */
+export function removeUptimeKumaKey(file: string): boolean {
+  return removeSecret(file);
+}
+
+function removeSecret(file: string): boolean {
   if (!fs.existsSync(file)) return false;
   fs.rmSync(file);
   return true;

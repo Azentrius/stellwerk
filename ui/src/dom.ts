@@ -33,9 +33,9 @@ export function icon(name: IconName, className = 'az-icon'): SVGSVGElement {
   return svg;
 }
 
-/** A state as the design system's label: tint, icon and word say the same. */
-export function label(state: State): HTMLSpanElement {
-  const node = el('span', state.tone === 'neutral' ? 'az-label' : `az-label az-label--${state.tone}`);
+/** A state as the design system's label: tint, icon and word say the same. Strong: filled, to stand out. */
+export function label(state: State, { strong = false } = {}): HTMLSpanElement {
+  const node = el('span', state.tone === 'neutral' ? 'az-label' : `az-label az-label--${state.tone}${strong ? ' az-label--strong' : ''}`);
   if (state.icon) node.append(icon(state.icon));
   node.append(state.text);
   return node;

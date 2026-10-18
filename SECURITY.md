@@ -53,13 +53,20 @@ reachable only from the machine it runs on and only by the display it serves:
   `powershell`, `netsh` and `schtasks`, with fixed arguments and without a
   shell; `serve` restricts the token file and the display's start file with
   `icacls` when it creates or changes them;
-- the hub's only connection to another machine is to `api.github.com` (fixed
-  in the code), for the list of open pull requests, and only once a GitHub
+- the hub connects to two other machines at most. One is `api.github.com`
+  (fixed in the code), for the list of open pull requests, and only once a GitHub
   token is set up: fine-grained only, meant to read pull requests and Actions
   and nothing else, kept like the hook token, never logged, never sent to the
   display; GitHub's answers are checked before use, redirects are not
   followed, and of the "next" links of long lists only those on
   `api.github.com` are followed, at most 10 pages per list;
+- the other is Uptime Kuma at the
+  address set up with `stellwerk kuma key` (http or https, host and port,
+  no path), only for `/metrics`, only once an API key is set up (which in
+  Uptime Kuma 2 opens `/metrics` and nothing else), kept like the hook
+  token, never logged, never sent to the display; redirects are not
+  followed, and of the answer the hub keeps only each monitor's name and
+  status;
 - besides that the hub asks only LibreHardwareMonitor on `127.0.0.1:8085`
   for `data.json`, when the hardware monitor is set up, with the password
   from LibreHardwareMonitor's settings file, and never sends that password
@@ -105,10 +112,11 @@ Reports are particularly welcome for:
   or the page token,
 - requests that end the hub instead of only their own connection,
 - hook data that the display renders as HTML or script,
-- the hook token or the GitHub token appearing in a log, a URL, a page or any
-  file other than its own,
-- the hub connecting anywhere but `api.github.com` and LibreHardwareMonitor on
-  `127.0.0.1:8085`, or to them without being set up,
+- the hook token, the GitHub token or the API key of Uptime Kuma appearing in
+  a log, a URL, a page or any file other than its own,
+- the hub connecting anywhere but `api.github.com`, Uptime Kuma's `/metrics`
+  at the address set up and LibreHardwareMonitor on `127.0.0.1:8085`, or to
+  them without being set up,
 - a hook event that makes the hub read a file outside the transcripts folders,
   or anything of a transcript beyond its token counts and limits reaching the
   display,
