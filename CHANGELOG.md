@@ -8,10 +8,14 @@ ends on a broken display connection; open questions stay open; GitHub lists are 
 - **Display sign-in (security):** the hub served the display, with the token that suffices to allow and
   deny requests, to anyone who could reach `127.0.0.1`, including other Windows accounts on the same
   computer. Now the display signs in first: the hub writes a start file only your account can read
-  (`%LOCALAPPDATA%\stellwerk\display.html`), which posts a key derived from the hook token; the hub answers
-  with an HttpOnly cookie, and the page and the WebSocket need it. The address alone shows only that the
-  display is not signed in. The key is in no address and no log; `Host`, `Origin` and the page token are
-  checked as before. A display reconnects after a restart of the hub with the same token.
+  (`%LOCALAPPDATA%\stellwerk\display.html`), which posts a key derived from the hook token; only the hub's
+  answer carries the page token the WebSocket needs. The display keeps it in its tab's storage for the
+  hub's address and port and sends it only in the WebSocket handshake. No cookie: browsers send cookies
+  of `127.0.0.1` to every port, so another local service would get it. The address alone gives no token
+  and the display says it is not signed in. The key is in no address and no log; `Host`, `Origin` and the
+  page token are checked as before. A display reconnects after a restart of the hub, and after a reload.
+  A test in a real Edge, also in CI, checks that a second local service visited after the sign-in gets
+  nothing to decide with.
   **Updating:** run `stellwerk autostart install` again so the display task opens the start file, then
   restart both tasks. Opened by hand, the display is `msedge --app=` with the start file's address.
 - **The hub keeps running:** a WebSocket upgrade with an unreadable target (such as `http://[`) is
@@ -20,8 +24,11 @@ ends on a broken display connection; open questions stay open; GitHub lists are 
 - **Open questions stay open:** a question Codex asks without waiting (`request_user_input_async`) now
   stays open past the end of the turn and further tool events, until the answer (the next prompt) or the
   end of the session.
-- **Subagents leave the main agent alone:** tool events, starts and requests of a subagent no longer
-  change what the session shows; a question the main agent asked stays open while subagents work.
+- **Subagents leave the main agent alone:** tool events, starts and requests of a subagent, and how its
+  requests end (allowed, denied, handed to the app, timed out, decided in the app), no longer change what
+  the session shows; a question the main agent asked stays open, with its time. A subagent's request left
+  to the app's card shows as waiting for a permission once the main agent waits for nothing else, until
+  the subagent goes on or stops.
 - **Complete GitHub lists:** repositories, pull requests and Actions runs are read to the last page,
   following GitHub's links only on `api.github.com`. A failed run on a later page now counts. A list of
   more than 1000 entries is reported as a problem of its own ("too many results") instead of being cut.

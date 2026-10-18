@@ -452,6 +452,42 @@ describe('subagents', () => {
     assert.deepEqual(question(), ['working', null, null]);
   });
 
+  test("settling a subagent's request keeps the main agent's question and its time, whatever the outcome", () => {
+    for (const outcome of ['allowed', 'denied', 'handed-to-app', 'timed-out', 'decided-in-app'] as const) {
+      const board = new Board();
+      board.apply(event('UserPromptSubmit'), 1);
+      board.askUser(request({ questions: [{ question: 'Which branch?' }] }, { tool_name: 'AskUserQuestion' }), 2);
+      board.addPermission('sub', request({ command: 'ls' }, { agent_id: 'a1' }), 3, HOLD);
+      assert.equal(board.settle('sub', outcome, 4), true);
+      const s = board.view().sessions[0];
+      assert.deepEqual([s?.status, s?.waitingFor, s?.question, s?.waitingSince], ['waiting', 'question', 'Which branch?', 2], outcome);
+    }
+  });
+
+  test("a subagent's request at the app's card shows after the main agent's question, until the subagent goes on", () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.askUser(request({ questions: [{ question: 'Which branch?' }] }, { tool_name: 'AskUserQuestion' }), 2);
+    board.addPermission('sub', request({ command: 'ls' }, { agent_id: 'a1' }), 3, HOLD);
+    board.settle('sub', 'handed-to-app', 4);
+    const shown = () => {
+      const s = board.view().sessions[0];
+      return [s?.status, s?.waitingFor, s?.waitingSince];
+    };
+    assert.deepEqual(shown(), ['waiting', 'question', 2], "the main agent's question comes first");
+    board.apply(event('PostToolUse', { tool_name: 'AskUserQuestion', tool_input: {} }), 5);
+    assert.deepEqual(shown(), ['waiting', 'permission', 4], "then the subagent's request in the app");
+    board.apply(event('PostToolUse', { agent_id: 'a1', tool_name: 'Bash', tool_input: { command: 'ls' } }), 6);
+    assert.deepEqual(shown(), ['working', null, null], 'the subagent went on: answered in the app');
+    // Timed out, and over with the subagent's stop.
+    board.addPermission('sub2', request({ command: 'pwd' }, { agent_id: 'a2' }), 7, HOLD);
+    board.settle('sub2', 'timed-out', 8);
+    assert.deepEqual(shown(), ['waiting', 'permission', 8]);
+    board.apply(event('SubagentStart', { agent_id: 'a2' }), 9);
+    board.apply(event('SubagentStop', { agent_id: 'a2' }), 10);
+    assert.deepEqual(shown(), ['working', null, null]);
+  });
+
   test('the stop of a subagent settles its own open requests', () => {
     const board = new Board();
     board.apply(event('SubagentStart', { agent_id: 'a1' }), 1);

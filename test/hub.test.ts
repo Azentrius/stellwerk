@@ -16,7 +16,6 @@ import { CODEX_HOOK_PATH, HOOK_PATH } from '../src/config.ts';
 import { appSettingsXml } from '../src/hub/hardware.ts';
 import {
   DENY_MESSAGE,
-  DISPLAY_COOKIE,
   DISPLAY_LOGIN_PATH,
   displayKey,
   displayStartPage,
@@ -94,8 +93,15 @@ function call(
 }
 
 const AUTH = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
-/** The cookie a display gets when its start file signs it in. */
-const SIGNED_IN = { Cookie: `${DISPLAY_COOKIE}=${displayKey(TOKEN)}` };
+/** The display's sign-in as its start file sends it; the answer is the page with the page token. */
+function signIn(port: number, headers: Record<string, string> = {}) {
+  return call(port, {
+    method: 'POST',
+    path: DISPLAY_LOGIN_PATH,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null', ...headers },
+    body: `key=${displayKey(TOKEN)}`,
+  }).reply;
+}
 
 function hook(port: number, body: Record<string, unknown>, extra: { timeoutMs?: number } = {}) {
   return call(port, { headers: AUTH, body: { session_id: 'session-1', cwd: 'C:\\Projekte\\shop-api', ...body }, ...extra });
@@ -106,7 +112,7 @@ function permissionRequest(port: number, command = 'git push origin main', extra
 }
 
 async function pageToken(port: number): Promise<string> {
-  const { body } = await call(port, { method: 'GET', path: '/', headers: SIGNED_IN }).reply;
+  const { body } = await signIn(port);
   return /name="stellwerk-session" content="([0-9a-f]{64})"/.exec(body)![1]!;
 }
 
@@ -115,7 +121,6 @@ async function display(port: number) {
   const token = await pageToken(port);
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ['stellwerk.v1', `stellwerk.session.${token}`], {
     origin: `http://127.0.0.1:${port}`,
-    headers: SIGNED_IN,
   });
   const messages: ServerMessage[] = [];
   const listeners = new Set<() => void>();
@@ -180,7 +185,7 @@ async function eventually(check: () => boolean, timeoutMs = 2000): Promise<void>
 describe('the display page', () => {
   test('is served with a strict content security policy and its page token', async () => {
     const { port } = await startTestHub();
-    const page = await call(port, { method: 'GET', path: '/', headers: SIGNED_IN }).reply;
+    const page = await signIn(port);
     assert.equal(page.status, 200);
     const csp = String(page.headers['content-security-policy']);
     assert.match(csp, /default-src 'none'/);
@@ -210,7 +215,7 @@ describe('the display page', () => {
 
   test('carries the build it was served with, the same the hub names in every state', async () => {
     const { port } = await startTestHub();
-    const { body } = await call(port, { method: 'GET', path: '/', headers: SIGNED_IN }).reply;
+    const { body } = await signIn(port);
     const pageBuild = /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1];
     assert.ok(pageBuild, 'the page names its build');
     const screen = await display(port);
@@ -237,7 +242,7 @@ describe('the display page', () => {
   test('names the version in its signature, and a new version gives another build', async () => {
     const page = async (version: string) => {
       const { port } = await startTestHub({ version });
-      const { body } = await call(port, { method: 'GET', path: '/', headers: SIGNED_IN }).reply;
+      const { body } = await signIn(port);
       return { body, build: /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1] };
     };
     const first = await page('1.2.3');
@@ -251,10 +256,10 @@ describe('the display page', () => {
 describe('security checks', () => {
   test('a foreign Host header is turned away (DNS rebinding)', async () => {
     const { port } = await startTestHub();
-    assert.equal((await call(port, { method: 'GET', path: '/', host: `evil.example:${port}`, headers: SIGNED_IN }).reply).status, 403);
-    assert.equal((await call(port, { method: 'GET', path: '/', host: `127.0.0.1:${port + 1}`, headers: SIGNED_IN }).reply).status, 403);
+    assert.equal((await call(port, { method: 'GET', path: '/', host: `evil.example:${port}` }).reply).status, 403);
+    assert.equal((await call(port, { method: 'GET', path: '/', host: `127.0.0.1:${port + 1}` }).reply).status, 403);
     assert.equal((await call(port, { headers: AUTH, host: 'evil.example', body: { hook_event_name: 'Stop', session_id: 'x' } }).reply).status, 403);
-    assert.equal((await call(port, { method: 'GET', path: '/', host: `localhost:${port}`, headers: SIGNED_IN }).reply).status, 200);
+    assert.equal((await call(port, { method: 'GET', path: '/', host: `localhost:${port}` }).reply).status, 200);
   });
 
   test('hook requests need the token (401) and JSON (415)', async () => {
@@ -287,12 +292,12 @@ describe('security checks', () => {
     assert.equal(reply.headers['access-control-allow-origin'], undefined);
   });
 
-  test('the WebSocket needs the sign-in, our origin, the page token and the right path', async () => {
+  test('the WebSocket needs our origin, the page token and the right path', async () => {
     const { port } = await startTestHub();
     const token = await pageToken(port);
-    const attempt = (url: string, protocols: string[], origin: string, headers: Record<string, string> = SIGNED_IN) =>
+    const attempt = (url: string, protocols: string[], origin: string) =>
       new Promise<number>((resolve) => {
-        const ws = new WebSocket(url, protocols, { origin, headers });
+        const ws = new WebSocket(url, protocols, { origin });
         ws.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
         ws.on('open', () => {
           ws.close();
@@ -303,9 +308,6 @@ describe('security checks', () => {
     const url = `ws://127.0.0.1:${port}/ws`;
     const own = `http://127.0.0.1:${port}`;
     assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${token}`], own), 101);
-    // The page token alone is no longer enough: without the sign-in cookie nobody gets the display.
-    assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${token}`], own, {}), 403);
-    assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${token}`], own, { Cookie: `${DISPLAY_COOKIE}=${'0'.repeat(64)}` }), 403);
     assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${token}`], 'https://evil.example'), 403);
     assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${'0'.repeat(64)}`], own), 403);
     assert.equal(await attempt(url, ['stellwerk.v1'], own), 403);
@@ -314,69 +316,74 @@ describe('security checks', () => {
 });
 
 describe('the display sign-in', () => {
-  const login = (port: number, body: string, headers: Record<string, string> = {}) =>
-    call(port, {
-      method: 'POST',
-      path: DISPLAY_LOGIN_PATH,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null', ...headers },
-      body,
-    }).reply;
+  const token = (body: string) => /name="stellwerk-session" content="([0-9a-f]{64})"/.exec(body)?.[1] ?? null;
 
-  test('an address alone gets no page token and no display', async () => {
-    const lines: string[] = [];
-    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+  test('the address alone gets the display without its page token, and no cookie at all', async () => {
+    const { port } = await startTestHub();
     const page = await call(port, { method: 'GET', path: '/' }).reply;
-    assert.equal(page.status, 401);
-    assert.doesNotMatch(page.body, /stellwerk-session" content="[0-9a-f]{64}"/);
-    assert.match(page.body, /not signed in/);
-    assert.match(page.body, /nicht angemeldet/);
-    assert.equal((await call(port, { method: 'GET', path: '/index.html' }).reply).status, 401);
-    assert.equal((await call(port, { method: 'GET', path: '/', headers: { Cookie: `${DISPLAY_COOKIE}=${'f'.repeat(64)}` } }).reply).status, 401);
-    // The display's own files hold no secret and stay reachable for the locked page.
-    assert.equal((await call(port, { method: 'GET', path: '/azentrius.css' }).reply).status, 200);
-    assert.ok(lines.some((line) => line.includes('without sign-in')));
+    assert.equal(page.status, 200);
+    assert.match(page.body, /name="stellwerk-session" content=""/);
+    assert.equal(token(page.body), null);
+    assert.equal(page.headers['set-cookie'], undefined);
   });
 
-  test('the start file signs the display in with a cookie; the key appears in no address and no log', async () => {
+  test('only the start file gets the page token, in the answer itself; the key is in no address and no log', async () => {
     const lines: string[] = [];
     const { port } = await startTestHub({ log: (line) => lines.push(line) });
     const key = displayKey(TOKEN);
     const start = displayStartPage(port, key);
     assert.match(start, new RegExp(`action="http://127\\.0\\.0\\.1:${port}${DISPLAY_LOGIN_PATH}"`));
     assert.doesNotMatch(start.match(/action="[^"]*"/)![0], new RegExp(key), 'the key is in the body, not the address');
-    assert.ok(!key.includes(TOKEN) && !start.includes(TOKEN), 'the start file does not reveal the hook token');
+    assert.ok(!start.includes(TOKEN), 'the start file does not reveal the hook token');
 
-    const reply = await login(port, `key=${key}`);
-    assert.equal(reply.status, 303);
-    assert.equal(reply.headers.location, '/');
-    const setCookie = String(reply.headers['set-cookie']);
-    assert.match(setCookie, new RegExp(`^${DISPLAY_COOKIE}=[0-9a-f]{64}; HttpOnly; SameSite=Lax; Path=/$`));
-    const cookie = setCookie.split(';')[0]!;
-    const page = await call(port, { method: 'GET', path: '/', headers: { Cookie: `theme=dark; ${cookie}` } }).reply;
-    assert.equal(page.status, 200);
-    assert.match(page.body, /stellwerk-session" content="[0-9a-f]{64}"/);
+    const reply = await signIn(port);
+    assert.equal(reply.status, 200);
+    assert.notEqual(token(reply.body), null);
+    assert.equal(reply.headers['set-cookie'], undefined, 'nothing the browser would send to other ports');
+    assert.match(String(reply.headers['content-security-policy']), /default-src 'none'/);
+    assert.equal(reply.headers['cache-control'], 'no-store');
 
-    assert.equal((await login(port, `key=${'0'.repeat(64)}`)).status, 403, 'a wrong key');
-    assert.equal((await login(port, 'key=')).status, 403, 'no key');
-    assert.equal((await login(port, `key=${key}`, { Origin: 'https://evil.example' })).status, 403, 'a foreign page');
-    assert.equal((await login(port, `key=${key}`, { Host: `evil.example:${port}` })).status, 403, 'a foreign host');
-    assert.equal((await login(port, `key=${key}`, { 'Content-Type': 'application/json' })).status, 415);
-    assert.equal((await login(port, `key=${key}&pad=${'x'.repeat(2000)}`)).status, 413);
+    const login = (body: string, headers: Record<string, string> = {}) =>
+      call(port, {
+        method: 'POST',
+        path: DISPLAY_LOGIN_PATH,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null', ...headers },
+        body,
+      }).reply;
+    assert.equal((await login(`key=${'0'.repeat(64)}`)).status, 403, 'a wrong key');
+    assert.equal((await login('key=')).status, 403, 'no key');
+    assert.equal((await login(`key=${key}`, { Origin: 'https://evil.example' })).status, 403, 'a foreign page');
+    assert.equal((await login(`key=${key}`, { Host: `evil.example:${port}` })).status, 403, 'a foreign host');
+    assert.equal((await login(`key=${key}`, { 'Content-Type': 'application/json' })).status, 415);
+    assert.equal((await login(`key=${key}&pad=${'x'.repeat(2000)}`)).status, 413);
     assert.equal((await call(port, { method: 'GET', path: DISPLAY_LOGIN_PATH }).reply).status, 405);
     assert.ok(lines.some((line) => line.includes('wrong key')));
     assert.doesNotMatch(lines.join('\n'), new RegExp(key));
   });
 
+  test('without the page token a client is turned away; with it the display decides', async () => {
+    const { port } = await startTestHub();
+    const refused = await new Promise<number>((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ['stellwerk.v1'], { origin: `http://127.0.0.1:${port}` });
+      ws.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+      ws.on('open', () => resolve(101));
+      ws.on('error', () => {});
+    });
+    assert.equal(refused, 403);
+    const screen = await display(port);
+    const pending = permissionRequest(port);
+    screen.decide(await openRequestId(screen), 'allow');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'allow');
+    screen.close();
+  });
+
   test('a signed-in display reconnects to a restarted hub with the same token', async () => {
     const first = await startTestHub();
-    const cookie = String((await login(first.port, `key=${displayKey(TOKEN)}`)).headers['set-cookie']).split(';')[0]!;
+    const pageToken = token((await signIn(first.port)).body)!;
     await first.hub.close();
     const second = await startTestHub();
-    const page = await call(second.port, { method: 'GET', path: '/', headers: { Cookie: cookie } }).reply;
-    const token = /name="stellwerk-session" content="([0-9a-f]{64})"/.exec(page.body)![1]!;
-    const ws = new WebSocket(`ws://127.0.0.1:${second.port}/ws`, ['stellwerk.v1', `stellwerk.session.${token}`], {
+    const ws = new WebSocket(`ws://127.0.0.1:${second.port}/ws`, ['stellwerk.v1', `stellwerk.session.${pageToken}`], {
       origin: `http://127.0.0.1:${second.port}`,
-      headers: { Cookie: cookie },
     });
     await new Promise<void>((resolve, reject) => {
       ws.once('open', () => resolve());
@@ -905,6 +912,31 @@ describe('permission requests', () => {
     assert.equal((await pending.reply).body, '');
     await screen.state((s) => s.permissions[0]?.outcome === 'aborted' && s.sessions[0]?.status === 'ended');
     await eventually(() => auditLines(auditFile)[0]?.result === 'aborted');
+    screen.close();
+  });
+
+  test("deciding a subagent's request on the display keeps the main agent's question", async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    await hook(port, {
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'Which branch?', options: [{ label: 'main' }] }] },
+    }).reply;
+    const asked = await screen.state((s) => s.sessions[0]?.waitingFor === 'question');
+    const since = asked.sessions[0]?.waitingSince;
+    const pending = hook(port, { hook_event_name: 'PermissionRequest', agent_id: 'a1', tool_name: 'Bash', tool_input: { command: 'ls' } });
+    const id = await openRequestId(screen);
+    screen.decide(id, 'allow');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'allow');
+    const after = await screen.state((s) => s.permissions.some((p) => p.id === id && p.outcome === 'allowed'));
+    assert.deepEqual([after.sessions[0]?.status, after.sessions[0]?.waitingFor, after.sessions[0]?.question, after.sessions[0]?.waitingSince], [
+      'waiting',
+      'question',
+      'Which branch?',
+      since,
+    ]);
     screen.close();
   });
 

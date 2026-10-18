@@ -56,6 +56,9 @@ export interface Texts {
   hubConnected: string;
   hubDisconnected: string;
   hubDisconnectedFix: string;
+  /** The display was opened without its start file. */
+  notSignedIn: string;
+  notSignedInFix: string;
   lastEvent: (ago: string) => string;
   noEvent: string;
   ago: (n: number, unit: TimeUnit) => string;
@@ -164,6 +167,8 @@ const en: Texts = {
   hubConnected: 'Hub connected',
   hubDisconnected: 'Hub disconnected, reconnecting',
   hubDisconnectedFix: 'If it does not come back, start the task "Stellwerk hub" and reload the display.',
+  notSignedIn: 'Display not signed in',
+  notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
   lastEvent: (ago) => `last event ${ago}`,
   noEvent: 'no event yet',
   ago: (n, unit) => `${n} ${unit} ago`,
@@ -268,6 +273,8 @@ const de: Texts = {
   hubConnected: 'Hub verbunden',
   hubDisconnected: 'Hub getrennt, verbinde neu',
   hubDisconnectedFix: 'Kommt er nicht zurück, starte die Aufgabe „Stellwerk hub“ und lade die Anzeige neu.',
+  notSignedIn: 'Anzeige nicht angemeldet',
+  notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',
   lastEvent: (ago) => `letztes Ereignis ${ago}`,
   noEvent: 'noch kein Ereignis',
   ago: (n, unit) => `vor ${n} ${unit}`,

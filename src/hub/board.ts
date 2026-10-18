@@ -77,6 +77,13 @@ interface Session {
    * end of the session; while open, the session waits for it.
    */
   openQuestion: { question: string | null; since: number } | null;
+  /**
+   * Requests of subagents that went to the app's own card (handed over, or the hold time ran out), by
+   * request id. Kept apart from the main agent's status: they show only while the main agent waits for
+   * nothing else (its question or input comes first), and end with the subagent's next event, its stop,
+   * the end of the turn or a new prompt.
+   */
+  subagentAppRequests: Map<string, { agentId: string; since: number }>;
   /** How full the context is, from the transcript; null until read. */
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
@@ -160,6 +167,13 @@ export class Board {
     const session = this.touch(event, now, provider);
     if (isOther(event)) return [];
     const agentId = event.agent_id ?? null;
+    // A subagent's request at the app's card is over with that subagent's next event (the tool ran or
+    // failed), its stop, the end of the turn or a new prompt.
+    const name = event.hook_event_name;
+    if (name === 'UserPromptSubmit' || name === 'Stop' || name === 'SessionEnd') session.subagentAppRequests.clear();
+    else if (agentId !== null && (name === 'PostToolUse' || name === 'PostToolUseFailure' || name === 'SubagentStop')) {
+      for (const [id, request] of session.subagentAppRequests) if (request.agentId === agentId) session.subagentAppRequests.delete(id);
+    }
 
     switch (event.hook_event_name) {
       case 'UserPromptSubmit':
@@ -306,6 +320,7 @@ export class Board {
         question: null,
         wrapUp: null,
         openQuestion: null,
+        subagentAppRequests: new Map(),
         context: null,
         subagents: new Set(),
         lastActivity: now,
@@ -336,7 +351,13 @@ export class Board {
     permission.outcome = outcome;
     permission.resolvedAt = now;
     const session = this.sessions.get(permission.sessionId);
-    if (session && session.base !== 'ended') {
+    if (session && session.base !== 'ended' && permission.agentId !== null) {
+      // A subagent's request: the main agent's status (a question it asked, and since when) stays. One that
+      // goes on to the app's card is kept apart, so the session still says something waits in the app.
+      if (outcome === 'handed-to-app' || outcome === 'timed-out') {
+        session.subagentAppRequests.set(permission.id, { agentId: permission.agentId, since: now });
+      }
+    } else if (session && session.base !== 'ended') {
       if (outcome === 'allowed' || outcome === 'denied') setStatus(session, 'working');
       // The app's own card stays open and waits for the user.
       else if (outcome === 'handed-to-app' || outcome === 'timed-out') waitFor(session, 'permission', now);
@@ -376,8 +397,7 @@ export class Board {
     const sessions = [...this.sessions.values()]
       .map((s): SessionView => {
         const status = this.statusOf(s);
-        // An open question the main agent asked outlasts its turn; it is what the session waits for.
-        const open = status === 'waiting' ? s.openQuestion : null;
+        const waiting = status === 'waiting' ? waitingOf(s) : null;
         return {
           id: s.id,
           provider: s.provider,
@@ -385,9 +405,9 @@ export class Board {
           cwd: s.cwd,
           title: s.title,
           status,
-          waitingFor: status !== 'waiting' ? null : open ? 'question' : s.waitingFor,
-          waitingSince: status !== 'waiting' ? null : open ? open.since : s.waitingSince,
-          question: status !== 'waiting' ? null : open ? open.question : s.question,
+          waitingFor: waiting?.reason ?? null,
+          waitingSince: waiting?.since ?? null,
+          question: waiting?.question ?? null,
           context: s.context,
           subagents: s.subagents.size,
           lastActivity: s.lastActivity,
@@ -422,7 +442,7 @@ export class Board {
   private statusOf(session: Session): SessionStatus {
     if (session.base === 'ended') return 'ended';
     if (this.pendingOf(session.id).length > 0) return 'permission';
-    return session.openQuestion ? 'waiting' : session.base;
+    return waitingOf(session) ? 'waiting' : session.base;
   }
 
   private pendingOf(sessionId: string): Permission[] {
@@ -454,6 +474,22 @@ export class Board {
     const oldest = candidates[0];
     if (oldest) this.sessions.delete(oldest.id);
   }
+}
+
+/**
+ * What a session waits for, most telling first: a question the main agent asked without waiting, the main
+ * agent's own question, input or permission, a subagent's request open at the app's card, and last the
+ * mere next prompt. Null when it waits for nothing.
+ */
+function waitingOf(session: Session): { reason: WaitingFor; since: number | null; question: string | null } | null {
+  if (session.openQuestion) return { reason: 'question', since: session.openQuestion.since, question: session.openQuestion.question };
+  const main = session.base === 'waiting' ? session.waitingFor : null;
+  if (main !== null && main !== 'idle') return { reason: main, since: session.waitingSince, question: session.question };
+  if (session.subagentAppRequests.size > 0) {
+    const since = Math.min(...[...session.subagentAppRequests.values()].map((request) => request.since));
+    return { reason: 'permission', since, question: null };
+  }
+  return main === 'idle' ? { reason: 'idle', since: session.waitingSince, question: null } : null;
 }
 
 /** Last part of a path, Windows or POSIX. */

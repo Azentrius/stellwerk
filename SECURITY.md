@@ -37,13 +37,15 @@ reachable only from the machine it runs on and only by the display it serves:
   is never logged;
 - the display signs in before it gets anything: a start file readable by
   the current Windows user only posts a key derived from the hook token, and
-  the hub answers with an HttpOnly cookie; the page (with its page token) and
-  the WebSocket need that cookie, so another account on the same computer
-  cannot get the display or its decisions from the address; the key is in
-  no address and no log;
+  only the hub's answer to it carries the page token the WebSocket needs;
+  the display keeps it in storage of the hub's origin (address and port),
+  which other sites and ports cannot read, and sends it only in the
+  WebSocket handshake; there is no cookie, since cookies of `127.0.0.1` go
+  to every port and so to other local services; the address alone gives no
+  token; the key is in no address and no log; `tools/check-browser.ts`
+  checks this in a real Edge with a second local service;
 - decisions travel only over the display's WebSocket, which needs the right
-  `Host`, the right `Origin`, the sign-in cookie and a token the hub puts
-  into the page; a broken or oversized message (over 4 KB) or an unreadable
+  `Host`, the right `Origin` and the page token from the sign-in; a broken or oversized message (over 4 KB) or an unreadable
   request target closes only its own connection;
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;

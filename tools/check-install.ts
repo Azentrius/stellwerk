@@ -1,5 +1,5 @@
-// Checks an installed hub as a display uses it: the address alone gets the locked page, the start file
-// the hub wrote signs the display in, and the signed-in page and the display's files are served. For CI,
+// Checks an installed hub as a display uses it: the address alone gets the display without its page token,
+// the start file the hub wrote signs the display in and gets it, and the display's files are served. For CI,
 // after the package is installed and `serve` started.
 //
 // Usage: node tools/check-install.ts [port]     (LOCALAPPDATA as the hub has it)
@@ -19,9 +19,9 @@ function check(ok: boolean, message: string): void {
   console.log(`ok  ${message}`);
 }
 
-const locked = await fetch(`${base}/`);
-const lockedPage = await locked.text();
-check(locked.status === 401 && !/stellwerk-session" content="[0-9a-f]{64}"/.test(lockedPage), '/ without sign-in: 401, no page token');
+const anonymous = await fetch(`${base}/`);
+const anonymousPage = await anonymous.text();
+check(anonymous.status === 200 && !/stellwerk-session" content="[0-9a-f]{64}"/.test(anonymousPage) && !anonymous.headers.has('set-cookie'), '/ without sign-in: no page token, no cookie');
 
 const start = fs.readFileSync(path.join(localAppData, 'stellwerk', 'display.html'), 'utf8');
 const key = /name="key" value="([0-9a-f]{64})"/.exec(start)?.[1];
@@ -31,13 +31,9 @@ const login = await fetch(`${base}/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null' },
   body: `key=${key}`,
-  redirect: 'manual',
 });
-const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
-check(login.status === 303 && /^stellwerk_display=[0-9a-f]{64}$/.test(cookie), 'sign-in: 303 with the display cookie');
-
-const page = await fetch(`${base}/`, { headers: { Cookie: cookie } });
-check(page.status === 200 && /stellwerk-session" content="[0-9a-f]{64}"/.test(await page.text()), '/ signed in: 200 with the page token');
+const signed = await login.text();
+check(login.status === 200 && /stellwerk-session" content="[0-9a-f]{64}"/.test(signed) && !login.headers.has('set-cookie'), 'sign-in: the page with its token, no cookie');
 
 for (const file of ['/app.js', '/app.css', '/static/fonts/RedHatMono/RedHatMonoVF.woff2']) {
   const reply = await fetch(`${base}${file}`);

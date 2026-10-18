@@ -37,12 +37,11 @@ export const WS_PROTOCOL = 'stellwerk.v1';
 export const WS_SESSION_PREFIX = 'stellwerk.session.';
 const MAX_WS_MESSAGE_BYTES = 4096;
 /**
- * The display signs in once: a start file only the user can read posts a key here, and the hub answers with
- * a cookie. Page and WebSocket need that cookie, so the address alone gives nobody the display, also not
- * another account on this computer.
+ * The display signs in once: a start file only the user can read posts a key here, and only the answer
+ * carries the page token, which the WebSocket needs. The display keeps it in storage of the hub's origin;
+ * there is no cookie, since cookies are sent to every port of 127.0.0.1, and with them to other services.
  */
 export const DISPLAY_LOGIN_PATH = '/login';
-export const DISPLAY_COOKIE = 'stellwerk_display';
 const MAX_LOGIN_BYTES = 1024;
 const SWEEP_INTERVAL_MS = 1000;
 const BROADCAST_DELAY_MS = 50;
@@ -119,21 +118,6 @@ export function displayStartPage(port: number, key: string): string {
   ].join('\n');
 }
 
-/** What an address without a signed-in display gets: no page token, only how to open the display. */
-const LOCKED_PAGE = Buffer.from(
-  [
-    '<!doctype html>',
-    '<html lang="en" class="pf-v6-theme-dark"><head><meta charset="utf-8"><title>Stellwerk</title>',
-    '<link rel="stylesheet" href="/azentrius.css"><link rel="stylesheet" href="/app.css"></head><body>',
-    '<main class="locked"><h1 class="wordmark">Stellwerk</h1>',
-    '<p>This display is not signed in. Open it with the start file the hub names when it starts ' +
-      '(display.html in %LOCALAPPDATA%\\stellwerk), or start the task "Stellwerk display" again.</p>',
-    '<p lang="de">Diese Anzeige ist nicht angemeldet. Öffne sie über die Startdatei, die der Hub beim Start nennt ' +
-      '(display.html in %LOCALAPPDATA%\\stellwerk), oder starte die Aufgabe „Stellwerk display“ neu.</p>',
-    '</main></body></html>',
-  ].join('\n'),
-);
-
 export interface Hub {
   readonly port: number;
   readonly board: Board;
@@ -169,7 +153,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   const template = renderIndex(loadIndexTemplate(options.uiRoot), { version: options.version });
   // An open display reloads itself when this differs from the build it was served with.
   const build = displayBuild(template, files);
-  const index = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));
+  // The page with its token answers only the sign-in; the address alone gets the same page without it.
+  const signedIndex = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));
+  const anonymousIndex = Buffer.from(renderIndex(template, { session: '', scale: String(options.scale), build }));
   let port = options.port;
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
@@ -258,11 +244,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     if (pathname === DISPLAY_LOGIN_PATH) return onLogin(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
     if (pathname === '/' || pathname === '/index.html') {
-      if (!displaySignedIn(req.headers.cookie)) {
-        reject('display sign-in', 'display page without sign-in; open it with the start file (401)');
-        return send(res, 401, LOCKED_PAGE, 'text/html; charset=utf-8');
-      }
-      return send(res, 200, index, 'text/html; charset=utf-8');
+      // Without the token: a display that signed in has it in its own storage, any other page has nothing.
+      return send(res, 200, options.openDisplay ? signedIndex : anonymousIndex, 'text/html; charset=utf-8');
     }
     const file = files.get(pathname);
     if (file) return send(res, 200, file.body, file.type);
@@ -288,12 +271,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       reject('display sign-in', 'display sign-in with a wrong key; start the hub and the display again (403)');
       return send(res, 403);
     }
-    res.writeHead(303, {
-      Location: '/',
-      'Set-Cookie': `${DISPLAY_COOKIE}=${loginKey}; HttpOnly; SameSite=Lax; Path=/`,
-      'Content-Length': 0,
-    });
-    res.end();
+    // The answer is the display itself, with its page token; nothing is set that the browser would send
+    // to other ports.
+    send(res, 200, signedIndex, 'text/html; charset=utf-8');
   }
 
   async function onHook(req: http.IncomingMessage, res: http.ServerResponse, provider: Provider): Promise<void> {
@@ -496,11 +476,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       return refuse(403, 'foreign origin', `display connection from the origin ${quote(req.headers.origin)}`);
     }
     if (pathname !== WS_PATH) return refuse(404, 'display path', 'display connection to an unknown path');
-    if (!displaySignedIn(req.headers.cookie)) {
-      return refuse(403, 'display sign-in', 'display connection without sign-in; open the display with its start file');
-    }
     if (!hasSessionToken(req.headers['sec-websocket-protocol'])) {
-      return refuse(403, 'page token', 'display connection without the right page token; reload the display');
+      return refuse(403, 'page token', 'display connection without the right page token; open the display with its start file');
     }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   }
@@ -561,13 +538,6 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     if (!header) return false;
     const given = Buffer.from(header);
     return given.length === expectedAuthorization.length && timingSafeEqual(given, expectedAuthorization);
-  }
-
-  /** The display signed in with its start file (or the demo, which needs no sign-in). */
-  function displaySignedIn(cookieHeader: string | undefined): boolean {
-    if (options.openDisplay) return true;
-    const value = cookie(cookieHeader, DISPLAY_COOKIE);
-    return value !== null && sameSecret(value, loginKey);
   }
 
   function hasSessionToken(header: string | undefined): boolean {
@@ -656,15 +626,6 @@ function pathOf(url: string | undefined): string | null {
   } catch {
     return null;
   }
-}
-
-/** A value of the Cookie header by name. */
-function cookie(header: string | undefined, name: string): string | null {
-  for (const part of (header ?? '').split(';')) {
-    const at = part.indexOf('=');
-    if (at > 0 && part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
-  }
-  return null;
 }
 
 /** Equal secrets, compared in constant time. */

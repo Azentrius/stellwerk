@@ -67,7 +67,7 @@ Done in 0.4.2 (see [CHANGELOG](CHANGELOG.md)), after an external review of 0.4.1
 with a start file only the user can read (another account on the computer no longer gets the
 decisions); a broken display connection no longer ends the hub; open Codex questions and the main
 agent's questions survive turn ends and subagents; GitHub lists are complete, private repositories of a
-person included. The sign-in was checked in a real Edge: start file, cookie, display, WebSocket.
+person included. The sign-in was checked in a real Edge, also with a second local service that must get nothing.
 
 ---
 

@@ -255,9 +255,6 @@ button { font: inherit; }
 .col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-md); padding-block-start: var(--sp-md); font-size: 1rem; }
 .az-signature__mark { font-size: 1.3rem; }
 
-/* ---------- the page an address gets without a signed-in display ---------- */
-.locked { display: flex; flex-direction: column; gap: var(--sp-md); max-width: 48rem; padding: var(--sp-lg); }
-
 /* ---------- toast: a note, with its icon ---------- */
 .toast {
   position: fixed;

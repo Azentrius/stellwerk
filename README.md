@@ -90,8 +90,8 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
    ```
 
    The hub writes `%LOCALAPPDATA%\stellwerk\display.html` when it starts (its console names it); only your
-   Windows account can read it. It signs the display in at the hub, which answers with a cookie. Opened at
-   `http://127.0.0.1:4780` alone, the display shows only that it is not signed in.
+   Windows account can read it. It signs the display in at the hub, which answers with the display and the
+   token it connects with. Opened at `http://127.0.0.1:4780` alone, the display says it is not signed in.
 
 ## Start with Windows
 
@@ -347,12 +347,15 @@ Restart the hub after a change.
   type makes a browser ask first (CORS preflight), which the hub never answers, so no web page can post
   events.
 - The display signs in before it gets anything: its start file, which only your Windows account can
-  read, posts a key derived from the hook token to the hub, and the hub answers with an HttpOnly cookie.
-  The page with its token and the WebSocket need that cookie, so neither a web page nor another account
-  on this computer gets the display or its decisions from the address alone. The key is in no address
-  and no log.
+  read, posts a key derived from the hook token to the hub, and only that answer carries the page token
+  the WebSocket needs. The display keeps it in its tab's storage for the hub's address and port, which
+  no other site or port can read, and sends it only in the WebSocket handshake. There is no cookie:
+  browsers send cookies of `127.0.0.1` to every port, so another local service, also one of another
+  account, would get it. The address alone gives no token; the key is in no address and no log. A test
+  in a real Edge (`tools/check-browser.ts`, also in CI) visits a second local service after the sign-in
+  and checks that it gets nothing to decide with.
 - Decisions travel only over the display's WebSocket. The hub checks `Host` and `Origin` (against
-  DNS rebinding and foreign pages), the cookie and a token it puts into the page it serves. A broken
+  DNS rebinding and foreign pages) and the page token. A broken
   or oversized message closes only its own connection.
 - Nothing is allowed automatically: no rules, no "always allow".
 - The hub starts no programs. Its only connection to another machine is to `api.github.com`, for the
@@ -392,9 +395,8 @@ once a minute per reason and never with the token:
 | `hook request without a token (401)` | Claude Code has no `STELLWERK_TOKEN`: run `stellwerk hooks install`, then restart the Claude app. |
 | `hook request with a wrong token (401)` | The token file was renewed: run `stellwerk hooks install` again, then restart the Claude app. |
 | `request with the Host header … (403)` | Open the display at `http://127.0.0.1:4780` or `http://localhost:4780`, not under another name. |
-| `display page without sign-in` or `display connection without sign-in` | Open the display with its start file (`%LOCALAPPDATA%\stellwerk\display.html`), or start the task "Stellwerk display" again. |
 | `display sign-in with a wrong key` | The token changed since the start file was opened: start the hub, then the display again. |
-| `display connection without the right page token` | Reload the display. |
+| `display connection without the right page token` | Open the display with its start file (`%LOCALAPPDATA%\stellwerk\display.html`), or start the task "Stellwerk display" again. |
 
 If the console stays silent, Claude Code sends nothing: check that the hooks are in
 `%USERPROFILE%\.claude\settings.json` and that the session was started after `stellwerk hooks install`.

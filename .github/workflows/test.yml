@@ -27,6 +27,8 @@ jobs:
         run: npm run build
       - name: Tests (status model, hook data, settings, configuration, the hub end to end)
         run: npm test
+      - name: Display sign-in in a real Edge (another local service gets nothing to decide with)
+        run: node tools/check-browser.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
       - name: Changelog has a section for the current version
