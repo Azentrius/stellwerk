@@ -1,10 +1,8 @@
 # Stellwerk
 
-*A signal box for your AI agents.*
-
-A desk display for a wide second screen (made for 1920×720, ready for touch) that shows every running
-Claude Code and Codex session and lets you answer their permission requests right there. Like a
-dispatcher who sees every train on the track diagram and sets the signals.
+A signal box for your AI agents: a desk display for a wide second screen (made for 1920×720, ready
+for touch) that shows every running Claude Code and Codex session and lets you answer their permission
+requests right there. Like a dispatcher who sees every train on the track diagram and sets the signals.
 
 ![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, Uptime Kuma's monitors with the failing ones on top, clock, hub, hardware and plan usage on the right](docs/display.png)
 
@@ -113,10 +111,13 @@ adding them. Both start at logon, without administrator rights:
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens. After an update, restarting the hub is enough: the open
 display notices that the hub serves a newer version and loads itself again.
+
+Stop or start a task in the Task Scheduler or with `schtasks /End /TN "Stellwerk hub"` and
+`schtasks /Run /TN "Stellwerk hub"`; the hub ends together with its task. `stellwerk autostart uninstall`
+removes both tasks.
+
 **Updating from 0.4.1 or older:** run `stellwerk autostart install` again, so that the display task
-opens the start file, then restart both tasks; until then the display shows that it is not signed in. Stop or start a task in the Task Scheduler or with
-`schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
-its task. `stellwerk autostart uninstall` removes both tasks.
+opens the start file, then restart both tasks; until then the display shows that it is not signed in.
 
 ## Open pull requests
 
