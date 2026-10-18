@@ -6,7 +6,7 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code and Codex session and lets you answer their permission requests right there. Like a
 dispatcher who sees every train on the track diagram and sets the signals.
 
-![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, room for monitoring, clock, hub and hardware on the right](docs/display.png)
+![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, room for monitoring, clock, hub, hardware and plan usage on the right](docs/display.png)
 
 ## What it does
 
@@ -29,7 +29,7 @@ dispatcher who sees every train on the track diagram and sets the signals.
   below the cards under "Answer in the app", with the question and how long it has been waiting. You
   answer in the app; allow or deny would not answer a question.
 - **Codex, if you like.** The Codex app's sessions and approvals appear among the others, marked
-  "Codex" (see [Codex](#codex)).
+  "Codex", and the status column shows how much of your plan's Codex limits is used (see [Codex](#codex)).
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
   owner (all repositories) are listed too, each with the state of its Actions runs.
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
@@ -212,6 +212,11 @@ How Codex differs:
 - Questions Codex asks you are listed under "Answer in the app". The app's short helper sessions, which
   have no transcript, are not shown.
 - The context meter uses the window Codex records with its token counts.
+- With its token counts Codex also records how much of your plan's limits is used. The status column
+  shows that below the hardware, under "Codex plan usage": one row per window your plan has (5 h, Week),
+  in percent, with when the window starts again; from 80 % it needs attention. The hub keeps the latest
+  values in `plans.json`, so they are there after a restart before Codex works again. Claude's limits are
+  not shown: the Claude apps keep them nowhere on this machine that the hub could read.
 
 `stellwerk codex uninstall` removes exactly these hooks.
 
@@ -290,6 +295,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
 | `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |
 | `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
+| `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plan's Codex limits, for the display after a restart |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
@@ -315,8 +321,9 @@ Restart the hub after a change.
   data and pull request titles as text, never as HTML.
 - For the context meters the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
   and `%USERPROFILE%\.codex\sessions` (a path elsewhere in a hook event is ignored), only from their end,
-  and only the token counts, the model, the context window and, for Codex, who approves. Prompts, code
-  and answers in them are not read into the hub's state and never reach the display.
+  and only the token counts, the model, the context window and, for Codex, who approves and the usage of
+  the plan's limits. Prompts, code and answers in them are not read into the hub's state and never reach
+  the display.
 - Codex events come through Stellwerk's forwarder to their own endpoint, with the same checks as the
   others (token, content type, `Host`). The forwarder reads the hook token from the token file, talks
   only to `127.0.0.1` and prints only the hub's answer.

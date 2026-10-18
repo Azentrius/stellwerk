@@ -56,8 +56,8 @@ reachable only from the machine it runs on and only by the display it serves:
   events, only under `%USERPROFILE%\.claude\projects` and
   `%USERPROFILE%\.codex\sessions` (after following links), only from their
   end, and keeps only the token counts, the model, the context window and,
-  for Codex, who approves; nothing else of a transcript reaches its state or
-  the display;
+  for Codex, who approves and the usage of the plan's limits; nothing else of
+  a transcript reaches its state, the display or its file `plans.json`;
 - Codex events reach the hub through Stellwerk's forwarder, which Codex runs
   as a command hook: it reads the hook token from the token file, posts to
   `127.0.0.1` only, prints only the hub's answer and ends at once without a
@@ -86,7 +86,8 @@ Reports are particularly welcome for:
 - the hub connecting anywhere but `api.github.com` and LibreHardwareMonitor on
   `127.0.0.1:8085`, or to them without being set up,
 - a hook event that makes the hub read a file outside the transcripts folders,
-  or anything of a transcript beyond its token counts reaching the display,
+  or anything of a transcript beyond its token counts and limits reaching the
+  display,
 - the forwarder printing anything but the hub's answer, sending the token
   elsewhere, or making Codex wait beyond its hook timeout; `stellwerk codex
   install` or `uninstall` changing more of Codex' hooks than Stellwerk's own,

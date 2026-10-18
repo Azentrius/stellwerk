@@ -197,6 +197,7 @@ async function serve(
       github,
       hardware,
       context: { root: defaultTranscriptsRoot(), codexRoot: codexTranscriptsRoot(paths.codexHome), windows: config.contextWindows },
+      plansFile: paths.plansFile,
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {

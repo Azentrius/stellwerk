@@ -229,10 +229,15 @@ button { font: inherit; }
 .col--status .az-alert__title { font-size: 1rem; }
 .col--status .az-alert code { font-family: var(--font-mono); font-size: 1rem; }
 
-/* Hardware at the foot of the status column: label, load bar and percent, temperature. */
-.hardware { margin-block-start: auto; }
-.gauges { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: var(--sp-md); row-gap: var(--sp-sm); margin: 0; }
+/* Hardware and the plans' usage at the foot of the status column: label, bar and percent, then a value
+   (temperature, memory, when a limit starts again). All rows share one grid, so the bars line up. */
+.gauge-sections { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--sp-md); margin-block-start: auto; }
+.plans { display: contents; }
+.gauge-section { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
+.gauge-section > :not(.gauges) { grid-column: 1 / -1; }
+.gauges { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; row-gap: var(--sp-sm); margin: 0; }
 .gauge { display: contents; }
+.gauge .az-label { white-space: nowrap; }
 .gauge dd { margin: 0; }
 .gauge__label { color: var(--text-subtle); font-weight: 600; }
 .gauge__load { display: flex; align-items: center; gap: var(--sp-sm); min-width: 0; }
@@ -243,7 +248,6 @@ button { font: inherit; }
 
 /* The Azentrius signature below everything, without a link: the display is a kiosk. */
 .col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-lg); padding-block-start: var(--sp-md); font-size: 1rem; }
-.hardware[hidden] + .az-signature { margin-block-start: auto; }
 .az-signature__mark { font-size: 1.3rem; }
 
 /* ---------- toast: a note, with its icon ---------- */

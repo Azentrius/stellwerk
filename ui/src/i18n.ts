@@ -39,6 +39,14 @@ export interface Texts {
   hardwareTitle: string;
   parts: { cpu: string; gpu: string; memory: string };
   hardware: { asking: string; problem: Record<HardwareProblem, string>; fix: Record<HardwareProblem, string> };
+  /** The title over a provider's limits: "Codex plan usage". */
+  planTitle: (provider: string) => string;
+  /** A limit's window by its length in minutes: "5 h", "Week". */
+  planWindow: (minutes: number) => string;
+  /** When a limit's window starts again: "until 14:20", "until Fri". */
+  resets: (at: string) => string;
+  /** The day of the week, short. */
+  weekday: (ms: number) => string;
   /** A number with the given decimals, in the language's way. */
   number: (n: number, decimals: number) => string;
   allow: string;
@@ -134,6 +142,11 @@ const en: Texts = {
       unexpected: 'Run `stellwerk hardware install` again as administrator.',
     },
   },
+  planTitle: (provider) => `${provider} plan usage`,
+  planWindow: (m) =>
+    m === 10_080 ? 'Week' : m % 1440 === 0 ? (m === 1440 ? 'Day' : `${m / 1440} days`) : m < 60 ? `${m} min` : `${Math.round(m / 60)} h`,
+  resets: (at) => `until ${at}`,
+  weekday: (ms) => new Date(ms).toLocaleDateString('en', { weekday: 'short' }),
   number: (n, decimals) => n.toLocaleString('en', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
   allow: 'Allow',
   deny: 'Deny',
@@ -231,6 +244,11 @@ const de: Texts = {
       unexpected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
     },
   },
+  planTitle: (provider) => `Abo-Nutzung ${provider}`,
+  planWindow: (m) =>
+    m === 10_080 ? 'Woche' : m % 1440 === 0 ? (m === 1440 ? 'Tag' : `${m / 1440} Tage`) : m < 60 ? `${m} min` : `${Math.round(m / 60)} h`,
+  resets: (at) => `bis ${at}`,
+  weekday: (ms) => new Date(ms).toLocaleDateString('de', { weekday: 'short' }),
   number: (n, decimals) => n.toLocaleString('de', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
   allow: 'Erlauben',
   deny: 'Ablehnen',

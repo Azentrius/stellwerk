@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 – not released yet
+
+How much of the plan's Codex limits is used, in the status column.
+
+- **Plan usage:** below the hardware, "Codex plan usage" shows each limit of your plan (5 h, Week, as the
+  plan has them) like the hardware values: a bar, the percent used and when the window starts again;
+  from 80 % it needs attention, and a window whose time is up counts from zero. Codex records these
+  values with its token counts; the hub takes them from the same transcripts it reads for the context
+  meter and keeps the latest in `%LOCALAPPDATA%\stellwerk\plans.json`, so they show again after a
+  restart. Claude's limits are not shown: the Claude apps keep them nowhere on this machine that the hub
+  could read.
+- **One grid for the gauges:** the rows of hardware and plan usage share their columns, so the bars line
+  up.
+
 ## 0.3.0 – 2026-10-18
 
 Codex joins; how full each session's context is; more room for the repository in the list of open pull

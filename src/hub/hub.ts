@@ -1,7 +1,7 @@
 // The hub: receives Claude Code's hook requests, holds permission requests until the display or the hold
 // time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
 // no programs. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
-// (when set up).
+// (when set up). Besides its own files it reads only transcripts named in hook events.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,6 +21,7 @@ import { ContextReader } from './context.ts';
 import { GitHubWatcher } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
+import { PlanBook } from './plans.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -69,6 +70,8 @@ export interface HubOptions {
    * under `root` (~/.claude/projects). Windows by model from the configuration.
    */
   context?: { root: string; codexRoot?: string | null; windows?: Record<string, number>; intervalMs?: number } | null;
+  /** Where the hub remembers the usage of the plans' limits between runs; without it, in memory only. */
+  plansFile?: string | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -151,12 +154,17 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     ? new HardwareWatcher({ ...options.hardware, now, onChange: () => scheduleBroadcast(), log })
     : null;
   hardware?.start();
+  const plans = new PlanBook(options.plansFile ?? null, log);
+  plans.load();
   const context = options.context
     ? new ContextReader({
         ...options.context,
         log,
         onUsage: (sessionId, usage) => {
           if (board.setContext(sessionId, usage)) scheduleBroadcast();
+        },
+        onPlan: (plan) => {
+          if (plans.offer(plan)) scheduleBroadcast();
         },
       })
     : null;
@@ -407,6 +415,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
+      plans: plans.view(),
     };
   }
 
@@ -486,7 +495,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         server.close(() => resolve());
         server.closeAllConnections();
       });
-      await audit.flush();
+      await Promise.all([audit.flush(), plans.flush()]);
     },
   };
 }

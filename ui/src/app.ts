@@ -1,6 +1,6 @@
 // Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
-// requests, answers due in the app, open pull requests), the hub's state and the hardware values, and
-// sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
+// requests, answers due in the app, open pull requests), the hub's state, the hardware values and the usage
+// of the plans' limits, and sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
 // serves a newer display after an update, the page loads itself again.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -9,7 +9,7 @@ import type { Decision, ServerMessage, StateMessage } from '../../src/shared/pro
 import { renderAgents } from './agents.ts';
 import { renderAnswers, waitingForAnswer } from './answers.ts';
 import { alert, byId, icon, label } from './dom.ts';
-import { renderHardware } from './hardware.ts';
+import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
@@ -50,6 +50,7 @@ const githubState = byId('github-state');
 const hardwareSection = byId('hardware');
 const gauges = byId('gauges');
 const hardwareState = byId('hardware-state');
+const plansNode = byId('plans');
 const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
@@ -163,6 +164,9 @@ function tick(): void {
   const hardwareNote = current(hardwareLine(hardware, texts));
   hardwareState.hidden = hardwareNote === null;
   if (hardwareNote) show(hardwareState, hardwareNote);
+  const plans = state?.plans ?? [];
+  plansNode.hidden = plans.length === 0;
+  renderPlans(plansNode, plans, now, texts);
 }
 
 /**

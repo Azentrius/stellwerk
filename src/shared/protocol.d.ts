@@ -130,6 +130,25 @@ export interface HardwareView {
   problem: HardwareProblem | null;
 }
 
+/** One usage limit of a plan: how much of it is used in its window (five hours, a week). */
+export interface PlanLimit {
+  /** In percent of the limit, 0 to 100. */
+  used: number;
+  /** The window's length: 300 for five hours, 10080 for a week. */
+  windowMinutes: number;
+  /** When the window starts again; null when not recorded. */
+  resetsAt: number | null;
+}
+
+/** How much of a plan's usage limits is used, as the agent recorded it last. */
+export interface PlanView {
+  provider: Provider;
+  /** Shortest window first. */
+  limits: PlanLimit[];
+  /** When the agent recorded these values. */
+  recordedAt: number;
+}
+
 export interface StateMessage {
   type: 'state';
   /** The hub's clock when it sent the message. */
@@ -144,6 +163,8 @@ export interface StateMessage {
   github: GitHubView | null;
   /** Null when the hardware monitor is not set up. */
   hardware: HardwareView | null;
+  /** The usage of the plans' limits, one entry per provider that recorded any. */
+  plans: PlanView[];
 }
 
 export interface DecisionResultMessage {

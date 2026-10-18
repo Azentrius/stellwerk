@@ -81,14 +81,26 @@ for (const [session, tokens] of Object.entries(CONTEXT_TOKENS)) {
   const line = { type: 'assistant', message: { model: 'claude-opus-5-5', usage: { input_tokens: 2, cache_read_input_tokens: tokens - 1_002, output_tokens: 1_000 } } };
   fs.writeFileSync(path.join(transcripts, 'demo', `${session}.jsonl`), `${JSON.stringify(line)}\n`);
 }
-// And one Codex session, whose rollout has a token_count with its window.
+// And one Codex session, whose rollout has a token_count with its window and the plan's limits.
 const codexSessions = path.join(demoDir, 'codex', 'sessions');
 fs.mkdirSync(path.join(codexSessions, '2026'), { recursive: true });
 const codexRollout = path.join(codexSessions, '2026', 'rollout-demo.jsonl');
+const inSeconds = (h: number) => Math.round(Date.now() / 1000 + h * 3600);
 fs.writeFileSync(
   codexRollout,
   `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: 'user' } })}\n` +
-    `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 } } })}\n`,
+    `${JSON.stringify({
+      timestamp: new Date().toISOString(),
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 },
+        rate_limits: {
+          primary: { used_percent: 38, window_minutes: 300, resets_at: inSeconds(2.4) },
+          secondary: { used_percent: 84, window_minutes: 10_080, resets_at: inSeconds(100) },
+        },
+      },
+    })}\n`,
 );
 
 const hub = await startHub({

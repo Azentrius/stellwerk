@@ -449,8 +449,9 @@ describe('hardware values', () => {
 });
 
 describe('Codex', () => {
+  const RECORDED_AT = '2026-10-18T01:00:05.000Z';
   /** A Codex transcript folder with one rollout whose last turn has the given approval reviewer. */
-  function codexRollout(reviewer: string, tokens = 182_031): { codexRoot: string; transcript: string } {
+  function codexRollout(reviewer: string, tokens = 182_031, rateLimits: Record<string, unknown> | null = null): { codexRoot: string; transcript: string } {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-codex-'));
     const codexRoot = path.join(home, 'sessions');
     const day = path.join(codexRoot, '2026', '10', '18');
@@ -459,7 +460,11 @@ describe('Codex', () => {
     fs.writeFileSync(
       transcript,
       `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: reviewer, cwd: 'C:\\x' } })}\n` +
-        `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: tokens }, model_context_window: 258_400 } } })}\n`,
+        `${JSON.stringify({
+          timestamp: RECORDED_AT,
+          type: 'event_msg',
+          payload: { type: 'token_count', info: { last_token_usage: { total_tokens: tokens }, model_context_window: 258_400 }, rate_limits: rateLimits },
+        })}\n`,
     );
     return { codexRoot, transcript };
   }
@@ -534,6 +539,30 @@ describe('Codex', () => {
     await codexHook(port, { hook_event_name: 'Interrupt', transcript_path: transcript }).reply;
     assert.equal(hub.board.view().sessions[0]?.status, 'done', 'an interrupt ends the turn');
     assert.doesNotMatch(JSON.stringify(hub.board.view()), /secret/);
+  });
+
+  test("the usage of the plan's limits comes from the transcript and is there again after a restart", async () => {
+    const resetsAt = Math.round(Date.now() / 1000) + 3600;
+    const { codexRoot, transcript } = codexRollout('user', 182_031, {
+      limit_id: 'codex',
+      primary: { used_percent: 74, window_minutes: 10_080, resets_at: resetsAt },
+      secondary: null,
+      plan_type: 'prolite',
+    });
+    const plansFile = path.join(path.dirname(codexRoot), 'stellwerk', 'plans.json');
+    const first = await startTestHub({ plansFile, context: { root: codexRoot, codexRoot, intervalMs: 20 } });
+    const screen = await display(first.port);
+    assert.deepEqual((await screen.state(() => true)).plans, [], 'nothing before the first Codex event');
+    await codexHook(first.port, { hook_event_name: 'UserPromptSubmit', transcript_path: transcript, prompt: 'x' }).reply;
+    const expected = [{ provider: 'codex', limits: [{ used: 74, windowMinutes: 10_080, resetsAt: resetsAt * 1000 }], recordedAt: Date.parse(RECORDED_AT) }];
+    assert.deepEqual((await screen.state((s) => s.plans.length > 0)).plans, expected);
+    screen.close();
+    await first.hub.close();
+
+    const second = await startTestHub({ plansFile });
+    const again = await display(second.port);
+    assert.deepEqual((await again.state(() => true)).plans, expected, 'remembered, before any Codex event');
+    again.close();
   });
 
   test('the Codex endpoint has the same checks: token, content type, host', async () => {

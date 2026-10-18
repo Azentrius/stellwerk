@@ -46,11 +46,14 @@
         <div class="hub-state" id="hub-state"></div>
         <p class="last-event" id="last-event"></p>
         <div class="github-state" id="github-state" hidden></div>
-        <section class="hardware" id="hardware" aria-labelledby="hardware-title" hidden>
-          <h2 class="section-title" id="hardware-title" data-text="hardwareTitle"></h2>
-          <dl class="gauges" id="gauges"></dl>
-          <div class="hardware-state" id="hardware-state" hidden></div>
-        </section>
+        <div class="gauge-sections">
+          <section class="gauge-section" id="hardware" aria-labelledby="hardware-title" hidden>
+            <h2 class="section-title" id="hardware-title" data-text="hardwareTitle"></h2>
+            <dl class="gauges" id="gauges"></dl>
+            <div class="hardware-state" id="hardware-state" hidden></div>
+          </section>
+          <div class="plans" id="plans" hidden></div>
+        </div>
         <footer class="az-signature">
           <span class="az-signature__mark">Azentrius</span>
           <span class="az-signature__meta"><span>Stellwerk {{version}}</span></span>
