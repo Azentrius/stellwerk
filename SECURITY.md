@@ -52,7 +52,7 @@ reachable only from the machine it runs on and only by the display it serves:
   for `data.json`, when the hardware monitor is set up, with the password
   from LibreHardwareMonitor's settings file, and never sends that password
   to the display;
-- for the context rings the hub reads session transcripts named in hook
+- for the context meters the hub reads session transcripts named in hook
   events, only under `%USERPROFILE%\.claude\projects` and
   `%USERPROFILE%\.codex\sessions` (after following links), only from their
   end, and keeps only the token counts, the model, the context window and,

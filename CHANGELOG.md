@@ -9,16 +9,16 @@ requests; questions in the app's box at the end of a turn count as waiting for y
   forwarder; after allowing them in the Codex app, its sessions and approvals appear among the others,
   marked "Codex". A Codex request waits on the display for 30 s (`codexHoldSeconds`), since the Codex
   app shows its own card only after the hook; with "Approve for me" nothing is held. Codex' questions
-  are listed under "Answer in the app"; the app's helper sessions are not shown; the context ring uses
+  are listed under "Answer in the app"; the app's helper sessions are not shown; the context meter uses
   the window Codex records. `stellwerk codex uninstall` removes exactly these hooks.
 - **Whose agent:** every session, answer and card says whose agent it is, all alike: "Claude · 12 s" next
   to the name (the time there is short now), "Claude · 0:42" with the waiting time, "Claude · shop-api"
   on the card.
-
-- **Context ring:** a ring in front of each agent shows how much of its context window is used, 0 to
-  100 %, as in the Claude app; from 80 % it needs attention. The hub takes the token counts of the last
-  answer from the session's transcript, only under `%USERPROFILE%\.claude\projects` and only those
-  numbers. Opus 5.5 has a window of 1M; other models can be set with `contextWindows` in `config.json`.
+- **How full the context is:** in front of each agent its percentage of the context window, 0 to 100 %,
+  over a thin line, quiet in grey; from 80 % it needs attention. The hub takes the token counts of the
+  last answer from the session's transcript, only under `%USERPROFILE%\.claude\projects` (and Codex'
+  folder) and only those numbers. Opus 5.5 has a window of 1M; other models can be set with
+  `contextWindows` in `config.json`.
 - **Columns:** 25 % agents, 35 % waiting for you, 20 % kept free for monitoring, 20 % status.
 - **Questions at the end of a turn:** when Claude ends a turn in the desktop app with its box that asks
   you something (a recap, a question and answers to tap), the session no longer shows as done: it waits
