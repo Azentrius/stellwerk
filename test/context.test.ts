@@ -17,7 +17,8 @@ import {
   readContextUsage,
   usageOfLine,
 } from '../src/hub/context.ts';
-import { CONTEXT_FULL, contextPercent } from '../ui/src/context.ts';
+import { contextPercent } from '../ui/src/context.ts';
+import { meterTone } from '../ui/src/levels.ts';
 
 const answer = (usage: Record<string, number>, extra: Record<string, unknown> = {}) =>
   JSON.stringify({
@@ -104,10 +105,10 @@ test('the reader reports usage for a session at most once per interval, and igno
   reader.stop();
 });
 
-test('the ring shows whole percent, at most 100, and needs attention from 80 %', () => {
+test('the meter shows whole percent, at most 100: grey, attention from 80 %, red from 90 %', () => {
   assert.equal(contextPercent({ used: 591_500, size: 1_000_000 }), 59);
   assert.equal(contextPercent({ used: 2_000_000, size: 1_000_000 }), 100);
   assert.equal(contextPercent(null), null);
   assert.equal(contextPercent({ used: 5, size: 0 }), null);
-  assert.equal(CONTEXT_FULL, 80);
+  assert.deepEqual([null, 0, 79, 80, 89, 90, 97, 100].map(meterTone), ['neutral', 'neutral', 'neutral', 'warning', 'warning', 'danger', 'danger', 'danger']);
 });

@@ -53,8 +53,11 @@ from Uptime Kuma, in the column kept free.
 
 ## Stage 3 – Usage of Claude and ChatGPT
 
-How much of the plans' limits is used. Only unofficial endpoints exist (as used by the Stream Deck
-plugins), so this can break at any time and must fail quietly.
+How much of the plans' limits is used: in 0.4.0, below the hardware, from local sources only. Claude's
+limits from the desktop app's tool `get_usage`, whose answer the `PostToolUse` hook carries when a session
+calls it; Codex' limits (those of the ChatGPT plan for Codex) from its transcripts. Not possible without
+a connection to another machine: the limits of chats in ChatGPT, and Claude's limits for Claude Code in a
+terminal without the desktop app.
 
 ---
 
@@ -68,8 +71,8 @@ stage begins with its own security review.
 ## Stage 5 – Codex agents
 
 The Codex app for Windows: in 0.3.0, after a probe of the app (it runs command hooks once they are
-allowed, and shows its own approval card only after the hook). Still open: the Codex command line, and
-the usage of the plan, which Codex records in its transcripts (`rate_limits`).
+allowed, and shows its own approval card only after the hook). The usage of the plan, which Codex records
+in its transcripts (`rate_limits`), in 0.4.0. Still open: the Codex command line.
 
 ---
 

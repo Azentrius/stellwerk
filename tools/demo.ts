@@ -81,14 +81,23 @@ for (const [session, tokens] of Object.entries(CONTEXT_TOKENS)) {
   const line = { type: 'assistant', message: { model: 'claude-opus-5-5', usage: { input_tokens: 2, cache_read_input_tokens: tokens - 1_002, output_tokens: 1_000 } } };
   fs.writeFileSync(path.join(transcripts, 'demo', `${session}.jsonl`), `${JSON.stringify(line)}\n`);
 }
-// And one Codex session, whose rollout has a token_count with its window.
+// And one Codex session, whose rollout has a token_count with its window and the plan's limits.
 const codexSessions = path.join(demoDir, 'codex', 'sessions');
 fs.mkdirSync(path.join(codexSessions, '2026'), { recursive: true });
 const codexRollout = path.join(codexSessions, '2026', 'rollout-demo.jsonl');
+const inSeconds = (h: number) => Math.round(Date.now() / 1000 + h * 3600);
 fs.writeFileSync(
   codexRollout,
   `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: 'user' } })}\n` +
-    `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 } } })}\n`,
+    `${JSON.stringify({
+      timestamp: new Date().toISOString(),
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: { last_token_usage: { total_tokens: 182_031 }, model_context_window: 258_400 },
+        rate_limits: { primary: { used_percent: 84, window_minutes: 10_080, resets_at: inSeconds(100) }, secondary: null },
+      },
+    })}\n`,
 );
 
 const hub = await startHub({
@@ -136,6 +145,28 @@ send('pipeline', 'data-pipeline', { hook_event_name: 'UserPromptSubmit', session
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a2', agent_type: 'Plan' });
 send('firmware', 'car-firmware', { hook_event_name: 'UserPromptSubmit', model: 'gpt-6-astra', prompt: 'Update the CAN driver' }, true);
+// A session asks the desktop app how much of the plan is used; the hook carries the answer.
+const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+send('pipeline', 'data-pipeline', {
+  hook_event_name: 'PostToolUse',
+  tool_name: 'mcp__ccd_session_mgmt__get_usage',
+  tool_input: {},
+  tool_response: [
+    {
+      type: 'text',
+      text: JSON.stringify({
+        plan: {
+          status: 'ok',
+          windows: [
+            { label: '5-hour limit', percentUsed: 28, resetsAt: inHours(1.4) },
+            { label: 'Weekly · all models', percentUsed: 57, resetsAt: inHours(69) },
+            { label: 'Weekly · Fable', percentUsed: 16, resetsAt: inHours(69) },
+          ],
+        },
+      }),
+    },
+  ],
+});
 // Waiting for an answer in the app: a question, and a permission the app shows itself.
 send('design', 'design-tokens', {
   hook_event_name: 'PermissionRequest',

@@ -4,8 +4,9 @@
 // - Claude Code (~/.claude/projects): the last answer of the main agent carries its usage (input with cache,
 //   and output), which together is what the context holds now. The window is not in the data; it comes
 //   from the model.
-// - Codex (~/.codex/sessions): token_count entries carry the last usage and the model's context window.
-//   Its latest turn_context also says who approves (`approvals_reviewer`), which the hub needs to know.
+// - Codex (~/.codex/sessions): token_count entries carry the last usage and the model's context window,
+//   and the usage of the plan's limits (`rate_limits`). Its latest turn_context also says who approves
+//   (`approvals_reviewer`), which the hub needs to know.
 //
 // The hub reads only those numbers and settings, only from transcripts in these folders, only from the end
 // of the file; nothing of the content goes anywhere.
@@ -15,7 +16,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ContextUsage, Provider } from '../shared/protocol.js';
+import type { ContextUsage, PlanLimit, PlanView, Provider } from '../shared/protocol.js';
 
 /** Where Claude Code keeps its transcripts. Any other path in a hook event is ignored. */
 export function defaultTranscriptsRoot(): string {
@@ -85,6 +86,35 @@ export function codexUsageOfLine(line: string): ContextUsage | null {
   const used = count(last.total_tokens) || count(last.input_tokens) + count(last.output_tokens);
   const size = count(info.model_context_window);
   return used > 0 && size > 0 ? { used, size } : null;
+}
+
+/** One limit of Codex' rate_limits: {used_percent, window_minutes, resets_at in seconds}. */
+function codexLimit(value: unknown): PlanLimit | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { used_percent: used, window_minutes: minutes, resets_at: resets } = value as Record<string, unknown>;
+  if (typeof used !== 'number' || !Number.isFinite(used)) return null;
+  if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes <= 0) return null;
+  return {
+    used: Math.min(100, Math.max(0, used)),
+    windowMinutes: minutes,
+    resetsAt: typeof resets === 'number' && Number.isFinite(resets) && resets > 0 ? resets * 1000 : null,
+  };
+}
+
+/** The usage of the plan's limits in one Codex transcript line, if it is a token_count entry with them. */
+export function codexPlanOfLine(line: string): PlanView | null {
+  if (!line.includes('"rate_limits"')) return null;
+  const entry = parseObject(line);
+  const payload = entry?.payload as Record<string, unknown> | undefined;
+  if (payload?.type !== 'token_count' || typeof payload.rate_limits !== 'object' || payload.rate_limits === null) return null;
+  // The time tells which of several transcripts recorded the newest values.
+  const recordedAt = typeof entry?.timestamp === 'string' ? Date.parse(entry.timestamp) : Number.NaN;
+  if (!Number.isFinite(recordedAt)) return null;
+  const { primary, secondary } = payload.rate_limits as Record<string, unknown>;
+  const limits = [codexLimit(primary), codexLimit(secondary)]
+    .filter((limit) => limit !== null)
+    .sort((a, b) => a.windowMinutes - b.windowMinutes);
+  return limits.length > 0 ? { provider: 'codex', limits, recordedAt } : null;
 }
 
 /** Who approves in a Codex session, from a turn_context line: "user", "auto_review", … */
@@ -161,6 +191,8 @@ export interface ContextReaderOptions {
   /** Context windows from the configuration, by model. */
   windows?: Readonly<Record<string, number>>;
   onUsage: (sessionId: string, usage: ContextUsage) => void;
+  /** The usage of the plan's limits, as a Codex transcript recorded it last. */
+  onPlan?: (plan: PlanView) => void;
   log?: (line: string) => void;
   intervalMs?: number;
 }
@@ -207,6 +239,8 @@ export class ContextReader {
     try {
       if (provider === 'codex') {
         usage = await readLastFromEnd(checked, codexUsageOfLine);
+        const plan = this.options.onPlan ? await readLastFromEnd(checked, codexPlanOfLine) : null;
+        if (plan && !this.stopped) this.options.onPlan?.(plan);
       } else {
         const found = await readContextUsage(checked);
         if (found) usage = { used: found.used, size: contextWindow(found.model, found.used, this.options.windows) };

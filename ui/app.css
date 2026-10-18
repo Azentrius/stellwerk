@@ -204,8 +204,10 @@ button { font: inherit; }
 .meter__value { font-size: 1rem; line-height: 1; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .meter__bar { display: block; height: 0.2rem; overflow: hidden; background: var(--line); border-radius: var(--radius-pill); }
 .meter__fill { display: block; height: 100%; background: var(--text-subtle); transform-origin: left center; transform: scaleX(0); }
-.meter--full { color: var(--status-warning); }
-.meter--full .meter__fill { background: var(--status-warning); }
+.meter--warning { color: var(--status-warning); }
+.meter--warning .meter__fill { background: var(--status-warning); }
+.meter--danger { color: var(--status-danger); }
+.meter--danger .meter__fill { background: var(--status-danger); }
 .agent--ended .meter { opacity: 0.5; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 
@@ -229,10 +231,18 @@ button { font: inherit; }
 .col--status .az-alert__title { font-size: 1rem; }
 .col--status .az-alert code { font-family: var(--font-mono); font-size: 1rem; }
 
-/* Hardware at the foot of the status column: label, load bar and percent, temperature. */
-.hardware { margin-block-start: auto; }
-.gauges { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: var(--sp-md); row-gap: var(--sp-sm); margin: 0; }
+/* Hardware and the plans' usage at the foot of the status column: label, bar and percent, then a value
+   (temperature, memory, when a limit starts again). All rows share one grid, so the bars line up. */
+.gauge-sections { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-content: start; gap: var(--sp-sm) var(--sp-md); min-height: 0; overflow: hidden; margin-block-start: auto; }
+/* Short of room (an alert above): the gauges give way and fade out at the bottom, like a full column. */
+.gauge-sections--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
+.plans { display: contents; }
+/* Each section under the same line as the signature. */
+.gauge-section { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; padding-block-start: var(--sp-sm); border-block-start: 1px solid var(--line); }
+.gauge-section > :not(.gauges) { grid-column: 1 / -1; }
+.gauges { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; row-gap: var(--sp-sm); margin: 0; }
 .gauge { display: contents; }
+.gauge .az-label { white-space: nowrap; }
 .gauge dd { margin: 0; }
 .gauge__label { color: var(--text-subtle); font-weight: 600; }
 .gauge__load { display: flex; align-items: center; gap: var(--sp-sm); min-width: 0; }
@@ -242,8 +252,7 @@ button { font: inherit; }
 .gauge__percent { min-width: 2.6rem; }
 
 /* The Azentrius signature below everything, without a link: the display is a kiosk. */
-.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-lg); padding-block-start: var(--sp-md); font-size: 1rem; }
-.hardware[hidden] + .az-signature { margin-block-start: auto; }
+.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-md); padding-block-start: var(--sp-md); font-size: 1rem; }
 .az-signature__mark { font-size: 1.3rem; }
 
 /* ---------- toast: a note, with its icon ---------- */

@@ -113,6 +113,7 @@ test('the files live under APPDATA and LOCALAPPDATA', () => {
   assert.equal(paths.configFile, path.join('C:\\Users\\u\\AppData\\Roaming', 'stellwerk', 'config.json'));
   assert.equal(paths.auditFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'audit.jsonl'));
   assert.equal(paths.tokenFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'token'));
+  assert.equal(paths.plansFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'plans.json'));
 });
 
 test('the hardware monitor lives in Program Files, where only administrators can change it', () => {

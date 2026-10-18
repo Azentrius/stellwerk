@@ -6,9 +6,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ContextUsage, SessionView } from '../../src/shared/protocol.js';
-import { CONTEXT_FULL, contextPercent } from './context.ts';
+import { contextPercent } from './context.ts';
 import { el, entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
+import { meterTone } from './levels.ts';
 import { sessionState } from './states.ts';
 import { elapsed } from './time.ts';
 
@@ -40,7 +41,8 @@ export function naming(projectName: string, title: string | null, sessionId: str
 /** The percentage over a thin line; its words are its name and tooltip. Empty while not known. */
 function contextMeter(usage: ContextUsage | null, texts: Texts): HTMLSpanElement {
   const percent = contextPercent(usage);
-  const node = el('span', percent !== null && percent >= CONTEXT_FULL ? 'meter meter--full' : 'meter');
+  const tone = meterTone(percent);
+  const node = el('span', tone === 'neutral' ? 'meter' : `meter meter--${tone}`);
   const name = percent === null ? texts.contextUnknown : texts.context(`${texts.number(percent, 0)} %`);
   node.setAttribute('role', 'img');
   node.setAttribute('aria-label', name);
