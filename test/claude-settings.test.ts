@@ -21,6 +21,7 @@ const groupsOf = (settings: Record<string, unknown>, event: string) => (settings
 test('every hook goes to the local hub with the token header and its timeout', () => {
   const hooks = stellwerkHooks(4780);
   assert.deepEqual(Object.keys(hooks).sort(), [
+    'Elicitation',
     'Notification',
     'PermissionRequest',
     'PostToolUse',
@@ -43,7 +44,11 @@ test('every hook goes to the local hub with the token header and its timeout', (
   assert.equal(timeout('PermissionRequest'), 90);
   assert.equal(timeout('UserPromptSubmit'), 3);
   assert.equal(timeout('SessionEnd'), 1);
-  assert.equal(hooks.Notification![0]!.matcher, 'idle_prompt|agent_needs_input|elicitation_dialog|permission_prompt');
+  // Every notification type, so the hub can name the ones it does not show; an MCP server's question is
+  // answered at once (empty: the app asks itself).
+  assert.equal(hooks.Notification![0]!.matcher, undefined);
+  assert.equal(timeout('Notification'), 3);
+  assert.equal(timeout('Elicitation'), 3);
 });
 
 test('installing keeps everything else and is idempotent', () => {

@@ -24,6 +24,25 @@ test('fields Stellwerk does not use are ignored, not rejected', () => {
   }
 });
 
+test('an Elicitation keeps who asks and how, not what is asked', () => {
+  const result = parseHookInput({
+    ...base,
+    hook_event_name: 'Elicitation',
+    mcp_server_name: 'Claude_Browser',
+    message: 'Allow typing a password on example.com?',
+    mode: 'form',
+    url: 'https://example.com/login',
+    elicitation_id: 'e-1',
+    requested_schema: { type: 'object', properties: { allow: { type: 'boolean' } } },
+  });
+  assert.equal(result.ok, true);
+  if (result.ok && !isOther(result.event) && result.event.hook_event_name === 'Elicitation') {
+    assert.deepEqual({ ...result.event }, { ...base, hook_event_name: 'Elicitation', mcp_server_name: 'Claude_Browser', mode: 'form' });
+  } else {
+    assert.fail('parsed as an Elicitation');
+  }
+});
+
 test('a PermissionRequest keeps its complete tool input, nested values included', () => {
   const toolInput = { file_path: 'C:\\a.txt', content: 'hallo', options: { mode: 'w', lines: [1, 2] } };
   const result = parseHookInput({

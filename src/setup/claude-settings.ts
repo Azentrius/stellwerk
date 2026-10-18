@@ -17,7 +17,6 @@ const STELLWERK_URL = new RegExp(`^http://${HOST.replaceAll('.', '\\.')}:\\d+${H
 const STATUS_TIMEOUT_S = 3;
 /** SessionEnd hooks share a budget of 1.5 s. */
 const SESSION_END_TIMEOUT_S = 1;
-const NOTIFICATION_MATCHER = 'idle_prompt|agent_needs_input|elicitation_dialog|permission_prompt';
 
 type Settings = Record<string, unknown>;
 type HookGroup = { matcher?: string; hooks?: unknown[] } & Record<string, unknown>;
@@ -39,14 +38,17 @@ function handler(port: number, timeout: number) {
 /**
  * The hooks, by event. There is no SessionStart hook: that event takes no HTTP hooks, and a session
  * appears with its first event instead. PostToolUse and PostToolUseFailure tell the display that a
- * request was allowed in the app.
+ * request was allowed in the app. Notification takes every type and Elicitation (an MCP server asking the
+ * user during its tool call) is answered at once and empty, so the app shows its own dialog: the hub
+ * notes in its log what it does not show, to find prompts that never reach the display.
  */
 export function stellwerkHooks(port: number): Record<string, HookGroup[]> {
   const status = () => [{ hooks: [handler(port, STATUS_TIMEOUT_S)] }];
   return {
     UserPromptSubmit: status(),
     PermissionRequest: [{ hooks: [handler(port, PERMISSION_HOOK_TIMEOUT_S)] }],
-    Notification: [{ matcher: NOTIFICATION_MATCHER, hooks: [handler(port, STATUS_TIMEOUT_S)] }],
+    Notification: status(),
+    Elicitation: status(),
     PostToolUse: status(),
     PostToolUseFailure: status(),
     Stop: status(),

@@ -19,6 +19,12 @@ Uptime Kuma's monitors in the third column: what is down stands out, what works 
 - **Since when, honestly:** how long a monitor fails is what the hub saw itself; one already failing
   when the hub started, or that changed while Uptime Kuma did not answer, shows no time until it changes
   again.
+- **Prompts the display does not show:** the hooks now take every notification type and `Elicitation`,
+  a question an MCP server asks during its tool call. The hub answers an elicitation at once and empty,
+  so the app shows its own dialog as before; it never answers one. Each kind it does not show it names
+  once in `hub.log`, with the server's name or the notification's type and nothing of what is asked. This
+  is to find out how the desktop app's built-in browser asks for a site, whose cards do not reach the
+  display. **Updating:** run `stellwerk hooks install` again.
 
 ## 0.4.2 – 2026-10-18
 
