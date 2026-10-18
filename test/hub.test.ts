@@ -859,6 +859,49 @@ describe('status hooks', () => {
     const { port } = await startTestHub({ simulateHang: true });
     await assert.rejects(hook(port, { hook_event_name: 'Stop' }, { timeoutMs: 300 }).reply, /timeout/);
   });
+
+  test("an MCP server's question (Elicitation) is answered at once and empty, so the app asks; the log names who asked, once", async () => {
+    const lines: string[] = [];
+    const { port, auditFile } = await startTestHub({ log: (line) => lines.push(line) });
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    const elicitation = {
+      hook_event_name: 'Elicitation',
+      mcp_server_name: 'Claude_Browser',
+      mode: 'form',
+      message: 'Allow typing a secret word on example.com?',
+      requested_schema: { type: 'object' },
+    };
+    const started = Date.now();
+    const reply = await hook(port, elicitation).reply;
+    assert.deepEqual([reply.status, reply.body], [200, ''], 'no decision: the app shows its own dialog');
+    assert.ok(Date.now() - started < 1000, 'answered at once');
+    await hook(port, elicitation).reply;
+    await hook(port, { ...elicitation, mcp_server_name: 'evil\nRejected forged line' }).reply;
+    const noted = lines.filter((line) => /asked the user/.test(line));
+    assert.equal(noted.length, 2, 'once per server');
+    assert.match(noted[0]!, /MCP server "Claude_Browser" asked the user \(elicitation, form\); the app shows its own dialog\./);
+    assert.match(noted[1]!, /MCP server "evil\?Rejected forged line"/, 'no line breaks from hook data');
+    assert.doesNotMatch(lines.join('\n'), /secret word/);
+    // Nothing to decide on the display, and the session goes on working.
+    const state = await screen.state((s) => s.sessions.length === 1);
+    assert.deepEqual([state.permissions.length, state.sessions[0]?.status], [0, 'working']);
+    assert.deepEqual(auditLines(auditFile), []);
+    screen.close();
+  });
+
+  test('notification types the display does not use are named in the log once, the others not', async () => {
+    const lines: string[] = [];
+    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+    for (const type of ['elicitation_url_dialog', 'idle_prompt', 'elicitation_url_dialog', 'agent_completed', 'permission_prompt']) {
+      assert.equal((await hook(port, { hook_event_name: 'Notification', notification_type: type, message: 'private text' }).reply).status, 200);
+    }
+    assert.deepEqual(
+      lines.filter((line) => /Notification/.test(line)).map((line) => line.replace(/^\S+\s+/, '')),
+      ['Notification "elicitation_url_dialog" (not shown on the display).', 'Notification "agent_completed" (not shown on the display).'],
+    );
+    assert.doesNotMatch(lines.join('\n'), /private text/);
+  });
 });
 
 describe('permission requests', () => {

@@ -39,6 +39,8 @@ const knownEvent = z.discriminatedUnion('hook_event_name', [
     tool_input: toolInput.optional(),
   }),
   z.object({ hook_event_name: z.literal('Notification'), ...common, notification_type: text(100).optional() }),
+  // An MCP server asks the user something during its tool call. Only who asks is kept, not what.
+  z.object({ hook_event_name: z.literal('Elicitation'), ...common, mcp_server_name: text(500).optional(), mode: text(50).optional() }),
   z.object({ hook_event_name: z.literal('SubagentStart'), ...common }),
   z.object({ hook_event_name: z.literal('SubagentStop'), ...common }),
   z.object({ hook_event_name: z.literal('SessionEnd'), ...common, reason: text(100).optional() }),

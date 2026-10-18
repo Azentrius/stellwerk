@@ -30,6 +30,11 @@ const WAITING_NOTIFICATIONS: Readonly<Record<string, WaitingFor>> = {
   permission_prompt: 'permission',
 };
 
+/** Whether a notification type changes what the display shows; the others the hub only notes. */
+export function showsNotification(type: string): boolean {
+  return Object.hasOwn(WAITING_NOTIFICATIONS, type);
+}
+
 /**
  * Tools that ask the user something rather than ask for permission. They arrive as PermissionRequest, but
  * allow or deny would not answer them, so they get no card: the session waits for the user in the app.

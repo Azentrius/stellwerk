@@ -320,7 +320,8 @@ header `Authorization: Bearer $STELLWERK_TOKEN`:
 |---|---|---|
 | `UserPromptSubmit` | working | 3 s |
 | `PermissionRequest` | the card; the hub holds the request | 90 s |
-| `Notification` (`idle_prompt`, `agent_needs_input`, `elicitation_dialog`, `permission_prompt`) | waiting for you | 3 s |
+| `Notification` | waiting for you (`idle_prompt`, `agent_needs_input`, `elicitation_dialog`, `permission_prompt`); other types are named once in `hub.log` | 3 s |
+| `Elicitation` | an MCP server asks something during its tool call: answered at once and empty, so the app shows its own dialog; named once per server in `hub.log` | 3 s |
 | `PostToolUse`, `PostToolUseFailure` | working; a card allowed in the app goes at once | 3 s |
 | `Stop` | done | 3 s |
 | `SubagentStart`, `SubagentStop` | counting subagents (pairs by `agent_id`) | 3 s |
@@ -396,7 +397,8 @@ Restart the hub after a change.
 - Decisions travel only over the display's WebSocket. The hub checks `Host` and `Origin` (against
   DNS rebinding and foreign pages) and the page token. A broken
   or oversized message closes only its own connection.
-- Nothing is allowed automatically: no rules, no "always allow".
+- Nothing is allowed automatically: no rules, no "always allow". A question of an MCP server
+  (`Elicitation`) the hub never answers; the app asks you itself.
 - The hub starts no programs. It connects to other machines only to `api.github.com`, for the list of
   pull requests, and only with a fine-grained read-only token you set up; and to Uptime Kuma at the
   address you set up, only for `/metrics` and only with its API key. Besides that it asks

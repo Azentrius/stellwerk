@@ -20,7 +20,7 @@ import { z } from 'zod';
 import type { Decision, DecisionResultMessage, PermissionOutcome, Provider, StateMessage } from '../shared/protocol.js';
 import { CODEX_HOOK_PATH, HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
-import { Board, QUESTION_TOOLS, projectName, type Permission } from './board.ts';
+import { Board, QUESTION_TOOLS, projectName, showsNotification, type Permission } from './board.ts';
 import { parseCodexInput } from './codex-input.ts';
 import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
@@ -50,6 +50,8 @@ const SWEEP_INTERVAL_MS = 1000;
 const BROADCAST_DELAY_MS = 50;
 /** A repeated rejection for the same reason is logged at most this often. */
 export const REJECTION_LOG_INTERVAL_MS = 60_000;
+/** At most this many kinds of unshown prompts are named in the log per run. */
+const MAX_NOTED = 100;
 
 export interface HubOptions {
   /** 0 picks a free port (tests). */
@@ -165,6 +167,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
   const rejections = new Map<string, { loggedAt: number; repeats: number }>();
+  /** The kinds of prompts and notifications not shown that the log has named already. */
+  const noted = new Set<string>();
 
   const server = http.createServer((req, res) => {
     handle(req, res).catch((err: Error) => {
@@ -358,7 +362,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       });
     }
     if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res, provider);
+    noteUnshown(event);
 
+    // An Elicitation gets the same empty answer as a status event: the app shows its own dialog.
     for (const { permission, outcome } of board.apply(event, now(), provider)) closeOut(permission, outcome);
     scheduleBroadcast();
     if (options.simulateHang) return; // Claude Code gives up after the hook's timeout
@@ -454,6 +460,33 @@ export async function startHub(options: HubOptions): Promise<Hub> {
    * Tells the console why a request was turned away, so a missing token or a wrong address shows up.
    * Never with the token. The same reason at most once a minute, with the number of repeats since.
    */
+  /**
+   * Prompts that do not reach the display, named once per kind in the log, without what they ask: an MCP
+   * server asking the user during its tool call (Elicitation; the hub never answers one, the app shows its
+   * own dialog), and notification types the display does not use. So a card that shows only in the app
+   * can be traced to what, if anything, reached the hub.
+   */
+  function noteUnshown(event: HookEvent): void {
+    if (isOther(event)) return;
+    let kind: string;
+    let line: string;
+    if (event.hook_event_name === 'Elicitation') {
+      const server = printable(event.mcp_server_name ?? 'unknown');
+      const mode = printable(event.mode ?? 'form');
+      kind = `elicitation ${server} ${mode}`;
+      line = `MCP server "${server}" asked the user (elicitation, ${mode}); the app shows its own dialog.`;
+    } else if (event.hook_event_name === 'Notification' && !showsNotification(event.notification_type ?? '')) {
+      const type = printable(event.notification_type ?? 'none');
+      kind = `notification ${type}`;
+      line = `Notification "${type}" (not shown on the display).`;
+    } else {
+      return;
+    }
+    if (noted.has(kind) || noted.size >= MAX_NOTED) return;
+    noted.add(kind);
+    log(`${clockTime(now())}  ${line}`);
+  }
+
   function reject(key: string, message: string): void {
     const at = now();
     const last = rejections.get(key);
@@ -611,6 +644,12 @@ function send(res: http.ServerResponse, status: number, body?: Buffer | string, 
   const payload = body === undefined ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(body);
   res.writeHead(status, { ...(type ? { 'Content-Type': type } : {}), 'Content-Length': payload?.length ?? 0 });
   res.end(payload);
+}
+
+/** A name from hook data for one log line: control characters replaced, cut to 100 characters. */
+function printable(value: string): string {
+  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '?');
+  return clean.length > 100 ? `${clean.slice(0, 100)}…` : clean;
 }
 
 function clockTime(at: number): string {
