@@ -44,6 +44,15 @@ Allowing and denying a Codex request on the display were checked on the real set
 
 ---
 
+## 0.4.0 – Plan usage, red when little is left ✅
+
+Done in 0.4.0 (see [CHANGELOG](CHANGELOG.md)): how much of the Claude and Codex plans' limits is used,
+below the hardware, from local sources only (stage 3); the context meter and the limits red from 90 %;
+the gauges in one grid, each section under a line. Claude's limits reached the real display through the
+desktop app's `get_usage` and are kept across a restart.
+
+---
+
 ## Stage 2 – System values and alerts
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts
