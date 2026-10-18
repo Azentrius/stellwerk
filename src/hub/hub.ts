@@ -1,6 +1,7 @@
 // The hub: receives Claude Code's hook requests, holds permission requests until the display or the hold
 // time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
-// no programs. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
+// no programs. The display signs in with a start file only the user can read; page and WebSocket need
+// the cookie it gets, so the address alone gives nobody the decisions. It asks only api.github.com (with a token set up) and LibreHardwareMonitor on 127.0.0.1
 // (when set up). Besides its own files it reads only transcripts named in hook events. The usage of the
 // plans' limits comes from the same local sources: Codex' transcripts and the desktop app's answer to a
 // session that asked for it (plans.ts).
@@ -35,6 +36,13 @@ export const WS_PROTOCOL = 'stellwerk.v1';
 /** The display proves it was served by this hub with a second subprotocol: this prefix plus the page's token. */
 export const WS_SESSION_PREFIX = 'stellwerk.session.';
 const MAX_WS_MESSAGE_BYTES = 4096;
+/**
+ * The display signs in once: a start file only the user can read posts a key here, and only the answer
+ * carries the page token, which the WebSocket needs. The display keeps it in storage of the hub's origin;
+ * there is no cookie, since cookies are sent to every port of 127.0.0.1, and with them to other services.
+ */
+export const DISPLAY_LOGIN_PATH = '/login';
+const MAX_LOGIN_BYTES = 1024;
 const SWEEP_INTERVAL_MS = 1000;
 const BROADCAST_DELAY_MS = 50;
 /** A repeated rejection for the same reason is logged at most this often. */
@@ -84,8 +92,30 @@ export interface HubOptions {
   plansFile?: string | null;
   /** The Codex app's state file, for the projects it files its chats under; without it, the folder shows. */
   codexStateFile?: string | null;
+  /** Demo only: the display needs no sign-in. The command line never sets it. */
+  openDisplay?: boolean;
   now?: () => number;
   log?: (line: string) => void;
+}
+
+/** The key in the display's start file: derived from the hook token, which it does not reveal. */
+export function displayKey(token: string): string {
+  return createHmac('sha256', token).update('stellwerk display login').digest('hex');
+}
+
+/**
+ * The display's start file: a local page that posts the key to the hub, which signs the display in. The
+ * key travels in the request body, never in an address; the file must be readable by the user only.
+ */
+export function displayStartPage(port: number, key: string): string {
+  return [
+    '<!doctype html>',
+    '<!-- Stellwerk: signs the display in at the hub on this computer. Only you can read this file; do not pass it on. -->',
+    '<html lang="en"><head><meta charset="utf-8"><title>Stellwerk</title></head><body>',
+    `<form method="post" action="http://${HOST}:${port}${DISPLAY_LOGIN_PATH}">`,
+    `<input type="hidden" name="key" value="${key}"><noscript><button type="submit">Stellwerk</button></noscript>`,
+    '</form><script>document.forms[0].submit();</script></body></html>',
+  ].join('\n');
 }
 
 export interface Hub {
@@ -115,14 +145,17 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   const held = new Map<string, Held>();
   const startedAt = now();
   const expectedAuthorization = Buffer.from(`Bearer ${options.token}`);
-  // Derived from the hook token (which it does not reveal), so an open display reconnects after a restart.
+  // Derived from the hook token (which they do not reveal), so an open display reconnects after a restart.
   const sessionToken = createHmac('sha256', options.token).update('stellwerk display session').digest('hex');
+  const loginKey = displayKey(options.token);
   const { files, missingBuild } = loadStaticFiles(options.uiRoot, options.webRoot);
   // The version is part of the page, so a new version alone also gives a new build.
   const template = renderIndex(loadIndexTemplate(options.uiRoot), { version: options.version });
   // An open display reloads itself when this differs from the build it was served with.
   const build = displayBuild(template, files);
-  const index = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));
+  // The page with its token answers only the sign-in; the address alone gets the same page without it.
+  const signedIndex = Buffer.from(renderIndex(template, { session: sessionToken, scale: String(options.scale), build }));
+  const anonymousIndex = Buffer.from(renderIndex(template, { session: '', scale: String(options.scale), build }));
   let port = options.port;
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
@@ -143,6 +176,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   });
   server.on('upgrade', onUpgrade);
   wss.on('connection', (ws) => {
+    // A broken frame or a message over the limit ends this connection (ws closes it), never the hub.
+    ws.on('error', (err) => reject('display message', `display connection closed: ${err.message}`));
     ws.send(JSON.stringify(stateMessage()));
     ws.on('message', (data, isBinary) => onMessage(ws, data, isBinary));
   });
@@ -194,7 +229,11 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       reject('foreign host', `request with the Host header ${quote(req.headers.host)} (403)`);
       return send(res, 403);
     }
-    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    const pathname = pathOf(req.url);
+    if (pathname === null) {
+      reject('request target', 'request with an unreadable target (400)');
+      return send(res, 400);
+    }
     if (pathname === HOOK_PATH || pathname === CODEX_HOOK_PATH) {
       if (req.method !== 'POST') {
         reject('hook method', `${quote(req.method)} request to the hook endpoint (405)`);
@@ -202,11 +241,39 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       }
       return onHook(req, res, pathname === CODEX_HOOK_PATH ? 'codex' : 'claude');
     }
+    if (pathname === DISPLAY_LOGIN_PATH) return onLogin(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
-    if (pathname === '/' || pathname === '/index.html') return send(res, 200, index, 'text/html; charset=utf-8');
+    if (pathname === '/' || pathname === '/index.html') {
+      // Without the token: a display that signed in has it in its own storage, any other page has nothing.
+      return send(res, 200, options.openDisplay ? signedIndex : anonymousIndex, 'text/html; charset=utf-8');
+    }
     const file = files.get(pathname);
     if (file) return send(res, 200, file.body, file.type);
     send(res, 404);
+  }
+
+  /**
+   * The display's sign-in: its start file posts the key. The start file is a local page, so its origin is
+   * "null"; the key authenticates, and the answer is a cookie only this hub's pages and WebSocket get.
+   */
+  async function onLogin(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    if (req.method !== 'POST') return send(res, 405);
+    const origin = req.headers.origin;
+    if (origin !== undefined && origin !== 'null' && !allowedOrigin(origin)) {
+      reject('foreign origin', `display sign-in from the origin ${quote(origin)} (403)`);
+      return send(res, 403);
+    }
+    if (!isForm(req.headers['content-type'])) return send(res, 415);
+    const raw = await readBody(req, MAX_LOGIN_BYTES);
+    if (raw === null) return send(res, 413);
+    const key = new URLSearchParams(raw.toString('utf8')).get('key') ?? '';
+    if (!sameSecret(key, loginKey)) {
+      reject('display sign-in', 'display sign-in with a wrong key; start the hub and the display again (403)');
+      return send(res, 403);
+    }
+    // The answer is the display itself, with its page token; nothing is set that the browser would send
+    // to other ports.
+    send(res, 200, signedIndex, 'text/html; charset=utf-8');
   }
 
   async function onHook(req: http.IncomingMessage, res: http.ServerResponse, provider: Provider): Promise<void> {
@@ -393,21 +460,24 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   // ---------- WebSocket ----------
 
   function onUpgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer): void {
+    // A socket that fails before the handshake (a reset, an aborted client) concerns only itself.
+    socket.on('error', () => socket.destroy());
     const refuse = (status: number, key: string, message: string) => {
       reject(key, `${message} (${status})`);
       socket.write(`HTTP/1.1 ${status} ${http.STATUS_CODES[status]}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
     };
-    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (!allowedHost(req.headers.host)) {
       return refuse(403, 'foreign host', `display connection with the Host header ${quote(req.headers.host)}`);
     }
+    const pathname = pathOf(req.url);
+    if (pathname === null) return refuse(400, 'request target', 'display connection with an unreadable target');
     if (!allowedOrigin(req.headers.origin)) {
       return refuse(403, 'foreign origin', `display connection from the origin ${quote(req.headers.origin)}`);
     }
     if (pathname !== WS_PATH) return refuse(404, 'display path', 'display connection to an unknown path');
     if (!hasSessionToken(req.headers['sec-websocket-protocol'])) {
-      return refuse(403, 'page token', 'display connection without the right page token; reload the display');
+      return refuse(403, 'page token', 'display connection without the right page token; open the display with its start file');
     }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   }
@@ -543,6 +613,26 @@ function quote(value: string | undefined): string {
 
 function isJson(contentType: string | undefined): boolean {
   return (contentType ?? '').split(';')[0]!.trim().toLowerCase() === 'application/json';
+}
+
+function isForm(contentType: string | undefined): boolean {
+  return (contentType ?? '').split(';')[0]!.trim().toLowerCase() === 'application/x-www-form-urlencoded';
+}
+
+/** The path of a request target, or null when it cannot be read (an upgrade with "http://[" and the like). */
+function pathOf(url: string | undefined): string | null {
+  try {
+    return new URL(url ?? '/', 'http://localhost').pathname;
+  } catch {
+    return null;
+  }
+}
+
+/** Equal secrets, compared in constant time. */
+function sameSecret(given: string, expected: string): boolean {
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /** The body, or null if it is larger than the limit (it is read to the end but not kept). */

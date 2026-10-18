@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
@@ -15,6 +16,9 @@ import { CODEX_HOOK_PATH, HOOK_PATH } from '../src/config.ts';
 import { appSettingsXml } from '../src/hub/hardware.ts';
 import {
   DENY_MESSAGE,
+  DISPLAY_LOGIN_PATH,
+  displayKey,
+  displayStartPage,
   MAX_OPEN_PERMISSIONS,
   REJECTION_LOG_INTERVAL_MS,
   startHub,
@@ -89,6 +93,15 @@ function call(
 }
 
 const AUTH = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+/** The display's sign-in as its start file sends it; the answer is the page with the page token. */
+function signIn(port: number, headers: Record<string, string> = {}) {
+  return call(port, {
+    method: 'POST',
+    path: DISPLAY_LOGIN_PATH,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null', ...headers },
+    body: `key=${displayKey(TOKEN)}`,
+  }).reply;
+}
 
 function hook(port: number, body: Record<string, unknown>, extra: { timeoutMs?: number } = {}) {
   return call(port, { headers: AUTH, body: { session_id: 'session-1', cwd: 'C:\\Projekte\\shop-api', ...body }, ...extra });
@@ -99,7 +112,7 @@ function permissionRequest(port: number, command = 'git push origin main', extra
 }
 
 async function pageToken(port: number): Promise<string> {
-  const { body } = await call(port, { method: 'GET', path: '/' }).reply;
+  const { body } = await signIn(port);
   return /name="stellwerk-session" content="([0-9a-f]{64})"/.exec(body)![1]!;
 }
 
@@ -172,7 +185,7 @@ async function eventually(check: () => boolean, timeoutMs = 2000): Promise<void>
 describe('the display page', () => {
   test('is served with a strict content security policy and its page token', async () => {
     const { port } = await startTestHub();
-    const page = await call(port, { method: 'GET', path: '/' }).reply;
+    const page = await signIn(port);
     assert.equal(page.status, 200);
     const csp = String(page.headers['content-security-policy']);
     assert.match(csp, /default-src 'none'/);
@@ -202,7 +215,7 @@ describe('the display page', () => {
 
   test('carries the build it was served with, the same the hub names in every state', async () => {
     const { port } = await startTestHub();
-    const { body } = await call(port, { method: 'GET', path: '/' }).reply;
+    const { body } = await signIn(port);
     const pageBuild = /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1];
     assert.ok(pageBuild, 'the page names its build');
     const screen = await display(port);
@@ -229,7 +242,7 @@ describe('the display page', () => {
   test('names the version in its signature, and a new version gives another build', async () => {
     const page = async (version: string) => {
       const { port } = await startTestHub({ version });
-      const { body } = await call(port, { method: 'GET', path: '/' }).reply;
+      const { body } = await signIn(port);
       return { body, build: /name="stellwerk-build" content="([0-9a-f]{16})"/.exec(body)?.[1] };
     };
     const first = await page('1.2.3');
@@ -299,6 +312,129 @@ describe('security checks', () => {
     assert.equal(await attempt(url, ['stellwerk.v1', `stellwerk.session.${'0'.repeat(64)}`], own), 403);
     assert.equal(await attempt(url, ['stellwerk.v1'], own), 403);
     assert.equal(await attempt(`ws://127.0.0.1:${port}/other`, ['stellwerk.v1', `stellwerk.session.${token}`], own), 404);
+  });
+});
+
+describe('the display sign-in', () => {
+  const token = (body: string) => /name="stellwerk-session" content="([0-9a-f]{64})"/.exec(body)?.[1] ?? null;
+
+  test('the address alone gets the display without its page token, and no cookie at all', async () => {
+    const { port } = await startTestHub();
+    const page = await call(port, { method: 'GET', path: '/' }).reply;
+    assert.equal(page.status, 200);
+    assert.match(page.body, /name="stellwerk-session" content=""/);
+    assert.equal(token(page.body), null);
+    assert.equal(page.headers['set-cookie'], undefined);
+  });
+
+  test('only the start file gets the page token, in the answer itself; the key is in no address and no log', async () => {
+    const lines: string[] = [];
+    const { port } = await startTestHub({ log: (line) => lines.push(line) });
+    const key = displayKey(TOKEN);
+    const start = displayStartPage(port, key);
+    assert.match(start, new RegExp(`action="http://127\\.0\\.0\\.1:${port}${DISPLAY_LOGIN_PATH}"`));
+    assert.doesNotMatch(start.match(/action="[^"]*"/)![0], new RegExp(key), 'the key is in the body, not the address');
+    assert.ok(!start.includes(TOKEN), 'the start file does not reveal the hook token');
+
+    const reply = await signIn(port);
+    assert.equal(reply.status, 200);
+    assert.notEqual(token(reply.body), null);
+    assert.equal(reply.headers['set-cookie'], undefined, 'nothing the browser would send to other ports');
+    assert.match(String(reply.headers['content-security-policy']), /default-src 'none'/);
+    assert.equal(reply.headers['cache-control'], 'no-store');
+
+    const login = (body: string, headers: Record<string, string> = {}) =>
+      call(port, {
+        method: 'POST',
+        path: DISPLAY_LOGIN_PATH,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'null', ...headers },
+        body,
+      }).reply;
+    assert.equal((await login(`key=${'0'.repeat(64)}`)).status, 403, 'a wrong key');
+    assert.equal((await login('key=')).status, 403, 'no key');
+    assert.equal((await login(`key=${key}`, { Origin: 'https://evil.example' })).status, 403, 'a foreign page');
+    assert.equal((await login(`key=${key}`, { Host: `evil.example:${port}` })).status, 403, 'a foreign host');
+    assert.equal((await login(`key=${key}`, { 'Content-Type': 'application/json' })).status, 415);
+    assert.equal((await login(`key=${key}&pad=${'x'.repeat(2000)}`)).status, 413);
+    assert.equal((await call(port, { method: 'GET', path: DISPLAY_LOGIN_PATH }).reply).status, 405);
+    assert.ok(lines.some((line) => line.includes('wrong key')));
+    assert.doesNotMatch(lines.join('\n'), new RegExp(key));
+  });
+
+  test('without the page token a client is turned away; with it the display decides', async () => {
+    const { port } = await startTestHub();
+    const refused = await new Promise<number>((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, ['stellwerk.v1'], { origin: `http://127.0.0.1:${port}` });
+      ws.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+      ws.on('open', () => resolve(101));
+      ws.on('error', () => {});
+    });
+    assert.equal(refused, 403);
+    const screen = await display(port);
+    const pending = permissionRequest(port);
+    screen.decide(await openRequestId(screen), 'allow');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'allow');
+    screen.close();
+  });
+
+  test('a signed-in display reconnects to a restarted hub with the same token', async () => {
+    const first = await startTestHub();
+    const pageToken = token((await signIn(first.port)).body)!;
+    await first.hub.close();
+    const second = await startTestHub();
+    const ws = new WebSocket(`ws://127.0.0.1:${second.port}/ws`, ['stellwerk.v1', `stellwerk.session.${pageToken}`], {
+      origin: `http://127.0.0.1:${second.port}`,
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.once('open', () => resolve());
+      ws.once('error', reject);
+    });
+    ws.close();
+  });
+});
+
+describe('the hub keeps running', () => {
+  /** Sends a raw request and returns the status line of the answer. */
+  function raw(port: number, request: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1', () => socket.write(request));
+      let data = '';
+      socket.setEncoding('utf8');
+      socket.on('data', (chunk: string) => (data += chunk));
+      socket.on('close', () => resolve(data.split('\r\n')[0] ?? ''));
+      socket.on('error', reject);
+      socket.setTimeout(3000, () => socket.destroy(new Error('timeout')));
+    });
+  }
+  const upgrade = (target: string, host: string) =>
+    `GET ${target} HTTP/1.1\r\nHost: ${host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+    'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n';
+
+  test('after an upgrade with an unreadable target, with our host or a foreign one', async () => {
+    const { port } = await startTestHub();
+    assert.match(await raw(port, upgrade('http://[', `127.0.0.1:${port}`)), /^HTTP\/1\.1 400/);
+    assert.match(await raw(port, upgrade('http://[', 'evil.example')), /^HTTP\/1\.1 403/);
+    assert.match(await raw(port, `GET http://[ HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`), /^HTTP\/1\.1 400/);
+    // Still there: a display connects and a request is decided.
+    const screen = await display(port);
+    const pending = permissionRequest(port);
+    screen.decide(await openRequestId(screen), 'allow');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'allow');
+    screen.close();
+  });
+
+  test('after a display message over the limit: only that connection closes', async () => {
+    const { port } = await startTestHub();
+    const noisy = await display(port);
+    const closed = new Promise<number>((resolve) => noisy.ws.once('close', (code) => resolve(code)));
+    noisy.ws.on('error', () => {});
+    noisy.ws.send('x'.repeat(4097));
+    assert.equal(await closed, 1009, 'message too big');
+    const screen = await display(port);
+    const pending = permissionRequest(port);
+    screen.decide(await openRequestId(screen), 'deny');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'deny');
+    screen.close();
   });
 });
 
@@ -536,8 +672,12 @@ describe('Codex', () => {
     }).reply;
     const waiting = hub.board.view().sessions[0];
     assert.deepEqual([waiting?.status, waiting?.waitingFor, waiting?.question], ['waiting', 'question', 'Fetch the latest state?']);
+    // An interrupt ends the turn like Stop; the question asked is still open until the answer comes.
     await codexHook(port, { hook_event_name: 'Interrupt', transcript_path: transcript }).reply;
-    assert.equal(hub.board.view().sessions[0]?.status, 'done', 'an interrupt ends the turn');
+    assert.equal(hub.board.view().sessions[0]?.waitingFor, 'question', 'the turn ended, the question did not');
+    await codexHook(port, { hook_event_name: 'UserPromptSubmit', transcript_path: transcript, prompt: 'Yes' }).reply;
+    await codexHook(port, { hook_event_name: 'Stop', transcript_path: transcript }).reply;
+    assert.equal(hub.board.view().sessions[0]?.status, 'done', 'answered, and the turn over');
     assert.doesNotMatch(JSON.stringify(hub.board.view()), /secret/);
   });
 
@@ -774,6 +914,93 @@ describe('permission requests', () => {
     await eventually(() => auditLines(auditFile)[0]?.result === 'aborted');
     screen.close();
   });
+
+  test("deciding a subagent's request on the display keeps the main agent's question", async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    await hook(port, {
+      hook_event_name: 'PermissionRequest',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'Which branch?', options: [{ label: 'main' }] }] },
+    }).reply;
+    const asked = await screen.state((s) => s.sessions[0]?.waitingFor === 'question');
+    const since = asked.sessions[0]?.waitingSince;
+    const pending = hook(port, { hook_event_name: 'PermissionRequest', agent_id: 'a1', tool_name: 'Bash', tool_input: { command: 'ls' } });
+    const id = await openRequestId(screen);
+    screen.decide(id, 'allow');
+    assert.equal(JSON.parse((await pending.reply).body).hookSpecificOutput.decision.behavior, 'allow');
+    const after = await screen.state((s) => s.permissions.some((p) => p.id === id && p.outcome === 'allowed'));
+    assert.deepEqual([after.sessions[0]?.status, after.sessions[0]?.waitingFor, after.sessions[0]?.question, after.sessions[0]?.waitingSince], [
+      'waiting',
+      'question',
+      'Which branch?',
+      since,
+    ]);
+    screen.close();
+  });
+
+  test("two requests of a subagent at the app's card, one handed over, one timed out: each ends with its own tool", async () => {
+    const { port } = await startTestHub({ holdMs: 600 });
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    const bash = (command: string) => ({ agent_id: 'a1', tool_name: 'Bash', tool_input: { command } });
+    const first = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo one') });
+    const id = await openRequestId(screen);
+    screen.decide(id, 'app');
+    assert.equal((await first.reply).body, '', 'handed to the app');
+    const second = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo two') });
+    assert.equal((await second.reply).body, '', 'the real hold timer ran out');
+    const waiting = await screen.state((s) => s.permissions.length === 2 && s.permissions.every((p) => p.outcome !== null));
+    const since = waiting.sessions[0]?.waitingSince;
+    assert.deepEqual([waiting.sessions[0]?.status, waiting.sessions[0]?.waitingFor], ['waiting', 'permission']);
+    await hook(port, { hook_event_name: 'PostToolUse', agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'a.ts' } }).reply;
+    await hook(port, { hook_event_name: 'PostToolUse', ...bash('echo one') }).reply;
+    // The second request's own time shows now: it started waiting later than the first.
+    const after = await screen.state((s) => s.sessions[0]?.waitingFor === 'permission' && (s.sessions[0]?.waitingSince ?? 0) > since!);
+    assert.equal(after.sessions[0]?.status, 'waiting', 'the second is still open in the app');
+    await hook(port, { hook_event_name: 'PostToolUse', ...bash('echo two') }).reply;
+    const done = await screen.state((s) => s.sessions[0]?.status === 'working');
+    assert.equal(done.sessions[0]?.waitingFor, null);
+    screen.close();
+  });
+
+  for (const { outcome, name, withInput } of [
+    { outcome: 'handed-to-app', name: 'PostToolUse', withInput: true },
+    { outcome: 'timed-out', name: 'PostToolUseFailure', withInput: false },
+  ] as const) {
+    test(`a subagent's request ${outcome}, one of the same tool held: one ${name} ${withInput ? 'with the same input' : 'without input'} leaves the held one to the display`, async () => {
+      const { port, auditFile } = await startTestHub({ holdMs: 1500 });
+      const screen = await display(port);
+      await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+      const bash = (command: string) => ({ agent_id: 'a1', tool_name: 'Bash', tool_input: { command } });
+      const first = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo same') });
+      const firstId = await openRequestId(screen);
+      if (outcome === 'handed-to-app') screen.decide(firstId, 'app');
+      assert.equal((await first.reply).body, '', outcome);
+      const second = hook(port, { hook_event_name: 'PermissionRequest', ...bash(withInput ? 'echo same' : 'echo other') });
+      const held = await screen.state((s) => s.permissions.some((p) => p.outcome === null && p.id !== firstId));
+      const id = held.permissions.find((p) => p.outcome === null)!.id;
+      const event = withInput ? bash('echo same') : { agent_id: 'a1', tool_name: 'Bash' };
+      assert.equal((await hook(port, { hook_event_name: name, ...event }).reply).status, 200);
+      // The held request is still the display's to decide: the decision reaches the agent.
+      screen.decide(id, 'deny');
+      const reply = await second.reply;
+      assert.equal(reply.status, 200);
+      assert.equal(JSON.parse(reply.body).hookSpecificOutput.decision.behavior, 'deny');
+      await eventually(() => auditLines(auditFile).length === 2);
+      assert.deepEqual(
+        auditLines(auditFile).map((line) => line.result),
+        [outcome, 'denied'],
+        'nothing was decided in the app',
+      );
+      // Its tool ran (with the input) or the match was unsure (without): the one at the app's card is over,
+      // or still waits there.
+      const state = await screen.state((s) => s.permissions.some((p) => p.id === id && p.outcome === 'denied'));
+      assert.deepEqual([state.sessions[0]?.status, state.sessions[0]?.waitingFor], withInput ? ['working', null] : ['waiting', 'permission']);
+      screen.close();
+    });
+  }
 
   test('a question to the user (AskUserQuestion) goes straight back to the app: no card, no audit entry', async () => {
     const { port, auditFile } = await startTestHub();

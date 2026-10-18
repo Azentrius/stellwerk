@@ -27,6 +27,8 @@ jobs:
         run: npm run build
       - name: Tests (status model, hook data, settings, configuration, the hub end to end)
         run: npm test
+      - name: Display sign-in in a real Edge (another local service gets nothing to decide with)
+        run: node tools/check-browser.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
       - name: Changelog has a section for the current version
@@ -49,10 +51,9 @@ jobs:
           $hub = Start-Process node -ArgumentList 'dist/cli.js', 'serve' -NoNewWindow -PassThru
           try {
             Start-Sleep -Seconds 3
-            foreach ($path in '/', '/app.js', '/app.css', '/static/fonts/RedHatMono/RedHatMonoVF.woff2') {
-              $status = (Invoke-WebRequest "http://127.0.0.1:4780$path" -UseBasicParsing).StatusCode
-              "$path $status"
-            }
+            # As a display uses it: locked without sign-in, signed in with the start file the hub wrote.
+            node (Join-Path $env:GITHUB_WORKSPACE 'tools/check-install.ts') 4780
+            if ($LASTEXITCODE -ne 0) { throw "The installed hub failed its check ($LASTEXITCODE)." }
           } finally {
             Stop-Process -Id $hub.Id
           }

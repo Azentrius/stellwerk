@@ -71,7 +71,8 @@ export function checksState(checks: ChecksState, texts: Texts): State {
 }
 
 /** Connected is good; disconnected is an error with a way to fix it. */
-export function hubState(connected: boolean, texts: Texts): State | Problem {
+export function hubState(connected: boolean, texts: Texts, signedIn = true): State | Problem {
+  if (!signedIn) return { title: texts.notSignedIn, fix: texts.notSignedInFix };
   return connected ? state('success', texts.hubConnected) : { title: texts.hubDisconnected, fix: texts.hubDisconnectedFix };
 }
 

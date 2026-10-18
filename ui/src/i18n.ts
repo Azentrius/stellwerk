@@ -56,6 +56,9 @@ export interface Texts {
   hubConnected: string;
   hubDisconnected: string;
   hubDisconnectedFix: string;
+  /** The display was opened without its start file. */
+  notSignedIn: string;
+  notSignedInFix: string;
   lastEvent: (ago: string) => string;
   noEvent: string;
   ago: (n: number, unit: TimeUnit) => string;
@@ -118,6 +121,7 @@ const en: Texts = {
       'not-found': 'GitHub: owner not found',
       unreachable: 'GitHub: not reachable',
       unexpected: 'GitHub: unexpected answer',
+      'too-many': 'GitHub: too many results',
     },
     fix: {
       rejected: 'Create a new token and run `stellwerk github token`.',
@@ -125,6 +129,7 @@ const en: Texts = {
       'not-found': 'Check the name and set the token again: `stellwerk github token --owner NAME`.',
       unreachable: 'Check the internet connection; the hub asks again by itself.',
       unexpected: 'The hub asks again by itself. If it stays, see `hub.log`.',
+      'too-many': 'A list has more than 1000 entries; Stellwerk shows none rather than an incomplete one. Give the token fewer repositories.',
     },
   },
   hardwareTitle: 'Hardware',
@@ -162,6 +167,8 @@ const en: Texts = {
   hubConnected: 'Hub connected',
   hubDisconnected: 'Hub disconnected, reconnecting',
   hubDisconnectedFix: 'If it does not come back, start the task "Stellwerk hub" and reload the display.',
+  notSignedIn: 'Display not signed in',
+  notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
   lastEvent: (ago) => `last event ${ago}`,
   noEvent: 'no event yet',
   ago: (n, unit) => `${n} ${unit} ago`,
@@ -220,6 +227,7 @@ const de: Texts = {
       'not-found': 'GitHub: Besitzer nicht gefunden',
       unreachable: 'GitHub: nicht erreichbar',
       unexpected: 'GitHub: unerwartete Antwort',
+      'too-many': 'GitHub: zu viele Ergebnisse',
     },
     fix: {
       rejected: 'Lege einen neuen Token an und führe `stellwerk github token` aus.',
@@ -227,6 +235,7 @@ const de: Texts = {
       'not-found': 'Prüfe den Namen und lege den Token neu an: `stellwerk github token --owner NAME`.',
       unreachable: 'Prüfe die Internetverbindung; der Hub fragt von selbst wieder.',
       unexpected: 'Der Hub fragt von selbst wieder. Bleibt es so, steht mehr in `hub.log`.',
+      'too-many': 'Eine Liste hat mehr als 1000 Einträge; Stellwerk zeigt sie lieber gar nicht als unvollständig. Gib dem Token weniger Repositories.',
     },
   },
   hardwareTitle: 'Hardware',
@@ -264,6 +273,8 @@ const de: Texts = {
   hubConnected: 'Hub verbunden',
   hubDisconnected: 'Hub getrennt, verbinde neu',
   hubDisconnectedFix: 'Kommt er nicht zurück, starte die Aufgabe „Stellwerk hub“ und lade die Anzeige neu.',
+  notSignedIn: 'Anzeige nicht angemeldet',
+  notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',
   lastEvent: (ago) => `letztes Ereignis ${ago}`,
   noEvent: 'noch kein Ereignis',
   ago: (n, unit) => `vor ${n} ${unit}`,

@@ -35,6 +35,8 @@ export interface Paths {
   githubTokenFile: string;
   /** The last usage of the plans' limits, so the display has it again after a restart. */
   plansFile: string;
+  /** The display's start file: signs the display in at the hub; only the current user can read it. */
+  displayStartFile: string;
   /**
    * LibreHardwareMonitor, set up by `stellwerk hardware install`. In Program Files, where only
    * administrators can change it: it runs with their rights.
@@ -58,6 +60,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
     plansFile: path.join(dataDir, 'plans.json'),
+    displayStartFile: path.join(dataDir, 'display.html'),
     hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),
     codexHome: env.CODEX_HOME || path.join(home, '.codex'),
   };

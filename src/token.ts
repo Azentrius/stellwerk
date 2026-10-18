@@ -1,6 +1,6 @@
-// The secrets Stellwerk keeps: the token Claude Code sends with every hook request, and (optionally) a
-// read-only GitHub token for the list of open pull requests. Both live in files only the current user can
-// read, and neither is ever logged.
+// The secrets Stellwerk keeps: the token Claude Code sends with every hook request, the display's start
+// file with the key that signs the display in, and (optionally) a read-only GitHub token for the list of
+// open pull requests. All live in files only the current user can read, and none is ever logged.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -57,6 +57,16 @@ export function saveGitHubToken(file: string, token: string): void {
     throw new Error('That is not a fine-grained GitHub token (it starts with "github_pat_"). Classic tokens are not accepted.');
   }
   writeSecret(file, token, { onlyIfNew: false });
+}
+
+/**
+ * The display's start file holds a key that signs a display in, so it is kept like a token: readable by the
+ * current user only. Written only when missing or different, so its permissions are set again only then.
+ */
+export function writeDisplayStart(file: string, page: string): boolean {
+  if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === `${page}\n`) return false;
+  writeSecret(file, page, { onlyIfNew: false });
+  return true;
 }
 
 /** Deletes the GitHub token. Returns false if there was none. */

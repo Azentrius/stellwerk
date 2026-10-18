@@ -24,7 +24,9 @@ const TOAST_MS = 3000;
 const RELOAD_KEY = 'stellwerk-reloaded-for';
 
 const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content ?? '';
-const sessionToken = meta('stellwerk-session');
+/** sessionStorage: the page token, kept for the hub's origin only (other ports are other origins). */
+const SESSION_KEY = 'stellwerk-session';
+const sessionToken = keepSessionToken(meta('stellwerk-session'));
 const pageBuild = meta('stellwerk-build');
 const scale = Number(meta('stellwerk-scale')) || 1;
 document.documentElement.style.setProperty('--stellwerk-scale', String(scale));
@@ -71,7 +73,31 @@ let audio: AudioContext | null = null;
 
 byId('all-clear-icon').append(icon('check-circle'));
 
+/**
+ * The page token is in the page only as the answer to the start file's sign-in. The display keeps it in
+ * this tab's storage, which the browser keeps apart per origin, port included, and sends it only in the
+ * WebSocket handshake to its own hub; no cookie, so no other service on this computer gets it. A page
+ * loaded at the address alone (a reload, a new build) takes it from there.
+ */
+function keepSessionToken(fromPage: string): string {
+  if (fromPage) {
+    try {
+      sessionStorage.setItem(SESSION_KEY, fromPage);
+    } catch {}
+    // The sign-in answered the POST to /login; the display lives at /, so a reload does not post again.
+    if (location.pathname !== '/') history.replaceState(null, '', '/');
+    return fromPage;
+  }
+  try {
+    return sessionStorage.getItem(SESSION_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 function connect(): void {
+  // Not signed in: nothing to connect with; the status column says how to open the display.
+  if (!sessionToken) return;
   const ws = new WebSocket(`ws://${location.host}/ws`, [WS_PROTOCOL, WS_SESSION_PREFIX + sessionToken]);
   socket = ws;
   ws.addEventListener('open', () => {
@@ -150,7 +176,7 @@ function tick(): void {
   const below = waitingList.scrollHeight - waitingList.scrollTop - waitingList.clientHeight;
   waitingList.classList.toggle('waiting--more', below > 4);
   clockNode.textContent = clock(now);
-  show(hubNode, hubState(connected, texts));
+  show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
   lastEvent.textContent = last === null ? texts.noEvent : texts.lastEvent(ago(now - last, texts));
   // While the hub is away, its last problems with GitHub and the hardware are old news: only its own

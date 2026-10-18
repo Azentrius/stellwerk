@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { defaultPaths, loadConfig, setConfigValue } from '../src/config.ts';
-import { ensureToken, isGitHubToken, readGitHubToken, readToken, removeGitHubToken, saveGitHubToken } from '../src/token.ts';
+import { ensureToken, isGitHubToken, readGitHubToken, readToken, removeGitHubToken, saveGitHubToken, writeDisplayStart } from '../src/token.ts';
 
 function tempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-config-'));
@@ -114,6 +114,7 @@ test('the files live under APPDATA and LOCALAPPDATA', () => {
   assert.equal(paths.auditFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'audit.jsonl'));
   assert.equal(paths.tokenFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'token'));
   assert.equal(paths.plansFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'plans.json'));
+  assert.equal(paths.displayStartFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'display.html'));
 });
 
 test('the hardware monitor lives in Program Files, where only administrators can change it', () => {
@@ -139,6 +140,15 @@ test('the token is created once, 256 bits as hex, and read back the same', () =>
   const second = ensureToken(file);
   assert.deepEqual(second, { token: first.token, created: false });
   assert.equal(readToken(file), first.token);
+});
+
+test("the display's start file is written like a token, and again only when it changes", () => {
+  const file = path.join(tempDir(), 'sub', 'display.html');
+  assert.equal(writeDisplayStart(file, '<form>one</form>'), true);
+  assert.equal(fs.readFileSync(file, 'utf8'), '<form>one</form>\n');
+  assert.equal(writeDisplayStart(file, '<form>one</form>'), false, 'unchanged: not written again');
+  assert.equal(writeDisplayStart(file, '<form>two</form>'), true, 'a new key or port: written again');
+  assert.equal(fs.readFileSync(file, 'utf8'), '<form>two</form>\n');
 });
 
 test('a damaged token file is reported', () => {

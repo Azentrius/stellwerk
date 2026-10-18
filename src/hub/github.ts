@@ -1,7 +1,8 @@
 // The list of open pull requests. Every few minutes the hub asks api.github.com, and nothing else, with
 // a read-only fine-grained token: the owner's repositories, their open pull requests, and for each the
-// Actions runs on its head commit. Every answer is checked before it is used; a failed round keeps the
-// last list and says why.
+// Actions runs on its head commit. Lists come in pages; the hub follows GitHub's "next" links, but only to
+// api.github.com and only up to a limit, so a list is complete or the round fails. Every answer is
+// checked before it is used; a failed round keeps the last list and says why.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,10 +14,17 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_TITLE = 200;
 /** Questions for the checks of several pull requests at the same time. */
 const PARALLEL = 4;
+/** Items per page (GitHub's maximum) and pages per list: more is an error, never a shortened list. */
+const PER_PAGE = 100;
+export const MAX_PAGES = 10;
 
-const repositories = z.array(
-  z.object({ name: z.string().regex(/^[A-Za-z0-9._-]{1,100}$/), archived: z.boolean().optional(), disabled: z.boolean().optional() }),
-);
+const repository = z.object({
+  name: z.string().regex(/^[A-Za-z0-9._-]{1,100}$/),
+  archived: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  owner: z.object({ login: z.string().max(100) }).optional(),
+});
+const repositories = z.array(repository);
 const pulls = z.array(
   z.object({
     number: z.number().int().positive(),
@@ -110,7 +118,7 @@ export class GitHubWatcher {
     try {
       const found: Array<{ view: PullRequestView; sha: string }> = [];
       for (const repo of await this.repositories()) {
-        const list = await this.get(`/repos/${this.owner}/${encodeURIComponent(repo)}/pulls?state=open&per_page=50`, pulls);
+        const list = await this.getAll(`/repos/${this.owner}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${PER_PAGE}`, pulls, (page) => page);
         for (const pr of list) {
           found.push({
             sha: pr.head.sha,
@@ -129,8 +137,8 @@ export class GitHubWatcher {
       for (let i = 0; i < found.length; i += PARALLEL) {
         await Promise.all(
           found.slice(i, i + PARALLEL).map(async (item) => {
-            const path = `/repos/${this.owner}/${encodeURIComponent(item.view.repo)}/actions/runs?head_sha=${item.sha}&per_page=50`;
-            item.view.checks = summarizeRuns((await this.get(path, runs)).workflow_runs);
+            const path = `/repos/${this.owner}/${encodeURIComponent(item.view.repo)}/actions/runs?head_sha=${item.sha}&per_page=${PER_PAGE}`;
+            item.view.checks = summarizeRuns(await this.getAll(path, runs, (page) => page.workflow_runs));
           }),
         );
       }
@@ -151,22 +159,51 @@ export class GitHubWatcher {
     return encodeURIComponent(this.options.owner);
   }
 
-  /** The owner's repositories that are neither archived nor disabled; an organisation or else a user. */
+  /**
+   * The owner's repositories that are neither archived nor disabled. An organisation lists its private
+   * ones to a token with access. For a user, /users/{owner}/repos lists only public repositories, so the
+   * ones the token may see (/user/repos, which includes private ones) are added, kept to this owner.
+   */
   private async repositories(): Promise<string[]> {
     let list: z.infer<typeof repositories>;
     try {
-      list = await this.get(`/orgs/${this.owner}/repos?type=all&per_page=100`, repositories);
+      list = await this.getAll(`/orgs/${this.owner}/repos?type=all&per_page=${PER_PAGE}`, repositories, (page) => page);
     } catch (err) {
       if (!(err instanceof GitHubFailure) || err.status !== 404) throw err;
-      list = await this.get(`/users/${this.owner}/repos?type=owner&per_page=100`, repositories);
+      const owner = this.options.owner.toLowerCase();
+      const visible = await this.getAll(
+        `/user/repos?affiliation=owner,collaborator,organization_member&visibility=all&per_page=${PER_PAGE}`,
+        repositories,
+        (page) => page,
+      );
+      const open = await this.getAll(`/users/${this.owner}/repos?type=owner&per_page=${PER_PAGE}`, repositories, (page) => page);
+      const byName = new Map<string, z.infer<typeof repository>>();
+      for (const repo of [...visible.filter((r) => r.owner?.login.toLowerCase() === owner), ...open]) byName.set(repo.name, repo);
+      list = [...byName.values()];
     }
     return list.filter((repo) => !repo.archived && !repo.disabled).map((repo) => repo.name);
   }
 
-  private async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+  /** Every page of a list, following GitHub's "next" links on api.github.com only, at most MAX_PAGES. */
+  private async getAll<P, I>(path: string, schema: z.ZodType<P>, itemsOf: (page: P) => I[]): Promise<I[]> {
+    const items: I[] = [];
+    let url: string | null = `${GITHUB_API}${path}`;
+    for (let page = 1; url !== null; page++) {
+      if (page > MAX_PAGES) {
+        this.options.log?.(`GitHub: ${path.split('?')[0]} has more than ${MAX_PAGES} pages.`);
+        throw new GitHubFailure('too-many');
+      }
+      const answer: { data: P; next: string | null } = await this.get(url, schema);
+      items.push(...itemsOf(answer.data));
+      url = answer.next;
+    }
+    return items;
+  }
+
+  private async get<T>(url: string, schema: z.ZodType<T>): Promise<{ data: T; next: string | null }> {
     let response: Response;
     try {
-      response = await this.fetch(`${GITHUB_API}${path}`, {
+      response = await this.fetch(url, {
         headers: {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${this.options.token}`,
@@ -186,8 +223,36 @@ export class GitHubWatcher {
     }
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) throw new GitHubFailure('unexpected', response.status);
-    return parsed.data;
+    // A "next" link elsewhere than api.github.com is not followed: the token goes nowhere else.
+    const next = nextPage(response.headers.get('link'));
+    if (next === undefined) throw new GitHubFailure('unexpected', response.status);
+    return { data: parsed.data, next };
   }
+}
+
+/**
+ * The "next" page from a Link header: null for the last page, undefined for a link that leads elsewhere
+ * than api.github.com (which is not followed).
+ */
+export function nextPage(link: string | null): string | null | undefined {
+  if (!link) return null;
+  for (const part of link.split(',')) {
+    const match = /^\s*<([^>]*)>(.*)$/.exec(part);
+    if (!match) continue;
+    const isNext = match[2]!.split(';').some((param) => {
+      const [name, value = ''] = param.split('=');
+      return name!.trim().toLowerCase() === 'rel' && value.trim().replaceAll('"', '').split(/\s+/).includes('next');
+    });
+    if (!isNext) continue;
+    let url: URL;
+    try {
+      url = new URL(match[1]!);
+    } catch {
+      return undefined;
+    }
+    return url.origin === GITHUB_API && url.username === '' && url.password === '' ? url.toString() : undefined;
+  }
+  return null;
 }
 
 export function describeProblem(problem: GitHubProblem): string {
@@ -202,5 +267,7 @@ export function describeProblem(problem: GitHubProblem): string {
       return 'api.github.com is not reachable.';
     case 'unexpected':
       return 'unexpected answer from api.github.com.';
+    case 'too-many':
+      return `more than ${MAX_PAGES * PER_PAGE} repositories, pull requests or runs in one list; the list is not shown incomplete.`;
   }
 }

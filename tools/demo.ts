@@ -127,6 +127,8 @@ const hub = await startHub({
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
   context: { root: transcripts, codexRoot: codexSessions, codexIndex, intervalMs: 300 },
   codexStateFile,
+  // Made-up data with a token of its own: the demo's display needs no sign-in.
+  openDisplay: true,
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');

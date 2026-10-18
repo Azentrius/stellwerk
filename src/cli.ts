@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
+import { pathToFileURL } from 'node:url';
 import { format, parseArgs } from 'node:util';
 import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue } from './config.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
@@ -21,7 +22,7 @@ import {
 import { codexStateFile } from './hub/codex-projects.ts';
 import { codexSessionIndex, codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
 import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
-import { startHub } from './hub/hub.ts';
+import { displayKey, displayStartPage, startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
   HUB_TASK,
@@ -73,7 +74,7 @@ import {
   stopProgram,
   taskExists,
 } from './setup/windows.ts';
-import { ensureToken, isGitHubToken, readGitHubToken, removeGitHubToken, saveGitHubToken } from './token.ts';
+import { ensureToken, isGitHubToken, readGitHubToken, removeGitHubToken, saveGitHubToken, writeDisplayStart } from './token.ts';
 
 /** hub.log is moved to hub.log.1 when it grows beyond this at a start. */
 const MAX_HUB_LOG_BYTES = 1024 * 1024;
@@ -88,8 +89,8 @@ const USAGE = `Stellwerk ${VERSION}: a signal box for your AI agents
 
 Usage:
   stellwerk serve [--debug-raw] [--simulate-hang] [--log-file <file>] [--exit-with-parent]
-      Start the hub on ${HOST}. Then open the display:
-      msedge --app=http://${HOST}:4780
+      Start the hub on ${HOST}. Then open the display with its start file, which only
+      you can read: %LOCALAPPDATA%\\stellwerk\\display.html
   stellwerk hooks install [--yes] [--settings <file>]
       Add Stellwerk's hooks to Claude Code's settings and give Claude Code the token
       through the user environment variable ${TOKEN_ENV}.
@@ -214,7 +215,13 @@ async function serve(
   }
   const url = `http://${HOST}:${hub.port}`;
   console.log(`Stellwerk ${VERSION} on ${url}`);
-  console.log(`Display: msedge --app=${url}`);
+  // The display signs in with this file; the address alone shows only how to open it.
+  try {
+    writeDisplayStart(paths.displayStartFile, displayStartPage(hub.port, displayKey(token)));
+    console.log(`Display: open ${paths.displayStartFile} (msedge --app=${pathToFileURL(paths.displayStartFile).href})`);
+  } catch (err) {
+    console.log(`The display's start file could not be written: ${(err as Error).message}`);
+  }
   console.log(`Hold time ${config.holdSeconds} s. Audit log: ${paths.auditFile}`);
   if (created) console.log(`A new token was created. Run "stellwerk hooks install" so that Claude Code sends it.`);
   if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
@@ -343,7 +350,8 @@ async function autostart(action: 'install' | 'uninstall', yes: boolean, screenNu
   const user = currentUser();
   const tasks = [
     hubTask({ node: process.execPath, cli, root: ROOT, logFile: paths.hubLogFile, conhost: conhostPath() }),
-    displayTask({ edge: findEdge(), url: `http://${HOST}:${config.port}`, profileDir: paths.displayProfileDir, screen, root: ROOT }),
+    // The start file signs the display in; the hub writes it when it starts, before the display opens.
+    displayTask({ edge: findEdge(), url: pathToFileURL(paths.displayStartFile).href, profileDir: paths.displayProfileDir, screen, root: ROOT }),
   ];
 
   console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screens.indexOf(screen) + 1}.\n`);
