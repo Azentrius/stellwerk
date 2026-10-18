@@ -53,6 +53,14 @@ desktop app's `get_usage` and are kept across a restart.
 
 ---
 
+## 0.4.1 – Names as the apps give them ✅
+
+Done in 0.4.1 (see [CHANGELOG](CHANGELOG.md)): Codex chats with their name and the project the Codex app
+files them under, Claude sessions with their title also after a restart of the hub. Checked against the
+real Codex app's projects and a desktop app session without a group.
+
+---
+
 ## Stage 2 – System values and alerts
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts

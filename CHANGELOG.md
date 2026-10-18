@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.1 – not released yet
+## 0.4.1 – 2026-10-18
 
 Sessions are named as their apps name them: Codex chats with their name and project, Claude sessions
 with their title also after a restart of the hub.
