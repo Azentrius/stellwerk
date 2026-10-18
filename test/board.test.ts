@@ -300,17 +300,55 @@ describe('what a waiting session waits for', () => {
     assert.deepEqual(waiting(board), { status: 'waiting', waitingFor: 'question', waitingSince: 1 });
   });
 
-  test('anything that means work again ends the waiting', () => {
-    for (const name of ['UserPromptSubmit', 'Stop', 'SubagentStart', 'SessionEnd']) {
+  test("anything that means the main agent works again ends the waiting; a subagent starting does not", () => {
+    for (const name of ['UserPromptSubmit', 'Stop', 'SessionEnd']) {
       const board = new Board();
       board.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 1);
-      board.apply(event(name, { agent_id: 'a1' }), 2);
+      board.apply(event(name), 2);
       assert.equal(waiting(board).waitingFor, null, name);
     }
+    const asked = new Board();
+    asked.askUser(request({ questions: [] }, { tool_name: 'AskUserQuestion' }), 1);
+    asked.apply(event('SubagentStart', { agent_id: 'a1' }), 2);
+    assert.equal(waiting(asked).waitingFor, 'question', 'a subagent starting leaves the question open');
     const board = new Board();
     board.apply(event('Notification', { notification_type: 'idle_prompt' }), 1);
     board.addPermission('p1', request(), 2, HOLD);
     assert.deepEqual(waiting(board), { status: 'permission', waitingFor: null, waitingSince: null });
+  });
+});
+
+describe('questions asked without waiting (Codex)', () => {
+  const ask = (title: string) =>
+    event('PostToolUse', { tool_name: 'request_user_input_async', tool_input: { questions: [{ title, options: ['Yes', 'No'] }] } });
+  const session = (board: Board) => {
+    const s = board.view().sessions[0];
+    return [s?.status, s?.waitingFor, s?.question, s?.waitingSince];
+  };
+
+  test('stay open past the end of the turn and further tool events, until the answer', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1, 'codex');
+    board.apply(ask('Fetch the latest state?'), 2, 'codex');
+    board.apply(event('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } }), 3, 'codex');
+    board.apply(event('Stop'), 4, 'codex');
+    assert.deepEqual(session(board), ['waiting', 'question', 'Fetch the latest state?', 2]);
+    // The answer comes as the next prompt.
+    board.apply(event('UserPromptSubmit'), 5, 'codex');
+    assert.deepEqual(session(board), ['working', null, null, null]);
+  });
+
+  test('a new one replaces the open one; the end of the session drops it; a request still shows first', () => {
+    const board = new Board();
+    board.apply(ask('First?'), 1, 'codex');
+    board.apply(ask('Second?'), 2, 'codex');
+    assert.equal(session(board)[2], 'Second?');
+    board.addPermission('p1', request(), 3, HOLD, 'codex');
+    assert.equal(session(board)[0], 'permission');
+    board.apply(event('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'git push origin main' } }), 4, 'codex');
+    assert.deepEqual(session(board), ['waiting', 'question', 'Second?', 2]);
+    board.apply(event('SessionEnd'), 5, 'codex');
+    assert.deepEqual(session(board), ['ended', null, null, null]);
   });
 });
 
@@ -387,6 +425,31 @@ describe('subagents', () => {
     board.apply(event('SubagentStop', { agent_id: 'helper', agent_type: '' }), 2);
     board.apply(event('SubagentStop'), 3);
     assert.equal(board.view().sessions[0]?.subagents, 1);
+  });
+
+  test("a subagent's work leaves the main agent's question open: tools, failures, starts, stops and requests", () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit'), 1);
+    board.apply(event('SubagentStart', { agent_id: 'a1' }), 2);
+    board.askUser(request({ questions: [{ question: 'Which branch?' }] }, { tool_name: 'AskUserQuestion' }), 3);
+    const question = () => {
+      const s = board.view().sessions[0];
+      return [s?.status, s?.waitingFor, s?.question];
+    };
+    board.apply(event('PostToolUse', { agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'a.ts' } }), 4);
+    board.apply(event('PostToolUseFailure', { agent_id: 'a1', tool_name: 'Bash', tool_input: { command: 'false' } }), 5);
+    board.apply(event('SubagentStart', { agent_id: 'a2' }), 6);
+    assert.deepEqual(question(), ['waiting', 'question', 'Which branch?']);
+    // A subagent's request shows as such while open, and afterwards the question is still there.
+    board.addPermission('sub', request({ command: 'ls' }, { agent_id: 'a1' }), 7, HOLD);
+    assert.equal(board.view().sessions[0]?.status, 'permission');
+    board.apply(event('PostToolUse', { agent_id: 'a1', tool_name: 'Bash', tool_input: { command: 'ls' } }), 8);
+    assert.equal(board.view().permissions[0]?.outcome, 'decided-in-app');
+    board.apply(event('SubagentStop', { agent_id: 'a2' }), 9);
+    assert.deepEqual(question(), ['waiting', 'question', 'Which branch?']);
+    // The main agent's own tool (the answered question) ends the waiting.
+    board.apply(event('PostToolUse', { tool_name: 'AskUserQuestion', tool_input: {} }), 10);
+    assert.deepEqual(question(), ['working', null, null]);
   });
 
   test('the stop of a subagent settles its own open requests', () => {

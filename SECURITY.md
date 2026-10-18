@@ -35,19 +35,29 @@ reachable only from the machine it runs on and only by the display it serves:
 - hook requests need a bearer token and `Content-Type: application/json`;
   the token file is readable by the current Windows user only and the token
   is never logged;
+- the display signs in before it gets anything: a start file readable by
+  the current Windows user only posts a key derived from the hook token, and
+  the hub answers with an HttpOnly cookie; the page (with its page token) and
+  the WebSocket need that cookie, so another account on the same computer
+  cannot get the display or its decisions from the address; the key is in
+  no address and no log;
 - decisions travel only over the display's WebSocket, which needs the right
-  `Host`, the right `Origin` and a token the hub puts into the page;
+  `Host`, the right `Origin`, the sign-in cookie and a token the hub puts
+  into the page; a broken or oversized message (over 4 KB) or an unreadable
+  request target closes only its own connection;
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;
 - the hub starts no programs; only the setup commands run `icacls`,
   `powershell`, `netsh` and `schtasks`, with fixed arguments and without a
-  shell;
+  shell; `serve` restricts the token file and the display's start file with
+  `icacls` when it creates or changes them;
 - the hub's only connection to another machine is to `api.github.com` (fixed
   in the code), for the list of open pull requests, and only once a GitHub
   token is set up: fine-grained only, meant to read pull requests and Actions
   and nothing else, kept like the hook token, never logged, never sent to the
-  display; GitHub's answers are checked before use and redirects are not
-  followed;
+  display; GitHub's answers are checked before use, redirects are not
+  followed, and of the "next" links of long lists only those on
+  `api.github.com` are followed, at most 10 pages per list;
 - besides that the hub asks only LibreHardwareMonitor on `127.0.0.1:8085`
   for `data.json`, when the hardware monitor is set up, with the password
   from LibreHardwareMonitor's settings file, and never sends that password
@@ -89,7 +99,9 @@ Reports are particularly welcome for:
 
 - ways to allow or deny a request without the display, or from another
   machine, another user account or a web page,
-- ways around the token, the `Host` or `Origin` check or the page token,
+- ways around the token, the `Host` or `Origin` check, the display's sign-in
+  or the page token,
+- requests that end the hub instead of only their own connection,
 - hook data that the display renders as HTML or script,
 - the hook token or the GitHub token appearing in a log, a URL, a page or any
   file other than its own,

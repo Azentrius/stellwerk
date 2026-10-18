@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.2 – 2026-10-18
+
+The display signs in, so another account on the computer can no longer allow requests; the hub no longer
+ends on a broken display connection; open questions stay open; GitHub lists are complete.
+
+- **Display sign-in (security):** the hub served the display, with the token that suffices to allow and
+  deny requests, to anyone who could reach `127.0.0.1`, including other Windows accounts on the same
+  computer. Now the display signs in first: the hub writes a start file only your account can read
+  (`%LOCALAPPDATA%\stellwerk\display.html`), which posts a key derived from the hook token; the hub answers
+  with an HttpOnly cookie, and the page and the WebSocket need it. The address alone shows only that the
+  display is not signed in. The key is in no address and no log; `Host`, `Origin` and the page token are
+  checked as before. A display reconnects after a restart of the hub with the same token.
+  **Updating:** run `stellwerk autostart install` again so the display task opens the start file, then
+  restart both tasks. Opened by hand, the display is `msedge --app=` with the start file's address.
+- **The hub keeps running:** a WebSocket upgrade with an unreadable target (such as `http://[`) is
+  answered with 400, and a display message over 4 KB closes only its own connection; both ended the hub
+  before.
+- **Open questions stay open:** a question Codex asks without waiting (`request_user_input_async`) now
+  stays open past the end of the turn and further tool events, until the answer (the next prompt) or the
+  end of the session.
+- **Subagents leave the main agent alone:** tool events, starts and requests of a subagent no longer
+  change what the session shows; a question the main agent asked stays open while subagents work.
+- **Complete GitHub lists:** repositories, pull requests and Actions runs are read to the last page,
+  following GitHub's links only on `api.github.com`. A failed run on a later page now counts. A list of
+  more than 1000 entries is reported as a problem of its own ("too many results") instead of being cut.
+- **Private repositories of a person:** for a personal account the list now includes the private
+  repositories of that owner the token may see; GitHub's list of a user's repositories holds public ones
+  only.
+
 ## 0.4.1 – 2026-10-18
 
 Sessions are named as their apps name them: Codex chats with their name and project, Claude sessions

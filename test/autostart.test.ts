@@ -31,7 +31,8 @@ const HUB = hubTask({
 });
 const DISPLAY = displayTask({
   edge: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-  url: 'http://127.0.0.1:4780',
+  // The start file that signs the display in, not the hub's address.
+  url: 'file:///C:/Users/dev/AppData/Local/stellwerk/display.html',
   profileDir: 'C:\\Users\\dev\\AppData\\Local\\stellwerk\\edge-display',
   screen: SCREENS[2]!,
   root: 'C:\\Users\\dev\\Projects\\stellwerk',
@@ -80,7 +81,7 @@ describe('the tasks', () => {
     assert.equal(DISPLAY.name, DISPLAY_TASK);
     assert.deepEqual(DISPLAY.action.args, [
       '--kiosk',
-      'http://127.0.0.1:4780',
+      'file:///C:/Users/dev/AppData/Local/stellwerk/display.html',
       '--edge-kiosk-type=fullscreen',
       '--user-data-dir=C:\\Users\\dev\\AppData\\Local\\stellwerk\\edge-display',
       '--no-first-run',

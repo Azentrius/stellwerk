@@ -71,6 +71,12 @@ interface Session {
   question: string | null;
   /** The end-of-turn box asked something; the Stop that follows makes the session wait. */
   wrapUp: { reason: 'question' | 'input'; question: string | null } | null;
+  /**
+   * A question the main agent asked without waiting for it (Codex' request_user_input_async). It stays
+   * open past the end of the turn and past further tool events, until the answer (the next prompt) or the
+   * end of the session; while open, the session waits for it.
+   */
+  openQuestion: { question: string | null; since: number } | null;
   /** How full the context is, from the transcript; null until read. */
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
@@ -160,6 +166,7 @@ export class Board {
         // A new prompt: whatever the main agent asked before was answered in the app.
         setStatus(session, 'working');
         session.wrapUp = null;
+        session.openQuestion = null;
         return this.settleWhere((p) => p.sessionId === session.id && p.agentId === null, 'decided-in-app', now);
 
       case 'Stop': {
@@ -173,13 +180,15 @@ export class Board {
 
       case 'PostToolUse':
       case 'PostToolUseFailure': {
-        // The tool ran, so a matching open request was allowed in the app (and a question answered).
-        setStatus(session, 'working');
+        // The tool ran, so a matching open request was allowed in the app (and a question answered). Only
+        // the main agent's tools say what the session does: a subagent working on leaves a question of the
+        // main agent open.
+        if (agentId === null) setStatus(session, 'working');
         if (event.hook_event_name === 'PostToolUse' && event.tool_name === WRAP_UP_TOOL && agentId === null) {
           session.wrapUp = wrapUpOf(event.tool_input);
         }
         if (event.hook_event_name === 'PostToolUse' && ASYNC_QUESTION_TOOLS.has(event.tool_name) && agentId === null) {
-          waitFor(session, 'question', now, firstQuestion(event.tool_input));
+          session.openQuestion = { question: firstQuestion(event.tool_input), since: now };
         }
         const candidates = this.pendingOf(session.id).filter((p) => p.agentId === agentId && p.tool === event.tool_name);
         const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
@@ -198,8 +207,8 @@ export class Board {
       }
 
       case 'SubagentStart':
+        // Counted only: the main agent's status stays as it is (a question it asked stays open).
         if (agentId) session.subagents.add(agentId);
-        setStatus(session, 'working');
         return [];
 
       case 'SubagentStop':
@@ -212,6 +221,7 @@ export class Board {
         session.endedAt = now;
         session.subagents.clear();
         session.wrapUp = null;
+        session.openQuestion = null;
         return this.settleWhere((p) => p.sessionId === session.id, 'aborted', now);
 
       default:
@@ -222,8 +232,9 @@ export class Board {
   /** Puts a permission request on the display. */
   addPermission(id: string, event: PermissionRequestEvent, now: number, holdMs: number, provider: Provider = 'claude'): Permission {
     const session = this.touch(event, now, provider);
-    // Asking for a permission means working; while the card is open the status shows 'permission'.
-    if (session.base !== 'ended') setStatus(session, 'working');
+    // The main agent asking for a permission means working; while the card is open the status shows
+    // 'permission'. A subagent's request leaves the main agent's status (a question it asked) as it is.
+    if (session.base !== 'ended' && (event.agent_id ?? null) === null) setStatus(session, 'working');
     const permission: Permission = {
       id,
       sessionId: session.id,
@@ -294,6 +305,7 @@ export class Board {
         waitingSince: null,
         question: null,
         wrapUp: null,
+        openQuestion: null,
         context: null,
         subagents: new Set(),
         lastActivity: now,
@@ -362,21 +374,26 @@ export class Board {
 
   view(): { sessions: SessionView[]; permissions: PermissionView[] } {
     const sessions = [...this.sessions.values()]
-      .map((s): SessionView => ({
-        id: s.id,
-        provider: s.provider,
-        project: s.project ?? projectName(s.cwd),
-        cwd: s.cwd,
-        title: s.title,
-        status: this.statusOf(s),
-        waitingFor: this.statusOf(s) === 'waiting' ? s.waitingFor : null,
-        waitingSince: this.statusOf(s) === 'waiting' ? s.waitingSince : null,
-        question: this.statusOf(s) === 'waiting' ? s.question : null,
-        context: s.context,
-        subagents: s.subagents.size,
-        lastActivity: s.lastActivity,
-        endedAt: s.endedAt,
-      }))
+      .map((s): SessionView => {
+        const status = this.statusOf(s);
+        // An open question the main agent asked outlasts its turn; it is what the session waits for.
+        const open = status === 'waiting' ? s.openQuestion : null;
+        return {
+          id: s.id,
+          provider: s.provider,
+          project: s.project ?? projectName(s.cwd),
+          cwd: s.cwd,
+          title: s.title,
+          status,
+          waitingFor: status !== 'waiting' ? null : open ? 'question' : s.waitingFor,
+          waitingSince: status !== 'waiting' ? null : open ? open.since : s.waitingSince,
+          question: status !== 'waiting' ? null : open ? open.question : s.question,
+          context: s.context,
+          subagents: s.subagents.size,
+          lastActivity: s.lastActivity,
+          endedAt: s.endedAt,
+        };
+      })
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || b.lastActivity - a.lastActivity);
 
     const all = [...this.permissions.values()];
@@ -404,7 +421,8 @@ export class Board {
 
   private statusOf(session: Session): SessionStatus {
     if (session.base === 'ended') return 'ended';
-    return this.pendingOf(session.id).length > 0 ? 'permission' : session.base;
+    if (this.pendingOf(session.id).length > 0) return 'permission';
+    return session.openQuestion ? 'waiting' : session.base;
   }
 
   private pendingOf(sessionId: string): Permission[] {

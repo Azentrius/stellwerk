@@ -49,10 +49,9 @@ jobs:
           $hub = Start-Process node -ArgumentList 'dist/cli.js', 'serve' -NoNewWindow -PassThru
           try {
             Start-Sleep -Seconds 3
-            foreach ($path in '/', '/app.js', '/app.css', '/static/fonts/RedHatMono/RedHatMonoVF.woff2') {
-              $status = (Invoke-WebRequest "http://127.0.0.1:4780$path" -UseBasicParsing).StatusCode
-              "$path $status"
-            }
+            # As a display uses it: locked without sign-in, signed in with the start file the hub wrote.
+            node (Join-Path $env:GITHUB_WORKSPACE 'tools/check-install.ts') 4780
+            if ($LASTEXITCODE -ne 0) { throw "The installed hub failed its check ($LASTEXITCODE)." }
           } finally {
             Stop-Process -Id $hub.Id
           }

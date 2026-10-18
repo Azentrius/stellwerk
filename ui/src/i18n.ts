@@ -118,6 +118,7 @@ const en: Texts = {
       'not-found': 'GitHub: owner not found',
       unreachable: 'GitHub: not reachable',
       unexpected: 'GitHub: unexpected answer',
+      'too-many': 'GitHub: too many results',
     },
     fix: {
       rejected: 'Create a new token and run `stellwerk github token`.',
@@ -125,6 +126,7 @@ const en: Texts = {
       'not-found': 'Check the name and set the token again: `stellwerk github token --owner NAME`.',
       unreachable: 'Check the internet connection; the hub asks again by itself.',
       unexpected: 'The hub asks again by itself. If it stays, see `hub.log`.',
+      'too-many': 'A list has more than 1000 entries; Stellwerk shows none rather than an incomplete one. Give the token fewer repositories.',
     },
   },
   hardwareTitle: 'Hardware',
@@ -220,6 +222,7 @@ const de: Texts = {
       'not-found': 'GitHub: Besitzer nicht gefunden',
       unreachable: 'GitHub: nicht erreichbar',
       unexpected: 'GitHub: unerwartete Antwort',
+      'too-many': 'GitHub: zu viele Ergebnisse',
     },
     fix: {
       rejected: 'Lege einen neuen Token an und führe `stellwerk github token` aus.',
@@ -227,6 +230,7 @@ const de: Texts = {
       'not-found': 'Prüfe den Namen und lege den Token neu an: `stellwerk github token --owner NAME`.',
       unreachable: 'Prüfe die Internetverbindung; der Hub fragt von selbst wieder.',
       unexpected: 'Der Hub fragt von selbst wieder. Bleibt es so, steht mehr in `hub.log`.',
+      'too-many': 'Eine Liste hat mehr als 1000 Einträge; Stellwerk zeigt sie lieber gar nicht als unvollständig. Gib dem Token weniger Repositories.',
     },
   },
   hardwareTitle: 'Hardware',

@@ -90,7 +90,7 @@ export interface PullRequestView {
 }
 
 /** Why the last question to GitHub failed. */
-export type GitHubProblem = 'rejected' | 'forbidden' | 'not-found' | 'unreachable' | 'unexpected';
+export type GitHubProblem = 'rejected' | 'forbidden' | 'not-found' | 'unreachable' | 'unexpected' | 'too-many';
 
 export interface GitHubView {
   owner: string;

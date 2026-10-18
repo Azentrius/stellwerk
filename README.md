@@ -56,10 +56,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.4.1.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.4.1.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.4.1.zip -DestinationPath .
-cd stellwerk-0.4.1
+(Get-FileHash stellwerk-0.4.2.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.4.2.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.4.2.zip -DestinationPath .
+cd stellwerk-0.4.2
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -83,11 +83,15 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 3. Restart the Claude desktop app (and terminals that run Claude Code), so they pick up the token.
 4. Once, in a terminal opened as administrator: `stellwerk install`. It adds a Windows Firewall rule
    that blocks the port for other machines, a second layer next to the fixed address.
-5. Open the display and move the window to the second screen (F11 for full screen):
+5. Open the display with its start file and move the window to the second screen (F11 for full screen):
 
    ```powershell
-   msedge --app=http://127.0.0.1:4780
+   msedge "--app=$(([uri]"$env:LOCALAPPDATA\stellwerk\display.html").AbsoluteUri)"
    ```
+
+   The hub writes `%LOCALAPPDATA%\stellwerk\display.html` when it starts (its console names it); only your
+   Windows account can read it. It signs the display in at the hub, which answers with a cookie. Opened at
+   `http://127.0.0.1:4780` alone, the display shows only that it is not signed in.
 
 ## Start with Windows
 
@@ -100,13 +104,15 @@ adding them. Both start at logon, without administrator rights:
 
 - **Stellwerk hub** starts the hub without a window. Its messages go to
   `%LOCALAPPDATA%\stellwerk\hub.log` (moved to `hub.log.1` when it grows beyond 1 MB).
-- **Stellwerk display** opens the display 20 s later in Edge's kiosk mode: full screen on the 1920×720
-  screen, without title bar and over the taskbar, with an Edge profile of its own. `--screen <number>`
+- **Stellwerk display** opens the display 20 s later with its start file in Edge's kiosk mode: full screen
+  on the 1920×720 screen, without title bar and over the taskbar, with an Edge profile of its own. `--screen <number>`
   picks another screen. Alt+F4 closes the display.
 
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens. After an update, restarting the hub is enough: the open
-display notices that the hub serves a newer version and loads itself again. Stop or start a task in the Task Scheduler or with
+display notices that the hub serves a newer version and loads itself again.
+**Updating from 0.4.1 or older:** run `stellwerk autostart install` again, so that the display task
+opens the start file, then restart both tasks; until then the display shows that it is not signed in. Stop or start a task in the Task Scheduler or with
 `schtasks /End /TN "Stellwerk hub"` and `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with
 its task. `stellwerk autostart uninstall` removes both tasks.
 
@@ -130,7 +136,11 @@ by your Windows user only, in `%LOCALAPPDATA%\stellwerk\github-token`; the owner
 `config.json`. Only fine-grained tokens (`github_pat_…`) are accepted. Restart the hub afterwards.
 
 Every two minutes the hub then asks `api.github.com` for the owner's repositories (archived ones are
-left out), their open pull requests, and the Actions runs on each pull request's head commit. Each pull
+left out), their open pull requests, and the Actions runs on each pull request's head commit. For a
+personal account it adds the private repositories of that owner the token may see, which GitHub's list
+of a user's repositories leaves out. Lists longer than one page are read to the end, following GitHub's
+links only on `api.github.com`; more than 1000 entries in one list are reported as a problem instead of
+showing an incomplete list. Each pull
 request is one line; the icon in front of its title stands for its checks (its word is the tooltip and
 the name a screen reader reads), so repository, number and author have room:
 
@@ -314,6 +324,7 @@ Restart the hub after a change.
 |---|---|
 | `%APPDATA%\stellwerk\config.json` | Configuration |
 | `%LOCALAPPDATA%\stellwerk\token` | The hook token; only your Windows user can read it |
+| `%LOCALAPPDATA%\stellwerk\display.html` | The display's start file with the key that signs it in, written by the hub; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\audit.jsonl` | Audit log: every permission request with time, session, project, tool, input and outcome |
 | `%LOCALAPPDATA%\stellwerk\debug-raw.jsonl` | Raw hook data, only in debug mode |
 | `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
@@ -335,8 +346,14 @@ Restart the hub after a change.
 - Hook requests need the token and `Content-Type: application/json` (otherwise 401 and 415). The content
   type makes a browser ask first (CORS preflight), which the hub never answers, so no web page can post
   events.
+- The display signs in before it gets anything: its start file, which only your Windows account can
+  read, posts a key derived from the hook token to the hub, and the hub answers with an HttpOnly cookie.
+  The page with its token and the WebSocket need that cookie, so neither a web page nor another account
+  on this computer gets the display or its decisions from the address alone. The key is in no address
+  and no log.
 - Decisions travel only over the display's WebSocket. The hub checks `Host` and `Origin` (against
-  DNS rebinding and foreign pages) and a token it puts into the page it serves.
+  DNS rebinding and foreign pages), the cookie and a token it puts into the page it serves. A broken
+  or oversized message closes only its own connection.
 - Nothing is allowed automatically: no rules, no "always allow".
 - The hub starts no programs. Its only connection to another machine is to `api.github.com`, for the
   list of pull requests, and only with a fine-grained read-only token you set up. Besides that it asks
@@ -375,6 +392,8 @@ once a minute per reason and never with the token:
 | `hook request without a token (401)` | Claude Code has no `STELLWERK_TOKEN`: run `stellwerk hooks install`, then restart the Claude app. |
 | `hook request with a wrong token (401)` | The token file was renewed: run `stellwerk hooks install` again, then restart the Claude app. |
 | `request with the Host header … (403)` | Open the display at `http://127.0.0.1:4780` or `http://localhost:4780`, not under another name. |
+| `display page without sign-in` or `display connection without sign-in` | Open the display with its start file (`%LOCALAPPDATA%\stellwerk\display.html`), or start the task "Stellwerk display" again. |
+| `display sign-in with a wrong key` | The token changed since the start file was opened: start the hub, then the display again. |
 | `display connection without the right page token` | Reload the display. |
 
 If the console stays silent, Claude Code sends nothing: check that the hooks are in

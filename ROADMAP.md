@@ -61,6 +61,16 @@ real Codex app's projects and a desktop app session without a group.
 
 ---
 
+## 0.4.2 – Review fixes ✅
+
+Done in 0.4.2 (see [CHANGELOG](CHANGELOG.md)), after an external review of 0.4.1: the display signs in
+with a start file only the user can read (another account on the computer no longer gets the
+decisions); a broken display connection no longer ends the hub; open Codex questions and the main
+agent's questions survive turn ends and subagents; GitHub lists are complete, private repositories of a
+person included. The sign-in was checked in a real Edge: start file, cookie, display, WebSocket.
+
+---
+
 ## Stage 2 – System values and alerts
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts
