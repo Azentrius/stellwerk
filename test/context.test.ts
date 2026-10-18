@@ -13,6 +13,7 @@ import {
   DEFAULT_WINDOW,
   LARGE_WINDOW,
   checkedTranscript,
+  claudeTitleOfLine,
   contextWindow,
   readContextUsage,
   usageOfLine,
@@ -102,6 +103,20 @@ test('the reader reports usage for a session at most once per interval, and igno
   assert.equal(await reader.read('s2', path.join(os.tmpdir(), 'other.jsonl')), null);
   assert.equal(await reader.read('s2', path.join(os.tmpdir(), 'other.jsonl')), null);
   assert.equal(log.length, 1, 'said once');
+  reader.stop();
+});
+
+test("a session's title is the transcript's latest, for the events that do not carry it", async () => {
+  const title = (text: unknown) => JSON.stringify({ type: 'custom-title', customTitle: text, sessionId: 's' });
+  assert.equal(claudeTitleOfLine(title(' Radar:\n Java-Version ')), 'Radar: Java-Version');
+  assert.equal(claudeTitleOfLine(title(7)), null);
+  assert.equal(claudeTitleOfLine(prompt('{"type":"custom-title"}')), null);
+  const t = transcripts();
+  const file = t.file('s.jsonl', [title('Hibiscus'), prompt('a secret prompt'), answer({ input_tokens: 5 }), title('Hibiscus Registry-Fehler'), prompt('more')]);
+  const names: string[] = [];
+  const reader = new ContextReader({ root: t.root, onUsage: () => {}, onName: (id, name) => names.push(`${id}: ${name}`) });
+  await reader.read('s', file);
+  assert.deepEqual(names, ['s: Hibiscus Registry-Fehler']);
   reader.stop();
 });
 

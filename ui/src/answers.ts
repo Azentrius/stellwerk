@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { SessionView, WaitingFor } from '../../src/shared/protocol.js';
-import { naming } from './agents.ts';
+import { naming } from './naming.ts';
 import { entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { state } from './states.ts';

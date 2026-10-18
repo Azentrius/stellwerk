@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, PermissionView } from '../../src/shared/protocol.js';
-import { naming } from './agents.ts';
+import { naming } from './naming.ts';
 import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { duration } from './time.ts';

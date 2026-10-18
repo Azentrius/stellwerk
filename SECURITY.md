@@ -62,7 +62,12 @@ reachable only from the machine it runs on and only by the display it serves:
   `get_usage` in a `PostToolUse` hook and keeps only the plan's limits from it;
 - for the names of Codex sessions the hub reads Codex' session index
   (`%USERPROFILE%\.codex\session_index.jsonl`, a fixed path, never one from
-  hook data) from its end and keeps only the name of a session it shows;
+  hook data) from its end and keeps only the name of a session it shows; for
+  their projects it reads the Codex app's state file
+  (`%USERPROFILE%\.codex\.codex-global-state.json`, a fixed path) after it
+  changed and keeps only project names and which chat belongs to which; the
+  title of a Claude Code session comes from its transcript like its token
+  counts;
 - Codex events reach the hub through Stellwerk's forwarder, which Codex runs
   as a command hook: it reads the hook token from the token file, posts to
   `127.0.0.1` only, prints only the hub's answer and ends at once without a

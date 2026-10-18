@@ -8,6 +8,7 @@ import type { ChecksState, SessionStatus } from '../src/shared/protocol.js';
 import { pickTexts } from '../ui/src/i18n.ts';
 import { elapsed } from '../ui/src/time.ts';
 import { ICONS } from '../ui/src/icons.ts';
+import { naming } from '../ui/src/naming.ts';
 import { checksState, hubState, sessionState, state, type State } from '../ui/src/states.ts';
 
 const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
@@ -80,4 +81,12 @@ test('every state in both languages has its icon and a word, never colour alone'
     assertSpoken(connected);
     for (const reason of Object.values(texts.waitingFor)) assertSpoken(state('info', reason));
   }
+});
+
+test('a session is named by its title over its project; a chat without a project shows no second line', () => {
+  assert.deepEqual(naming('cockpit-image-update-monitor', 'image-update-monitor', 'abc12345xyz'), { name: 'image-update-monitor', project: 'cockpit-image-update-monitor' });
+  assert.deepEqual(naming('stellwerk', 'stellwerk', 'abc12345xyz'), { name: 'stellwerk', project: '' }, 'title and project alike: once');
+  assert.deepEqual(naming('Azentrius', null, 'abc12345xyz'), { name: 'Azentrius', project: '' }, 'no title yet: the project');
+  assert.deepEqual(naming('', 'Webseite prüfen', 'abc12345xyz'), { name: 'Webseite prüfen', project: '' }, 'kept without a project');
+  assert.deepEqual(naming('', null, 'abc12345xyz'), { name: 'abc12345', project: '' }, 'nothing known: the start of the id');
 });

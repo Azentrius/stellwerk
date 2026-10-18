@@ -18,6 +18,7 @@ import {
   appSettingsXml,
   parseAppSettings,
 } from './hub/hardware.ts';
+import { codexStateFile } from './hub/codex-projects.ts';
 import { codexSessionIndex, codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
 import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
 import { startHub } from './hub/hub.ts';
@@ -203,6 +204,7 @@ async function serve(
         windows: config.contextWindows,
       },
       plansFile: paths.plansFile,
+      codexStateFile: codexStateFile(paths.codexHome),
     });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
