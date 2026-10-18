@@ -10,6 +10,9 @@ Uptime Kuma's monitors in the third column: what is down stands out, what works 
   quieter below; everything else is only a number ("35 up", "1 in maintenance"). Paused monitors and
   groups are not counted. The column's title counts what fails, its foot says when Uptime Kuma was last
   asked, or what failed and how to fix it.
+- **GitHub's line where its list is:** when the pull requests were last brought up to date, or what
+  failed and how to fix it, now stands at the foot of the "Waiting for you" column, below the pull
+  requests, as Uptime Kuma's line does in its column. The status column keeps the hub's own state.
 - **One more connection, and only that:** every minute the hub asks Uptime Kuma at the address set up
   for `/metrics`, with the key as the password; such a key opens nothing else in Uptime Kuma. The address
   is http or https, a host and a port, nothing else; redirects are not followed; of the answer the hub

@@ -154,8 +154,8 @@ the name a screen reader reads), so repository, number and author have room:
 | grey hourglass: running | runs still going, or waiting for approval |
 | none | no runs |
 
-The status column says when the list was last brought up to date, or why that failed (token rejected,
-no access, not reachable) and how to fix it. The token is never logged and never sent to the display.
+At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
+last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it. The token is never logged and never sent to the display.
 `stellwerk github remove` deletes it; the hub then opens no connection to GitHub.
 
 ## Hardware values
