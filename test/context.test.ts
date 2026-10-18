@@ -69,7 +69,8 @@ test('it is read from the end of the transcript, also across long lines', async 
 test('only transcripts in the transcripts folder are read', async () => {
   const t = transcripts();
   const inside = t.file('session.jsonl', [answer({ input_tokens: 1 })]);
-  assert.equal(await checkedTranscript(inside, t.root), fs.realpathSync(inside));
+  // The native resolution, as the hub uses it: it also expands short 8.3 names such as RUNNER~1.
+  assert.equal(await checkedTranscript(inside, t.root), fs.realpathSync.native(inside));
   const outside = path.join(path.dirname(t.root), 'elsewhere.jsonl');
   fs.writeFileSync(outside, answer({ input_tokens: 1 }));
   for (const file of [outside, path.join(t.root, '..', 'elsewhere.jsonl'), path.join(t.root, 'C--Projekte-shop-api', 'notes.txt'), 'relative/session.jsonl']) {
