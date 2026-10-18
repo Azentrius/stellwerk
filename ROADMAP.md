@@ -71,6 +71,14 @@ person included. The sign-in was checked in a real Edge, also with a second loca
 
 ---
 
+## 0.5.1 – Hints to the log ✅
+
+Done in 0.5.1 (see [CHANGELOG](CHANGELOG.md)): the status column says when the hub turned requests away
+(how many, when and why the last) and when its raw hook log is on, so that `hub.log` gets a look before
+something stays missing unnoticed.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

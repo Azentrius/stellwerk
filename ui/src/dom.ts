@@ -54,12 +54,16 @@ export function stateIcon(state: State): HTMLSpanElement {
   return node;
 }
 
-/** An error as the design system's alert: what happened as its title, how to fix it below. */
+/**
+ * An error as the design system's alert: what happened as its title, how to fix it below. A warning has
+ * the attention tone and its triangle, and is not announced as an alert.
+ */
 export function alert(problem: Problem): HTMLDivElement {
-  const node = el('div', 'az-alert az-alert--danger');
-  node.setAttribute('role', 'alert');
+  const warning = problem.tone === 'warning';
+  const node = el('div', `az-alert az-alert--${warning ? 'warning' : 'danger'}`);
+  node.setAttribute('role', warning ? 'status' : 'alert');
   const mark = el('span', 'az-alert__icon');
-  mark.append(icon('exclamation-circle'));
+  mark.append(icon(warning ? 'exclamation-triangle' : 'exclamation-circle'));
   const body = el('p', 'az-alert__body');
   for (const part of splitCode(problem.fix)) body.append(part.code ? el('code', undefined, part.text) : part.text);
   node.append(mark, el('p', 'az-alert__title', problem.title), body);

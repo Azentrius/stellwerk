@@ -17,7 +17,15 @@ import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { z } from 'zod';
-import type { Decision, DecisionResultMessage, PermissionOutcome, Provider, StateMessage } from '../shared/protocol.js';
+import type {
+  Decision,
+  DecisionResultMessage,
+  HubView,
+  PermissionOutcome,
+  Provider,
+  RejectionReason,
+  StateMessage,
+} from '../shared/protocol.js';
 import { CODEX_HOOK_PATH, HOOK_PATH, HOST } from '../config.ts';
 import { AuditLog } from './audit.ts';
 import { Board, QUESTION_TOOLS, projectName, showsNotification, type Permission } from './board.ts';
@@ -52,6 +60,31 @@ const BROADCAST_DELAY_MS = 50;
 export const REJECTION_LOG_INTERVAL_MS = 60_000;
 /** At most this many kinds of unshown prompts are named in the log per run. */
 const MAX_NOTED = 100;
+/** The display mentions rejections until an hour after the last one. */
+export const REJECTION_HINT_MS = 60 * 60_000;
+
+/** Each kind of rejection the log names, and the reason the display gives for it. */
+const REJECTION_REASONS = {
+  'no token': 'token',
+  'no token (codex)': 'token',
+  'wrong token': 'token',
+  'wrong token (codex)': 'token',
+  'content type': 'hook-data',
+  'hook method': 'hook-data',
+  'too large': 'hook-data',
+  json: 'hook-data',
+  'hook input': 'hook-data',
+  'codex input': 'hook-data',
+  'foreign host': 'foreign',
+  'foreign origin': 'foreign',
+  'request target': 'foreign',
+  'display path': 'foreign',
+  'display sign-in': 'display',
+  'page token': 'display',
+  'display message': 'display',
+} as const satisfies Record<string, RejectionReason>;
+
+type RejectionKey = keyof typeof REJECTION_REASONS;
 
 export interface HubOptions {
   /** 0 picks a free port (tests). */
@@ -167,6 +200,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   let broadcastTimer: NodeJS.Timeout | null = null;
   let closing = false;
   const rejections = new Map<string, { loggedAt: number; repeats: number }>();
+  /** Rejections for the display's hint: counted since the last quiet hour. */
+  let rejected: HubView['rejected'] = null;
   /** The kinds of prompts and notifications not shown that the log has named already. */
   const noted = new Set<string>();
 
@@ -487,8 +522,12 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     log(`${clockTime(now())}  ${line}`);
   }
 
-  function reject(key: string, message: string): void {
+  function reject(key: RejectionKey, message: string): void {
     const at = now();
+    // The display says that something was turned away, how often and why, so that the log gets a look.
+    const count = rejected !== null && at < rejected.until ? rejected.count + 1 : 1;
+    rejected = { count, lastAt: at, until: at + REJECTION_HINT_MS, reason: REJECTION_REASONS[key] };
+    scheduleBroadcast();
     const last = rejections.get(key);
     if (last && at - last.loggedAt < REJECTION_LOG_INTERVAL_MS) {
       last.repeats++;
@@ -504,7 +543,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   function onUpgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer): void {
     // A socket that fails before the handshake (a reset, an aborted client) concerns only itself.
     socket.on('error', () => socket.destroy());
-    const refuse = (status: number, key: string, message: string) => {
+    const refuse = (status: number, key: RejectionKey, message: string) => {
       reject(key, `${message} (${status})`);
       socket.write(`HTTP/1.1 ${status} ${http.STATUS_CODES[status]}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
@@ -550,7 +589,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       now: now(),
       ...board.view(),
       pullRequests: github?.pullRequests ?? [],
-      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build },
+      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build, rejected, rawLog: Boolean(options.rawLogFile) },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
       uptimeKuma: uptimeKuma?.view() ?? null,

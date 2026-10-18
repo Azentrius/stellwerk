@@ -56,10 +56,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.5.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.5.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.5.0.zip -DestinationPath .
-cd stellwerk-0.5.0
+(Get-FileHash stellwerk-0.5.1.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.5.1.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.5.1.zip -DestinationPath .
+cd stellwerk-0.5.1
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -430,7 +430,9 @@ Details and how to report a problem: [SECURITY.md](SECURITY.md).
 
 ## When nothing shows up
 
-The hub's console (or `hub.log`, when it started with Windows) says why it turned a request away, at most
+When the hub turned requests away, the status column says so as a warning: how many, when and why the
+last one (a missing or wrong token, hook data it could not take, a request from elsewhere, a display
+without sign-in). The hub's console (or `hub.log`, when it started with Windows) has the details, at most
 once a minute per reason and never with the token:
 
 | Message | What to do |
@@ -443,6 +445,15 @@ once a minute per reason and never with the token:
 
 If the console stays silent, Claude Code sends nothing: check that the hooks are in
 `%USERPROFILE%\.claude\settings.json` and that the session was started after `stellwerk hooks install`.
+
+If a Codex chat stays away while others show: Codex starts its hooks in the chat's folder, and a chat
+keeps its folder when that is renamed or moved. With the folder gone, Codex starts no hook for the chat
+and reports no error. Start a new chat in the project, or put a junction with the old name where the
+folder was (`New-Item -ItemType Junction -Path <old> -Target <new>`; remove it with `cmd /c rmdir <old>`,
+not with `Remove-Item`, which in Windows PowerShell 5.1 can delete what the junction points to).
+
+While the raw hook log is on (`debugRawLog` or `--debug-raw`), the status column says so: the file holds
+prompts and code, so turn it off and delete `debug-raw.jsonl` when you are done.
 
 ## Uninstall
 

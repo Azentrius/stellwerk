@@ -9,6 +9,7 @@ import type {
   HardwareProblem,
   PermissionOutcome,
   Provider,
+  RejectionReason,
   SessionStatus,
   UptimeKumaProblem,
   WaitingFor,
@@ -70,6 +71,14 @@ export interface Texts {
   hubConnected: string;
   hubDisconnected: string;
   hubDisconnectedFix: string;
+  /** Requests the hub turned away: how many, and when and why the last; the reason never quotes a request. */
+  rejected: {
+    title: (count: number) => string;
+    detail: (ago: string, reason: string) => string;
+    reasons: Record<RejectionReason, string>;
+  };
+  /** The raw hook log is on. */
+  rawLog: { title: string; fix: string };
   /** The display was opened without its start file. */
   notSignedIn: string;
   notSignedInFix: string;
@@ -200,6 +209,20 @@ const en: Texts = {
   hubConnected: 'Hub connected',
   hubDisconnected: 'Hub disconnected, reconnecting',
   hubDisconnectedFix: 'If it does not come back, start the task "Stellwerk hub" and reload the display.',
+  rejected: {
+    title: (n) => (n === 1 ? '1 request turned away' : `${n} requests turned away`),
+    detail: (ago, reason) => `The last one ${ago}: ${reason}.` + ' More in `hub.log`.',
+    reasons: {
+      token: 'missing or wrong token',
+      'hook-data': 'hook data the hub could not take',
+      foreign: 'a request from elsewhere (host, origin or address)',
+      display: 'a display not signed in, or a broken display connection',
+    },
+  },
+  rawLog: {
+    title: 'Raw hook log is on',
+    fix: 'It holds prompts and code. Set `debugRawLog` to false in `config.json` (or start without `--debug-raw`), restart the hub and delete `debug-raw.jsonl`.',
+  },
   notSignedIn: 'Display not signed in',
   notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
   lastEvent: (ago) => `last event ${ago}`,
@@ -325,6 +348,20 @@ const de: Texts = {
   hubConnected: 'Hub verbunden',
   hubDisconnected: 'Hub getrennt, verbinde neu',
   hubDisconnectedFix: 'Kommt er nicht zurück, starte die Aufgabe „Stellwerk hub“ und lade die Anzeige neu.',
+  rejected: {
+    title: (n) => (n === 1 ? '1 Anfrage abgelehnt' : `${n} Anfragen abgelehnt`),
+    detail: (ago, reason) => `Zuletzt ${ago}: ${reason}.` + ' Mehr in `hub.log`.',
+    reasons: {
+      token: 'Token fehlt oder ist falsch',
+      'hook-data': 'Hook-Daten, die der Hub nicht annehmen konnte',
+      foreign: 'eine Anfrage von außerhalb (Host, Herkunft oder Adresse)',
+      display: 'eine Anzeige ohne Anmeldung oder eine abgebrochene Verbindung',
+    },
+  },
+  rawLog: {
+    title: 'Rohprotokoll ist an',
+    fix: 'Es enthält Prompts und Code. Setze `debugRawLog` in `config.json` auf false (oder starte ohne `--debug-raw`), starte den Hub neu und lösche `debug-raw.jsonl`.',
+  },
   notSignedIn: 'Anzeige nicht angemeldet',
   notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',
   lastEvent: (ago) => `letztes Ereignis ${ago}`,

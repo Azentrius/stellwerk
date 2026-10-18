@@ -68,12 +68,26 @@ export interface PermissionView {
   resolvedAt: number | null;
 }
 
+/**
+ * Why the hub turned a request away, as the display names it: a missing or wrong token, hook data it could
+ * not take, a request from elsewhere (foreign host or origin, an unknown path or target), a display that is
+ * not signed in or broke its connection. Never the request's content.
+ */
+export type RejectionReason = 'token' | 'hook-data' | 'foreign' | 'display';
+
 export interface HubView {
   startedAt: number;
   lastEventAt: number | null;
   sound: boolean;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
   build: string;
+  /**
+   * Requests turned away since the last quiet hour: how many, the last one's time and reason, and until
+   * when the display mentions them (an hour after the last); null when there were none.
+   */
+  rejected: { count: number; lastAt: number; until: number; reason: RejectionReason } | null;
+  /** The raw hook log is on: it holds prompts and code. */
+  rawLog: boolean;
 }
 
 /** The Actions runs on a pull request's head commit, summed up. */

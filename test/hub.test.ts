@@ -20,6 +20,7 @@ import {
   displayKey,
   displayStartPage,
   MAX_OPEN_PERMISSIONS,
+  REJECTION_HINT_MS,
   REJECTION_LOG_INTERVAL_MS,
   startHub,
   type Hub,
@@ -441,6 +442,41 @@ describe('the hub keeps running', () => {
 describe('rejections on the console', () => {
   const STOP = { hook_event_name: 'Stop', session_id: 'x' };
   const WRONG = 'b'.repeat(64);
+
+  test('the display hears how many were turned away, when and why the last, never what they carried', async () => {
+    let clock = 1_000_000;
+    const { port } = await startTestHub({ now: () => clock });
+    const screen = await display(port);
+    assert.equal((await screen.state(() => true)).hub.rejected, null);
+    await call(port, { headers: { ...AUTH, Authorization: `Bearer ${WRONG}` }, body: STOP }).reply;
+    clock += 1000;
+    await call(port, { headers: AUTH, body: STOP, host: `evil.example:${port}` }).reply;
+    const state = await screen.state((s) => s.hub.rejected?.count === 2);
+    assert.deepEqual(state.hub.rejected, { count: 2, lastAt: 1_001_000, until: 1_001_000 + REJECTION_HINT_MS, reason: 'foreign' });
+    assert.doesNotMatch(JSON.stringify(state), new RegExp(`${WRONG}|${TOKEN}|evil`));
+    // Within the hour they add up; after a quiet hour the next one counts from one.
+    clock += 60_000;
+    await call(port, { headers: AUTH, body: '{"hook_event_name":' }).reply;
+    assert.equal((await screen.state((s) => s.hub.rejected?.lastAt === clock)).hub.rejected?.count, 3);
+    clock += REJECTION_HINT_MS;
+    await call(port, { headers: { ...AUTH, Authorization: `Bearer ${WRONG}` }, body: STOP }).reply;
+    const again = await screen.state((s) => s.hub.rejected?.lastAt === clock);
+    assert.deepEqual([again.hub.rejected?.count, again.hub.rejected?.reason], [1, 'token']);
+    screen.close();
+  });
+
+  test('the display knows whether the raw hook log is on', async () => {
+    const off = await startTestHub();
+    const offScreen = await display(off.port);
+    assert.equal((await offScreen.state(() => true)).hub.rawLog, false);
+    offScreen.close();
+    const rawLogFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-raw-')), 'debug-raw.jsonl');
+    const on = await startTestHub({ rawLogFile });
+    const onScreen = await display(on.port);
+    assert.equal((await onScreen.state(() => true)).hub.rawLog, true);
+    assert.doesNotMatch(JSON.stringify(await onScreen.state(() => true)), /debug-raw/, 'not where it is');
+    onScreen.close();
+  });
 
   test('say why a request was turned away, and never show a token', async () => {
     const lines: string[] = [];
