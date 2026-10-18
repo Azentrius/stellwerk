@@ -15,7 +15,16 @@ import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { shouldReload } from './reload.ts';
-import { githubLine, hardwareLine, hubState, uptimeKumaLine, type Problem, type State } from './states.ts';
+import {
+  githubLine,
+  hardwareLine,
+  hubState,
+  rawLogLine,
+  rejectedLine,
+  uptimeKumaLine,
+  type Problem,
+  type State,
+} from './states.ts';
 import { ago, clock } from './time.ts';
 
 const WS_PROTOCOL = 'stellwerk.v1';
@@ -66,6 +75,8 @@ const waitingEmpty = byId('waiting-empty');
 const clockNode = byId('clock');
 const hubNode = byId('hub-state');
 const lastEvent = byId('last-event');
+const rejectedState = byId('rejected-state');
+const rawLogState = byId('raw-log-state');
 const toastNode = byId('toast');
 
 let state: StateMessage | null = null;
@@ -185,6 +196,10 @@ function tick(): void {
   show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
   lastEvent.textContent = last === null ? texts.noEvent : texts.lastEvent(ago(now - last, texts));
+  // What the hub turned away and whether its raw log is on: hints to look at its log, while it is here.
+  const hub = connected ? (state?.hub ?? null) : null;
+  showOrHide(rejectedState, rejectedLine(hub, now, texts));
+  showOrHide(rawLogState, rawLogLine(hub, texts));
   // While the hub is away, its last problems with GitHub and the hardware are old news: only its own
   // alert shows.
   const current = <T>(line: T): T | null => (connected || typeof line === 'string' ? line : null);
@@ -222,6 +237,11 @@ function show(node: HTMLElement, content: string | State | Problem): void {
   if (node.dataset.shown === key) return;
   node.dataset.shown = key;
   node.replaceChildren(typeof content === 'string' ? content : 'fix' in content ? alert(content) : label(content));
+}
+
+function showOrHide(node: HTMLElement, content: string | State | Problem | null): void {
+  node.hidden = content === null;
+  if (content !== null) show(node, content);
 }
 
 function toast(text: string): void {

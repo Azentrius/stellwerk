@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1 – 2026-10-18
+
+The status column points to the log when the hub turned requests away or its raw hook log is on.
+
+- **Requests turned away:** a wrong or missing token, hook data the hub could not take, a request from
+  elsewhere or a display without sign-in used to show only in `hub.log`, which nobody reads while the hub
+  runs without a window. Now the status column says so as a warning, below the last event: how many,
+  when and why the last one ("3 requests turned away. The last one 2 min ago: missing or wrong token.
+  More in `hub.log`."). The reason is one of four fixed kinds, never anything of the request. An hour
+  after the last one the warning goes; a new one then counts from one.
+- **Raw hook log on:** while the hub writes `debug-raw.jsonl` (`debugRawLog` or `--debug-raw`), the status
+  column reminds you that it holds prompts and code and how to turn it off.
+- **When Codex stays away:** the README says what to do when a Codex chat's folder was renamed or
+  deleted: Codex then starts no hooks for it, and nothing reaches the hub.
+
 ## 0.5.0 – 2026-10-18
 
 Uptime Kuma's monitors in the third column: what is down stands out, what works is a number.

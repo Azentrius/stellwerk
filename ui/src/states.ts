@@ -6,7 +6,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ChecksState, FailingMonitor, GitHubView, HardwareView, SessionStatus, UptimeKumaView } from '../../src/shared/protocol.js';
+import type {
+  ChecksState,
+  FailingMonitor,
+  GitHubView,
+  HardwareView,
+  HubView,
+  SessionStatus,
+  UptimeKumaView,
+} from '../../src/shared/protocol.js';
 import type { Texts } from './i18n.ts';
 import type { IconName } from './icons.ts';
 import { ago, elapsed } from './time.ts';
@@ -21,10 +29,14 @@ export interface State {
   text: string;
 }
 
-/** An error the user can fix: what happened, and how to fix it (commands in backticks). Shown as an alert. */
+/**
+ * An error the user can fix: what happened, and how to fix it (commands in backticks). Shown as an alert,
+ * an error unless it only needs attention (`tone: 'warning'`).
+ */
 export interface Problem {
   title: string;
   fix: string;
+  tone?: 'warning';
 }
 
 const TONE_ICON: Record<Exclude<Tone, 'neutral'>, IconName> = {
@@ -116,6 +128,25 @@ export function uptimeKumaLine(kuma: UptimeKumaView | null, now: number, texts: 
   if (kuma.problem) return { title: texts.uptimeKuma.problem[kuma.problem], fix: texts.uptimeKuma.fix[kuma.problem] };
   if (kuma.updatedAt === null) return texts.uptimeKuma.asking;
   return texts.uptimeKuma.synced(ago(now - kuma.updatedAt, texts));
+}
+
+/**
+ * A hint that the hub turned requests away, so that its log gets a look: how many, when and why the last.
+ * Needs attention, no more; gone an hour after the last one. Null when there is nothing to say.
+ */
+export function rejectedLine(hub: HubView | null, now: number, texts: Texts): Problem | null {
+  const rejected = hub?.rejected ?? null;
+  if (rejected === null || now >= rejected.until) return null;
+  return {
+    tone: 'warning',
+    title: texts.rejected.title(rejected.count),
+    fix: texts.rejected.detail(ago(now - rejected.lastAt, texts), texts.rejected.reasons[rejected.reason]),
+  };
+}
+
+/** A reminder that the raw hook log is on: it holds prompts and code. */
+export function rawLogLine(hub: HubView | null, texts: Texts): Problem | null {
+  return hub?.rawLog ? { tone: 'warning', title: texts.rawLog.title, fix: texts.rawLog.fix } : null;
 }
 
 /** Splits a text at its backticks: what stands between them is a command, the rest plain text. */

@@ -25,4 +25,6 @@ test("GitHub's line stands below the pull requests, Uptime Kuma's below the moni
   assert.equal(columnOf('monitors-state'), 'col--monitors');
   assert.equal(columnOf('hub-state'), 'col--status');
   assert.equal(columnOf('hardware-state'), 'col--status');
+  assert.equal(columnOf('rejected-state'), 'col--status');
+  assert.equal(columnOf('raw-log-state'), 'col--status');
 });

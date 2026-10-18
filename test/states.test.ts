@@ -77,7 +77,7 @@ test('every state in both languages has its icon and a word, never colour alone'
     for (const status of STATUSES) assertSpoken(sessionState(status, texts));
     for (const checks of CHECKS) assertSpoken(checksState(checks, texts));
     const connected = hubState(true, texts);
-    assert.ok('tone' in connected);
+    assert.ok(!('fix' in connected), 'a state, not a problem');
     assertSpoken(connected);
     for (const reason of Object.values(texts.waitingFor)) assertSpoken(state('info', reason));
     for (const status of ['down', 'pending'] as const) assertSpoken(monitorState(status, texts));

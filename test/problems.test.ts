@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import type { GitHubView, HardwareView, UptimeKumaView } from '../src/shared/protocol.js';
+import type { GitHubView, HardwareView, HubView, UptimeKumaView } from '../src/shared/protocol.js';
 import { pickTexts } from '../ui/src/i18n.ts';
-import { githubLine, hardwareLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
+import { githubLine, hardwareLine, rawLogLine, rejectedLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const cli = fs.readFileSync(path.join(ROOT, 'src', 'cli.ts'), 'utf8');
@@ -17,7 +17,14 @@ const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
 const en = languages[0]!;
 
 function fixes(texts: (typeof languages)[number]): string[] {
-  return [...Object.values(texts.github.fix), ...Object.values(texts.hardware.fix), ...Object.values(texts.uptimeKuma.fix), texts.hubDisconnectedFix];
+  return [
+    ...Object.values(texts.github.fix),
+    ...Object.values(texts.hardware.fix),
+    ...Object.values(texts.uptimeKuma.fix),
+    texts.hubDisconnectedFix,
+    texts.rawLog.fix,
+    ...Object.values(texts.rejected.reasons).map((reason) => texts.rejected.detail('vor 2 min', reason)),
+  ];
 }
 
 test('every problem has a fix in both languages, as a whole sentence', () => {
@@ -76,4 +83,26 @@ test('the status lines are plain text, or a problem with its fix', () => {
     title: 'Uptime Kuma: key rejected',
     fix: 'Create a new API key in Uptime Kuma and run `stellwerk kuma key`.',
   });
+});
+
+test('requests turned away and the raw log are hints to look at the log, as warnings', () => {
+  const hub = (rejected: HubView['rejected'], rawLog = false): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, build: 'x', rejected, rawLog });
+  const de = languages[1]!;
+  assert.equal(rejectedLine(null, 0, en), null);
+  assert.equal(rejectedLine(hub(null), 0, en), null);
+  const three = hub({ count: 3, lastAt: 1_000, until: 1_000 + 3_600_000, reason: 'token' });
+  assert.deepEqual(rejectedLine(three, 121_000, en), {
+    tone: 'warning',
+    title: '3 requests turned away',
+    fix: 'The last one 2 min ago: missing or wrong token. More in `hub.log`.',
+  });
+  assert.deepEqual(rejectedLine(hub({ count: 1, lastAt: 0, until: 3_600_000, reason: 'foreign' }), 5_000, de), {
+    tone: 'warning',
+    title: '1 Anfrage abgelehnt',
+    fix: 'Zuletzt vor 5 s: eine Anfrage von außerhalb (Host, Herkunft oder Adresse). Mehr in `hub.log`.',
+  });
+  assert.equal(rejectedLine(three, 1_000 + 3_600_000, en), null, 'gone an hour after the last one');
+  assert.equal(rawLogLine(hub(null), en), null);
+  assert.deepEqual(rawLogLine(hub(null, true), de)?.title, 'Rohprotokoll ist an');
+  assert.equal(rawLogLine(hub(null, true), en)?.tone, 'warning');
 });
