@@ -541,6 +541,18 @@ describe('Codex', () => {
     assert.doesNotMatch(JSON.stringify(hub.board.view()), /secret/);
   });
 
+  test("a session is named as in Codex' session index, the project stays below", async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const codexIndex = path.join(path.dirname(codexRoot), 'session_index.jsonl');
+    fs.writeFileSync(codexIndex, `${JSON.stringify({ id: 'codex-1', thread_name: 'Planning & Concept', updated_at: RECORDED_AT })}\n`);
+    const { port } = await startTestHub({ context: { root: codexRoot, codexRoot, codexIndex, intervalMs: 20 } });
+    const screen = await display(port);
+    await codexHook(port, { hook_event_name: 'UserPromptSubmit', transcript_path: transcript, prompt: 'x' }).reply;
+    const state = await screen.state((s) => s.sessions[0]?.title !== null && s.sessions[0]?.title !== undefined);
+    assert.deepEqual([state.sessions[0]?.title, state.sessions[0]?.project], ['Planning & Concept', 'OpenAuto AI']);
+    screen.close();
+  });
+
   test("the usage of the plan's limits comes from the transcript and is there again after a restart", async () => {
     const resetsAt = Math.round(Date.now() / 1000) + 3600;
     const { codexRoot, transcript } = codexRollout('user', 182_031, {

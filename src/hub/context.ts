@@ -6,7 +6,9 @@
 //   from the model.
 // - Codex (~/.codex/sessions): token_count entries carry the last usage and the model's context window,
 //   and the usage of the plan's limits (`rate_limits`). Its latest turn_context also says who approves
-//   (`approvals_reviewer`), which the hub needs to know.
+//   (`approvals_reviewer`), which the hub needs to know. Codex' hook events carry no name for the
+//   session; Codex keeps the names of its threads in its session index, read from the end like a
+//   transcript.
 //
 // The hub reads only those numbers and settings, only from transcripts in these folders, only from the end
 // of the file; nothing of the content goes anywhere.
@@ -126,6 +128,22 @@ export function codexReviewerOfLine(line: string): string | null {
   return typeof reviewer === 'string' && reviewer.length <= 100 ? reviewer : null;
 }
 
+/** Where Codex keeps the names of its threads (sessions): one line per naming, newest last. */
+export function codexSessionIndex(codexHome: string): string {
+  return path.join(codexHome, 'session_index.jsonl');
+}
+
+const MAX_NAME = 200;
+
+/** A thread's name from a line of Codex' session index ({id, thread_name, updated_at}), if it is this thread's. */
+export function codexNameOfLine(line: string, sessionId: string): string | null {
+  if (!line.includes(sessionId)) return null;
+  const entry = parseObject(line);
+  if (entry?.id !== sessionId || typeof entry.thread_name !== 'string') return null;
+  const name = entry.thread_name.replace(/\s+/g, ' ').trim();
+  return name.length > 0 ? name.slice(0, MAX_NAME) : null;
+}
+
 /** Codex names transcripts with the long-path prefix (\\?\C:\…); the plain path is the same file. */
 export function plainPath(file: string): string {
   return file.replace(/^\\\\\?\\(?=[A-Za-z]:\\)/, '');
@@ -193,6 +211,10 @@ export interface ContextReaderOptions {
   onUsage: (sessionId: string, usage: ContextUsage) => void;
   /** The usage of the plan's limits, as a Codex transcript recorded it last. */
   onPlan?: (plan: PlanView) => void;
+  /** Codex' session index with the names of its threads; without it, Codex sessions keep no name. */
+  codexIndex?: string | null;
+  /** A Codex session's name, as Codex' session index has it last. */
+  onName?: (sessionId: string, name: string) => void;
   log?: (line: string) => void;
   intervalMs?: number;
 }
@@ -231,8 +253,9 @@ export class ContextReader {
     this.pending.clear();
   }
 
-  /** Reads one transcript now (also for tests). */
+  /** Reads one transcript now (also for tests); for a Codex session also its name. */
   async read(sessionId: string, file: string, provider: Provider = 'claude'): Promise<ContextUsage | null> {
+    if (provider === 'codex') await this.readName(sessionId);
     const checked = await this.checked(file, provider);
     if (!checked) return null;
     let usage: ContextUsage | null = null;
@@ -251,6 +274,19 @@ export class ContextReader {
     if (!usage || this.stopped) return null;
     this.options.onUsage(sessionId, usage);
     return usage;
+  }
+
+  /** A Codex session's newest name from Codex' session index, which lies at a fixed place, not in hook data. */
+  private async readName(sessionId: string): Promise<void> {
+    const index = this.options.codexIndex;
+    if (!index || !this.options.onName) return;
+    let name: string | null = null;
+    try {
+      name = await readLastFromEnd(index, (line) => codexNameOfLine(line, sessionId));
+    } catch {
+      return;
+    }
+    if (name && !this.stopped) this.options.onName(sessionId, name);
   }
 
   /** Who approves in a Codex session ("user", "auto_review", …); null when it cannot be read. */

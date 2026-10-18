@@ -71,7 +71,14 @@ export interface HubOptions {
    * How full each session's context is: the token counts of the last answer in its transcript, read only
    * under `root` (~/.claude/projects). Windows by model from the configuration.
    */
-  context?: { root: string; codexRoot?: string | null; windows?: Record<string, number>; intervalMs?: number } | null;
+  context?: {
+    root: string;
+    codexRoot?: string | null;
+    /** Codex' session index, for the names of Codex sessions. */
+    codexIndex?: string | null;
+    windows?: Record<string, number>;
+    intervalMs?: number;
+  } | null;
   /** Where the hub remembers the usage of the plans' limits between runs; without it, in memory only. */
   plansFile?: string | null;
   now?: () => number;
@@ -167,6 +174,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         },
         onPlan: (plan) => {
           if (plans.offer(plan)) scheduleBroadcast();
+        },
+        onName: (sessionId, name) => {
+          if (board.setTitle(sessionId, name)) scheduleBroadcast();
         },
       })
     : null;

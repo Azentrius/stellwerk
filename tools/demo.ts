@@ -100,6 +100,10 @@ fs.writeFileSync(
     })}\n`,
 );
 
+// Codex names its threads in its session index; the demo's Codex session has one.
+const codexIndex = path.join(demoDir, 'codex', 'session_index.jsonl');
+fs.writeFileSync(codexIndex, `${JSON.stringify({ id: 'firmware', thread_name: 'CAN driver update', updated_at: new Date().toISOString() })}\n`);
+
 const hub = await startHub({
   port,
   token,
@@ -112,7 +116,7 @@ const hub = await startHub({
   webRoot: path.join(ROOT, 'dist', 'ui'),
   github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
-  context: { root: transcripts, codexRoot: codexSessions, intervalMs: 300 },
+  context: { root: transcripts, codexRoot: codexSessions, codexIndex, intervalMs: 300 },
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');

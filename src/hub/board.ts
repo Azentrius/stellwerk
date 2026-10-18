@@ -243,6 +243,14 @@ export class Board {
   }
 
   /** How full a session's context is now. Returns false for a session the board does not know (any more). */
+  /** A name from elsewhere than the session's events (Codex' session index); true when it changed. */
+  setTitle(sessionId: string, title: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.title === title) return false;
+    session.title = title;
+    return true;
+  }
+
   setContext(sessionId: string, usage: ContextUsage): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;

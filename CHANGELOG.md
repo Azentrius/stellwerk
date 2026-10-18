@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 – not released yet
+
+Codex sessions show the name of their chat.
+
+- **Names for Codex sessions:** Codex' hook events carry no name, so a Codex session showed its project
+  in bold and nothing below. The hub now takes the chat's name, as the Codex app shows it, from Codex'
+  session index (`%USERPROFILE%\.codex\session_index.jsonl`): the name stands in bold, the project below,
+  as for every other session. A renamed chat shows its new name with its next event. The hub reads that
+  file from its end and keeps only the names of the sessions it shows.
+
 ## 0.4.0 – 2026-10-18
 
 How much of the Claude and Codex plans' limits is used, in the status column, from local sources only; a
