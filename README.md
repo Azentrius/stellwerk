@@ -11,9 +11,9 @@ dispatcher who sees every train on the track diagram and sets the signals.
 ## What it does
 
 - **Every session at a glance.** In the left column, each session with its name (bold) and project, and
-  its status: waiting for approval, waiting for you, working, done, ended. With the number of running
-  subagents and the time of the last activity. The most urgent first. Sessions of other agents than
-  Claude Code say whose they are, e.g. "Codex".
+  its status: waiting for approval, waiting for you, working, done, ended. With whose agent it is
+  ("Claude", "Codex", all alike), the number of running subagents and the time of the last activity. The
+  most urgent first.
 - **How full the context is.** A ring in front of each session shows how much of its context window is
   used, from 0 to 100 %, as the ring in the Claude app does; from 80 % it needs attention. The hub takes
   the token counts of the last answer from the session's transcript.

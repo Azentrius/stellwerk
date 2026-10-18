@@ -53,8 +53,10 @@ export interface Texts {
   ago: (n: number, unit: TimeUnit) => string;
   justNow: string;
   subagents: (n: number) => string;
-  /** Whose agent a session is; shown for every agent but Claude, the usual one (see `providerTag`). */
+  /** Whose agent a session is, shown for every session alike. */
   providers: Record<Provider, string>;
+  /** A moment ago, short (with the provider, in place of "just now"). */
+  now: string;
   /** The context ring of an agent: how full, as its name and tooltip; or not known yet. */
   context: (percent: string) => string;
   contextUnknown: string;
@@ -153,6 +155,7 @@ const en: Texts = {
   justNow: 'just now',
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
   providers: { claude: 'Claude', codex: 'Codex' },
+  now: 'now',
   context: (percent) => `Context ${percent} used`,
   contextUnknown: 'Context not known yet',
   alreadyDecided: 'Already decided.',
@@ -249,6 +252,7 @@ const de: Texts = {
   justNow: 'gerade eben',
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
   providers: { claude: 'Claude', codex: 'Codex' },
+  now: 'jetzt',
   context: (percent) => `Kontext ${percent} genutzt`,
   contextUnknown: 'Kontext noch unbekannt',
   alreadyDecided: 'Bereits entschieden.',
@@ -268,11 +272,6 @@ const de: Texts = {
   address: 'Adresse',
   query: 'Suche',
 };
-
-/** The provider's name in front of a session's details, for every agent but Claude, the usual one. */
-export function providerTag(provider: Provider, texts: Texts): string {
-  return provider === 'claude' ? '' : texts.providers[provider];
-}
 
 export function pickTexts(languages: readonly string[]): { lang: Lang; texts: Texts } {
   const first = (languages[0] ?? 'en').toLowerCase();

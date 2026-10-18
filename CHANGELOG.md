@@ -11,8 +11,9 @@ requests; questions in the app's box at the end of a turn count as waiting for y
   app shows its own card only after the hook; with "Approve for me" nothing is held. Codex' questions
   are listed under "Answer in the app"; the app's helper sessions are not shown; the context ring uses
   the window Codex records. `stellwerk codex uninstall` removes exactly these hooks.
-- **Whose agent:** sessions, answers and cards of other agents than Claude Code carry their name, e.g.
-  "Codex", in front of their details.
+- **Whose agent:** every session, answer and card says whose agent it is, all alike: "Claude · 12 s" next
+  to the name (the time there is short now), "Claude · 0:42" with the waiting time, "Claude · shop-api"
+  on the card.
 
 - **Context ring:** a ring in front of each agent shows how much of its context window is used, 0 to
   100 %, as in the Claude app; from 80 % it needs attention. The hub takes the token counts of the last

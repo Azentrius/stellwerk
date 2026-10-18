@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ChecksState, SessionStatus } from '../src/shared/protocol.js';
-import { pickTexts, providerTag } from '../ui/src/i18n.ts';
+import { pickTexts } from '../ui/src/i18n.ts';
+import { elapsed } from '../ui/src/time.ts';
 import { ICONS } from '../ui/src/icons.ts';
 import { checksState, hubState, sessionState, state, type State } from '../ui/src/states.ts';
 
@@ -53,11 +54,13 @@ test('checks stand as an icon alone in the list: each but "none" has one, and th
   }
 });
 
-test('every agent but Claude, the usual one, says whose it is, in both languages', () => {
-  for (const texts of languages) {
-    assert.equal(providerTag('claude', texts), '');
-    assert.equal(providerTag('codex', texts), 'Codex');
-  }
+test('every agent says whose it is, all alike, with a short time', () => {
+  for (const texts of languages) assert.deepEqual(texts.providers, { claude: 'Claude', codex: 'Codex' });
+  assert.equal(elapsed(500, en), 'now');
+  assert.equal(elapsed(12_000, en), '12 s');
+  assert.equal(elapsed(4 * 60_000 + 5_000, en), '4 min');
+  assert.equal(elapsed(2 * 3_600_000, languages[1]!), '2 h');
+  assert.equal(elapsed(0, languages[1]!), 'jetzt');
 });
 
 test('the hub: connected is good, disconnected an error that says how to fix it', () => {

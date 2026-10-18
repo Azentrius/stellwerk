@@ -8,7 +8,7 @@
 import type { SessionView, WaitingFor } from '../../src/shared/protocol.js';
 import { naming } from './agents.ts';
 import { entry } from './dom.ts';
-import { providerTag, type Texts } from './i18n.ts';
+import type { Texts } from './i18n.ts';
 import { state } from './states.ts';
 import { duration } from './time.ts';
 
@@ -25,10 +25,12 @@ export function renderAnswers(list: HTMLElement, sessions: Array<SessionView & {
   list.replaceChildren(
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);
-      const since = session.waitingSince === null ? '' : texts.since(duration(now - session.waitingSince));
-      const details = [providerTag(session.provider, texts), session.question ?? project].filter(Boolean).join(' · ');
+      // Whose agent it is, with how long it has been waiting ("Codex · 0:42").
+      const since = [texts.providers[session.provider], session.waitingSince === null ? '' : duration(now - session.waitingSince)]
+        .filter(Boolean)
+        .join(' · ');
       // The same state as "waiting for you" in the agents column: a note, with the reason as its word.
-      return entry('answer entry--short', name, since, details, state('info', texts.waitingFor[session.waitingFor]));
+      return entry('answer entry--short', name, since, session.question ?? project, state('info', texts.waitingFor[session.waitingFor]));
     }),
   );
 }
