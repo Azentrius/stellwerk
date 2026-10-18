@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 – not released yet
+## 0.3.0 – 2026-10-18
 
 Codex joins; how full each session's context is; more room for the repository in the list of open pull
 requests; questions in the app's box at the end of a turn count as waiting for you.

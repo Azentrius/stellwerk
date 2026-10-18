@@ -1,6 +1,6 @@
 {
   "name": "stellwerk",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A signal box for your AI agents: a local dashboard for Claude Code sessions and their permission requests.",
   "license": "Apache-2.0",
   "private": true,

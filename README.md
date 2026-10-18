@@ -53,10 +53,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.2.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.2.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.2.0.zip -DestinationPath .
-cd stellwerk-0.2.0
+(Get-FileHash stellwerk-0.3.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.3.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.3.0.zip -DestinationPath .
+cd stellwerk-0.3.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```

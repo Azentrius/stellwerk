@@ -1,6 +1,6 @@
 # Roadmap
 
-As of 2026-10-16. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
+As of 2026-10-18. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
 until they are decided.
 
 **Guardrails for every stage** (they keep applying):
@@ -35,6 +35,15 @@ part of stage 2). Allowing and denying by touch were checked on the real 12.3″
 
 ---
 
+## 0.3.0 – Codex, context, questions at the end of a turn ✅
+
+Done in 0.3.0 (see [CHANGELOG](CHANGELOG.md)): the Codex app's sessions and approvals next to the others,
+every agent marked alike (the first part of stage 5); how full each session's context is; questions in
+the app's box at the end of a turn count as waiting for you; the checks of a pull request as an icon.
+Allowing and denying a Codex request on the display were checked on the real setup.
+
+---
+
 ## Stage 2 – System values and alerts
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts
@@ -58,7 +67,7 @@ stage begins with its own security review.
 
 ## Stage 5 – Codex agents
 
-The Codex app for Windows: in 0.2.1, after a probe of the app (it runs command hooks once they are
+The Codex app for Windows: in 0.3.0, after a probe of the app (it runs command hooks once they are
 allowed, and shows its own approval card only after the hook). Still open: the Codex command line, and
 the usage of the plan, which Codex records in its transcripts (`rate_limits`).
 
