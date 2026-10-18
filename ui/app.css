@@ -228,6 +228,8 @@ button { font: inherit; }
 .monitors__ok { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-xs) var(--sp-md); margin: 0; color: var(--text-subtle); }
 .monitors__ok .az-label { white-space: nowrap; }
 .monitors__state { margin-block-start: auto; color: var(--text-subtle); }
+/* GitHub's line at the foot of its column, below the pull requests, as Uptime Kuma's is in its own. */
+.col--waiting .github-state { flex: none; margin-block-start: var(--sp-sm); }
 
 /* ---------- status column ---------- */
 .col--status { gap: var(--sp-sm); }
@@ -241,10 +243,10 @@ button { font: inherit; }
 .last-event, .github-state, .hardware-state { color: var(--text-subtle); }
 /* An error says what happened and how to fix it (az-alert), in the display's text size; a little tighter
    than usual, so that two of them fit in the narrow column. */
-:is(.col--status, .col--monitors) .az-alert { gap: var(--sp-xs) var(--sp-sm); padding: var(--sp-sm); }
-:is(.col--status, .col--monitors) .az-alert__icon { font-size: 1rem; line-height: 1.35; }
-:is(.col--status, .col--monitors) .az-alert__title { font-size: 1rem; }
-:is(.col--status, .col--monitors) .az-alert code { font-family: var(--font-mono); font-size: 1rem; }
+:is(.col--status, .col--waiting, .col--monitors) .az-alert { gap: var(--sp-xs) var(--sp-sm); padding: var(--sp-sm); }
+:is(.col--status, .col--waiting, .col--monitors) .az-alert__icon { font-size: 1rem; line-height: 1.35; }
+:is(.col--status, .col--waiting, .col--monitors) .az-alert__title { font-size: 1rem; }
+:is(.col--status, .col--waiting, .col--monitors) .az-alert code { font-family: var(--font-mono); font-size: 1rem; }
 
 /* Hardware and the plans' usage at the foot of the status column: label, bar and percent, then a value
    (temperature, memory, when a limit starts again). All rows share one grid, so the bars line up. */

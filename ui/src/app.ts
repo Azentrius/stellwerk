@@ -215,7 +215,7 @@ function tick(): void {
 
 /**
  * Puts plain text, a state (as a label with its icon) or a problem (as an alert that says how to fix it)
- * into a line of the status column, when it changed.
+ * into a status line (the hub's, GitHub's, the hardware's, Uptime Kuma's), when it changed.
  */
 function show(node: HTMLElement, content: string | State | Problem): void {
   const key = JSON.stringify(content);

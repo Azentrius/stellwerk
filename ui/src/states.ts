@@ -77,8 +77,8 @@ export function hubState(connected: boolean, texts: Texts, signedIn = true): Sta
 }
 
 /**
- * The GitHub line in the status column: when GitHub was last asked, or what failed and how to fix it. Null
- * without a token.
+ * The GitHub line at the foot of the "waiting for you" column, below the pull requests: when GitHub was
+ * last asked, or what failed and how to fix it. Null without a token.
  */
 export function githubLine(github: GitHubView | null, now: number, texts: Texts): string | Problem | null {
   if (!github) return null;
