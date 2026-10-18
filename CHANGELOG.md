@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 – not released yet
+## 0.4.0 – 2026-10-18
 
 How much of the Claude and Codex plans' limits is used, in the status column, from local sources only; a
 nearly full context turns red.
