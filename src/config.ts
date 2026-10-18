@@ -33,6 +33,8 @@ export interface Paths {
   displayProfileDir: string;
   /** The read-only GitHub token for the list of open pull requests. */
   githubTokenFile: string;
+  /** The API key of Uptime Kuma, for its monitors. */
+  uptimeKumaKeyFile: string;
   /** The last usage of the plans' limits, so the display has it again after a restart. */
   plansFile: string;
   /** The display's start file: signs the display in at the hub; only the current user can read it. */
@@ -59,6 +61,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     hubLogFile: path.join(dataDir, 'hub.log'),
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
+    uptimeKumaKeyFile: path.join(dataDir, 'uptime-kuma-key'),
     plansFile: path.join(dataDir, 'plans.json'),
     displayStartFile: path.join(dataDir, 'display.html'),
     hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),
@@ -68,6 +71,22 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
 
 /** A GitHub user or organisation name. */
 export const GITHUB_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+
+/**
+ * Uptime Kuma's address as the hub keeps it: http or https, a host and maybe a port, nothing else (no
+ * path, user, query or fragment), so the hub can ask only its /metrics. Null for anything else.
+ */
+export function uptimeKumaAddress(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) return null;
+  return url.origin;
+}
 
 const configSchema = z.strictObject({
   port: z.number().int().min(1024).max(65535).default(4780),
@@ -83,6 +102,12 @@ const configSchema = z.strictObject({
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */
   githubOwner: z.string().regex(GITHUB_OWNER).optional(),
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
+  /** Uptime Kuma's address, e.g. "http://192.168.0.130:3001" (with an API key from `stellwerk kuma key`). */
+  uptimeKumaUrl: z
+    .string()
+    .refine((value) => uptimeKumaAddress(value) === value, 'http(s)://host[:port], without a path')
+    .optional(),
+  uptimeKumaIntervalSeconds: z.number().int().min(30).max(3600).default(60),
   /** Show CPU, memory and graphics card from LibreHardwareMonitor (set by `stellwerk hardware install`). */
   hardwareMonitor: z.boolean().default(false),
   /**

@@ -6,10 +6,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ChecksState, GitHubView, HardwareView, SessionStatus } from '../../src/shared/protocol.js';
+import type { ChecksState, FailingMonitor, GitHubView, HardwareView, SessionStatus, UptimeKumaView } from '../../src/shared/protocol.js';
 import type { Texts } from './i18n.ts';
 import type { IconName } from './icons.ts';
-import { ago } from './time.ts';
+import { ago, elapsed } from './time.ts';
 
 /** Without judgement, good, a note, attention, an error. */
 export type Tone = 'neutral' | 'success' | 'info' | 'warning' | 'danger';
@@ -95,6 +95,27 @@ export function hardwareLine(hardware: HardwareView | null, texts: Texts): strin
   if (!hardware || hardware.values) return null;
   if (hardware.problem) return { title: texts.hardware.problem[hardware.problem], fix: texts.hardware.fix[hardware.problem] };
   return texts.hardware.asking;
+}
+
+/** A failing monitor: down is an error, pending (Uptime Kuma tries again before it says down) needs attention. */
+export function monitorState(status: FailingMonitor['status'], texts: Texts): State {
+  return state(status === 'down' ? 'danger' : 'warning', texts.monitorStatus[status]);
+}
+
+/** How long a monitor fails, as far as the hub saw it: "for 4 min"; nothing when it does not know. */
+export function failingFor(monitor: FailingMonitor, now: number, texts: Texts): string {
+  return monitor.since === null ? '' : texts.since(elapsed(now - monitor.since, texts));
+}
+
+/**
+ * The line below the monitors: when Uptime Kuma was last asked, or what failed and how to fix it. Null when
+ * Uptime Kuma is not set up.
+ */
+export function uptimeKumaLine(kuma: UptimeKumaView | null, now: number, texts: Texts): string | Problem | null {
+  if (!kuma) return null;
+  if (kuma.problem) return { title: texts.uptimeKuma.problem[kuma.problem], fix: texts.uptimeKuma.fix[kuma.problem] };
+  if (kuma.updatedAt === null) return texts.uptimeKuma.asking;
+  return texts.uptimeKuma.synced(ago(now - kuma.updatedAt, texts));
 }
 
 /** Splits a text at its backticks: what stands between them is a command, the rest plain text. */

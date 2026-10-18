@@ -6,7 +6,7 @@ A desk display for a wide second screen (made for 1920×720, ready for touch) th
 Claude Code and Codex session and lets you answer their permission requests right there. Like a
 dispatcher who sees every train on the track diagram and sets the signals.
 
-![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, room for monitoring, clock, hub, hardware and plan usage on the right](docs/display.png)
+![The display at 1920×720: the sessions with how full their context is on the left, what waits for you next to them, Uptime Kuma's monitors with the failing ones on top, clock, hub, hardware and plan usage on the right](docs/display.png)
 
 ## What it does
 
@@ -37,9 +37,11 @@ dispatcher who sees every train on the track diagram and sets the signals.
   owner (all repositories) are listed too, each with the state of its Actions runs.
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
   from LibreHardwareMonitor, which Stellwerk sets up for you.
+- **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
+  out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else and needs a token for every hook
-  request. The display loads nothing from the internet. The only connection the hub opens to another
-  machine is to `api.github.com`, and only once you set up a GitHub token.
+  request. The display loads nothing from the internet. The hub opens connections to other machines only
+  to `api.github.com` and to your Uptime Kuma, each only once you set it up.
 - English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
   one). One factor scales every size.
 
@@ -56,10 +58,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.4.2.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.4.2.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.4.2.zip -DestinationPath .
-cd stellwerk-0.4.2
+(Get-FileHash stellwerk-0.5.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.5.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.5.0.zip -DestinationPath .
+cd stellwerk-0.5.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -198,6 +200,40 @@ A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its versio
 `stellwerk hardware install` again after updating. `stellwerk hardware uninstall` stops it and removes
 the task, the firewall rule and the folder.
 
+## Uptime Kuma
+
+Optional. The third column shows the monitors of your [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+(version 2): what fails stands out, what works is only a number.
+
+In Uptime Kuma create an API key (Settings › API Keys › Add API Key, a name such as "Stellwerk"). Then,
+with Uptime Kuma's address:
+
+```powershell
+stellwerk kuma key --url http://192.168.0.130:3001
+```
+
+It asks for the key without showing it, tries it once against the address's `/metrics` and keeps it,
+readable by your Windows user only, in `%LOCALAPPDATA%\stellwerk\uptime-kuma-key`; the address goes into
+`config.json`. Restart the hub afterwards.
+
+Every minute the hub then asks Uptime Kuma for `/metrics`, with the key as the password, and keeps of each
+monitor only its name and status:
+
+- **Down:** on top, the name in large letters with a red label, and how long the hub has seen it down.
+- **Retrying:** a monitor Uptime Kuma tries again before it says down ("pending"), quieter below.
+- **Everything else** is a number: "35 up", "1 in maintenance". Paused monitors are not counted, since
+  Uptime Kuma leaves them out of its metrics, and neither are groups, which only sum up others.
+
+How long a monitor fails is what the hub saw itself: a monitor that was already failing when the hub
+started, or that changed while Uptime Kuma did not answer, shows no time until it changes again. At the
+foot of the column the display says when Uptime Kuma was last asked, or why that failed (not reachable,
+key rejected, unexpected answer) and how to fix it.
+
+An API key of Uptime Kuma 2 opens `/metrics` and nothing else: it can neither log in nor change a
+monitor. On a plain `http://` address the key and the metrics go over your network unencrypted, so use it
+only within your own network, or give an `https://` address. The key is never logged and never sent to
+the display. `stellwerk kuma remove` deletes it; the hub then opens no connection to Uptime Kuma.
+
 ## Codex
 
 Optional. Stellwerk shows the sessions of the Codex app too, marked "Codex", and lets you answer their
@@ -313,6 +349,8 @@ session appears with its first event, which in the desktop app is the first prom
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
 | `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
+| `uptimeKumaUrl` | Uptime Kuma's address, such as `http://192.168.0.130:3001` (no path); set by `stellwerk kuma key --url`. Needs the API key. |
+| `uptimeKumaIntervalSeconds` | How often to ask Uptime Kuma: 30 to 3600, 60 by default. |
 | `contextWindows` | Context windows by model id for the context meters, for models Stellwerk does not know, e.g. `{ "claude-sonnet-5-5": 1000000 }`. Known: Opus 5.5 with 1M. Otherwise 200k, or 1M once more than 200k are in use. Codex records its window itself. |
 | `codexHoldSeconds` | How long a Codex request waits on the display before the Codex app shows its own card: 10 to 35, 30 by default. |
 
@@ -330,6 +368,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
 | `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |
 | `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
+| `%LOCALAPPDATA%\stellwerk\uptime-kuma-key` | The API key of Uptime Kuma, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
@@ -358,8 +397,9 @@ Restart the hub after a change.
   DNS rebinding and foreign pages) and the page token. A broken
   or oversized message closes only its own connection.
 - Nothing is allowed automatically: no rules, no "always allow".
-- The hub starts no programs. Its only connection to another machine is to `api.github.com`, for the
-  list of pull requests, and only with a fine-grained read-only token you set up. Besides that it asks
+- The hub starts no programs. It connects to other machines only to `api.github.com`, for the list of
+  pull requests, and only with a fine-grained read-only token you set up; and to Uptime Kuma at the
+  address you set up, only for `/metrics` and only with its API key. Besides that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
@@ -406,6 +446,7 @@ If the console stays silent, Claude Code sends nothing: check that the hooks are
 ```powershell
 stellwerk autostart uninstall
 stellwerk github remove
+stellwerk kuma remove
 stellwerk hooks uninstall
 stellwerk codex uninstall
 stellwerk hardware uninstall # as administrator: LibreHardwareMonitor, its task and firewall rule

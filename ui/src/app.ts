@@ -1,6 +1,6 @@
 // Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
-// requests, answers due in the app, open pull requests), the hub's state, the hardware values and the usage
-// of the plans' limits, and sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
+// requests, answers due in the app, open pull requests), Uptime Kuma's monitors, the hub's state, the
+// hardware values and the usage of the plans' limits, and sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
 // serves a newer display after an update, the page loads itself again.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -11,10 +11,11 @@ import { renderAnswers, waitingForAnswer } from './answers.ts';
 import { alert, byId, icon, label } from './dom.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
+import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { shouldReload } from './reload.ts';
-import { githubLine, hardwareLine, hubState, type Problem, type State } from './states.ts';
+import { githubLine, hardwareLine, hubState, uptimeKumaLine, type Problem, type State } from './states.ts';
 import { ago, clock } from './time.ts';
 
 const WS_PROTOCOL = 'stellwerk.v1';
@@ -54,6 +55,11 @@ const gauges = byId('gauges');
 const hardwareState = byId('hardware-state');
 const plansNode = byId('plans');
 const gaugeSections = byId('gauge-sections');
+const monitorsNode = byId('monitors');
+const monitorsCount = byId('monitors-count');
+const monitorsFailing = byId('monitors-failing');
+const monitorNodes = { down: byId('monitors-down'), pending: byId('monitors-pending'), ok: byId('monitors-ok') };
+const monitorsState = byId('monitors-state');
 const waitingCount = byId('waiting-count');
 const waitingList = byId('waiting-list');
 const waitingEmpty = byId('waiting-empty');
@@ -195,6 +201,16 @@ function tick(): void {
   plansNode.hidden = plans.length === 0;
   renderPlans(plansNode, plans, now, texts);
   gaugeSections.classList.toggle('gauge-sections--more', gaugeSections.scrollHeight - gaugeSections.clientHeight > 4);
+
+  // Uptime Kuma's column; while the hub is away its monitors are old news too.
+  const kuma = connected ? (state?.uptimeKuma ?? null) : null;
+  monitorsNode.hidden = kuma === null;
+  const failing = renderMonitors(monitorNodes, kuma, now, texts);
+  monitorsCount.textContent = failing > 0 ? `(${failing})` : '';
+  monitorsFailing.hidden = failing === 0;
+  monitorsFailing.classList.toggle('monitors__failing--more', monitorsFailing.scrollHeight - monitorsFailing.clientHeight > 4);
+  const kumaNote = uptimeKumaLine(kuma, now, texts);
+  if (kumaNote) show(monitorsState, kumaNote);
 }
 
 /**

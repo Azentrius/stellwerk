@@ -584,6 +584,39 @@ describe('hardware values', () => {
   });
 });
 
+describe("Uptime Kuma's monitors", () => {
+  test('without Uptime Kuma the state has none', async () => {
+    const { port } = await startTestHub();
+    const screen = await display(port);
+    assert.equal((await screen.state(() => true)).uptimeKuma, null);
+    screen.close();
+  });
+
+  test('with it the display gets what fails and how many work, never the API key', async () => {
+    const key = `uk1_${'k3Y-_'.repeat(8)}`;
+    const calls: Array<{ url: string; authorization: string | undefined }> = [];
+    const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), authorization: (init?.headers as Record<string, string>).Authorization });
+      return new Response(
+        '# HELP monitor_status Monitor Status (1 = UP, 0= DOWN, 2= PENDING, 3= MAINTENANCE)\n# TYPE monitor_status gauge\n' +
+          'monitor_status{monitor_id="1",monitor_name="Server - web",monitor_type="ping"} 1\n' +
+          'monitor_status{monitor_id="2",monitor_name="Backup - web",monitor_type="push"} 0\n' +
+          'monitor_status{monitor_id="3",monitor_name="Docs",monitor_type="http"} 3\n',
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    const { port } = await startTestHub({ uptimeKuma: { url: 'http://192.0.2.10:3001', key, intervalMs: 60_000, fetch: fakeFetch } });
+    const screen = await display(port);
+    const state = await screen.state((s) => s.uptimeKuma?.monitors !== null && s.uptimeKuma?.monitors !== undefined);
+    assert.deepEqual(state.uptimeKuma?.monitors, { failing: [{ name: 'Backup - web', status: 'down', since: null }], up: 1, maintenance: 1 });
+    assert.equal(state.uptimeKuma?.problem, null);
+    assert.doesNotMatch(JSON.stringify(state), new RegExp(key));
+    assert.deepEqual(calls.map((c) => c.url), ['http://192.0.2.10:3001/metrics']);
+    assert.equal(calls[0]!.authorization, `Basic ${Buffer.from(`stellwerk:${key}`).toString('base64')}`);
+    screen.close();
+  });
+});
+
 describe('Codex', () => {
   const RECORDED_AT = '2026-10-18T01:00:05.000Z';
   /** A Codex transcript folder with one rollout whose last turn has the given approval reviewer. */

@@ -8,7 +8,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { defaultPaths, loadConfig, setConfigValue } from '../src/config.ts';
-import { ensureToken, isGitHubToken, readGitHubToken, readToken, removeGitHubToken, saveGitHubToken, writeDisplayStart } from '../src/token.ts';
+import {
+  ensureToken,
+  isGitHubToken,
+  isUptimeKumaKey,
+  readGitHubToken,
+  readToken,
+  readUptimeKumaKey,
+  removeGitHubToken,
+  removeUptimeKumaKey,
+  saveGitHubToken,
+  saveUptimeKumaKey,
+  writeDisplayStart,
+} from '../src/token.ts';
 
 function tempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-config-'));
@@ -22,6 +34,7 @@ test('without a file every setting has its default', () => {
     scale: 1,
     debugRawLog: false,
     githubIntervalSeconds: 120,
+    uptimeKumaIntervalSeconds: 60,
     hardwareMonitor: false,
     codexHoldSeconds: 30,
     contextWindows: {},
@@ -82,6 +95,35 @@ test('only fine-grained GitHub tokens are kept; they can be read back and remove
   assert.equal(removeGitHubToken(file), true);
   assert.equal(readGitHubToken(file), null);
   assert.equal(removeGitHubToken(file), false);
+});
+
+test("Uptime Kuma's address is kept as an origin, the interval at least half a minute", () => {
+  const file = path.join(tempDir(), 'config.json');
+  setConfigValue(file, 'uptimeKumaUrl', 'http://192.168.0.130:3001');
+  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.168.0.130:3001');
+  for (const url of ['http://192.168.0.130:3001/', 'http://192.168.0.130:3001/metrics', 'ftp://192.168.0.130', 'http://u:p@host']) {
+    assert.throws(() => setConfigValue(file, 'uptimeKumaUrl', url), /uptimeKumaUrl/, url);
+  }
+  assert.throws(() => setConfigValue(file, 'uptimeKumaIntervalSeconds', 10));
+  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.168.0.130:3001');
+});
+
+test("only Uptime Kuma's API keys are kept; they can be read back and removed", () => {
+  const key = `uk12_${'Ab9-_'.repeat(8)}`;
+  assert.equal(isUptimeKumaKey(key), true);
+  for (const other of ['uk_abc', `uk1-${'a'.repeat(40)}`, `github_pat_${'a'.repeat(30)}`, `uk1_${'a'.repeat(40)} `, `uk1_${'a'.repeat(20)}/x`]) {
+    assert.equal(isUptimeKumaKey(other), false, other);
+  }
+  const file = path.join(tempDir(), 'sub', 'uptime-kuma-key');
+  assert.throws(() => saveUptimeKumaKey(file, 'password123'), /API key of Uptime Kuma/);
+  assert.equal(fs.existsSync(file), false);
+  saveUptimeKumaKey(file, key);
+  assert.equal(readUptimeKumaKey(file), key);
+  fs.writeFileSync(file, 'something else\n');
+  assert.throws(() => readUptimeKumaKey(file), /stellwerk kuma key/);
+  assert.equal(removeUptimeKumaKey(file), true);
+  assert.equal(readUptimeKumaKey(file), null);
+  assert.equal(removeUptimeKumaKey(file), false);
 });
 
 test('a file written by a Windows editor (with byte order mark) is read', () => {

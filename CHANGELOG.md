@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0 – 2026-10-18
+
+Uptime Kuma's monitors in the third column: what is down stands out, what works is a number.
+
+- **Monitors:** with `stellwerk kuma key --url ADDRESS` and an API key of Uptime Kuma 2, the column kept
+  free so far shows its monitors. A monitor that is down stands on top, its name in large letters with a
+  red label and how long the hub has seen it down; one that Uptime Kuma is trying again ("pending") stands
+  quieter below; everything else is only a number ("35 up", "1 in maintenance"). Paused monitors and
+  groups are not counted. The column's title counts what fails, its foot says when Uptime Kuma was last
+  asked, or what failed and how to fix it.
+- **One more connection, and only that:** every minute the hub asks Uptime Kuma at the address set up
+  for `/metrics`, with the key as the password; such a key opens nothing else in Uptime Kuma. The address
+  is http or https, a host and a port, nothing else; redirects are not followed; of the answer the hub
+  keeps each monitor's name and status. The key is kept like the hook token, readable by you only, never
+  logged and never sent to the display. On a plain `http://` address key and metrics cross your network
+  unencrypted. `stellwerk kuma remove` deletes the key.
+- **Since when, honestly:** how long a monitor fails is what the hub saw itself; one already failing
+  when the hub started, or that changed while Uptime Kuma did not answer, shows no time until it changes
+  again.
+
 ## 0.4.2 – 2026-10-18
 
 The display signs in, so another account on the computer can no longer allow requests; the hub no longer

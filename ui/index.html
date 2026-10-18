@@ -39,7 +39,17 @@
           <p class="az-empty__title" data-text="allClear"></p>
         </div>
       </section>
-      <section class="col col--spare" aria-hidden="true"></section>
+      <section class="col col--monitors" aria-labelledby="monitors-title">
+        <div class="monitors" id="monitors" hidden>
+          <h2 class="col__title" id="monitors-title"><span data-text="monitorsTitle"></span> <span class="count" id="monitors-count"></span></h2>
+          <div class="monitors__failing" id="monitors-failing">
+            <ul class="entries" id="monitors-down"></ul>
+            <ul class="entries" id="monitors-pending"></ul>
+          </div>
+          <p class="monitors__ok" id="monitors-ok"></p>
+          <div class="monitors__state" id="monitors-state"></div>
+        </div>
+      </section>
       <aside class="col col--status">
         <h1 class="wordmark">Stellwerk</h1>
         <p class="clock" id="clock"></p>

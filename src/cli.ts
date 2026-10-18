@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stellwerk's command line: start the hub; add and remove the hooks, the firewall rule, the start with
-// Windows, the GitHub token and the hardware monitor.
+// Windows, the GitHub token, the hardware monitor and Uptime Kuma's API key.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,8 +10,9 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { format, parseArgs } from 'node:util';
-import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue } from './config.ts';
+import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
+import { UptimeKumaWatcher, describeUptimeKumaProblem } from './hub/kuma.ts';
 import {
   HARDWARE_INTERVAL_MS,
   LHM_PORT,
@@ -74,7 +75,18 @@ import {
   stopProgram,
   taskExists,
 } from './setup/windows.ts';
-import { ensureToken, isGitHubToken, readGitHubToken, removeGitHubToken, saveGitHubToken, writeDisplayStart } from './token.ts';
+import {
+  ensureToken,
+  isGitHubToken,
+  isUptimeKumaKey,
+  readGitHubToken,
+  readUptimeKumaKey,
+  removeGitHubToken,
+  removeUptimeKumaKey,
+  saveGitHubToken,
+  saveUptimeKumaKey,
+  writeDisplayStart,
+} from './token.ts';
 
 /** hub.log is moved to hub.log.1 when it grows beyond this at a start. */
 const MAX_HUB_LOG_BYTES = 1024 * 1024;
@@ -110,6 +122,11 @@ Usage:
       (input hidden), tries it once against api.github.com and keeps it for the hub.
   stellwerk github remove
       Forget the GitHub token; the hub then opens no connection to GitHub.
+  stellwerk kuma key [--url <address>]
+      Show Uptime Kuma's monitors: asks for an API key of Uptime Kuma (input hidden), tries it
+      once against the address's /metrics and keeps both for the hub.
+  stellwerk kuma remove
+      Forget the API key; the hub then opens no connection to Uptime Kuma.
   stellwerk hardware install [--yes]
       Show processor, graphics card and memory: set up LibreHardwareMonitor ${LHM_VERSION} from its
       official release (checked by SHA-256) with a password, a firewall rule and a logon task
@@ -136,6 +153,7 @@ async function main(): Promise<void> {
       'log-file': { type: 'string' },
       'exit-with-parent': { type: 'boolean', default: false },
       owner: { type: 'string' },
+      url: { type: 'string' },
       screen: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', default: false },
@@ -156,6 +174,7 @@ async function main(): Promise<void> {
     return autostart(action, values.yes, values.screen);
   }
   if (command === 'github' && (action === 'token' || action === 'remove')) return githubToken(action, values.owner);
+  if (command === 'kuma' && (action === 'key' || action === 'remove')) return uptimeKumaKey(action, values.url);
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   console.error(USAGE);
@@ -181,6 +200,11 @@ async function serve(
   const hardware = config.hardwareMonitor
     ? { settingsFile: path.join(paths.hardwareDir, LHM_SETTINGS_FILE), intervalMs: HARDWARE_INTERVAL_MS }
     : null;
+  const kumaKey = config.uptimeKumaUrl ? readUptimeKumaKey(paths.uptimeKumaKeyFile) : null;
+  const uptimeKuma =
+    config.uptimeKumaUrl && kumaKey
+      ? { url: config.uptimeKumaUrl, key: kumaKey, intervalMs: config.uptimeKumaIntervalSeconds * 1000 }
+      : null;
   let hub;
   try {
     hub = await startHub({
@@ -198,6 +222,7 @@ async function serve(
       simulateHang,
       github,
       hardware,
+      uptimeKuma,
       context: {
         root: defaultTranscriptsRoot(),
         codexRoot: codexTranscriptsRoot(paths.codexHome),
@@ -233,6 +258,11 @@ async function serve(
     console.log(`githubOwner is set, but there is no GitHub token. Run "stellwerk github token".`);
   }
   if (hardware) console.log(`Hardware values from LibreHardwareMonitor on 127.0.0.1:${LHM_PORT}, every ${HARDWARE_INTERVAL_MS / 1000} s.`);
+  if (uptimeKuma) {
+    console.log(`Monitors of Uptime Kuma from ${uptimeKuma.url}/metrics, every ${config.uptimeKumaIntervalSeconds} s.`);
+  } else if (config.uptimeKumaUrl) {
+    console.log(`uptimeKumaUrl is set, but there is no API key. Run "stellwerk kuma key".`);
+  }
   console.log('Ctrl+C stops the hub.\n');
 
   const stop = () => void hub.close().then(() => process.exit(0));
@@ -393,6 +423,36 @@ async function githubToken(action: 'token' | 'remove', owner: string | undefined
   saveGitHubToken(paths.githubTokenFile, token);
   if (owner && owner !== config.githubOwner) setConfigValue(paths.configFile, 'githubOwner', owner);
   console.log(`Saved to ${paths.githubTokenFile} (readable by you only). Restart the hub to show the pull requests.`);
+}
+
+async function uptimeKumaKey(action: 'key' | 'remove', url: string | undefined): Promise<void> {
+  const paths = defaultPaths();
+  if (action === 'remove') {
+    console.log(removeUptimeKumaKey(paths.uptimeKumaKeyFile) ? 'API key of Uptime Kuma removed. Restart the hub.' : 'There is no API key of Uptime Kuma.');
+    return;
+  }
+  const address = url === undefined ? undefined : uptimeKumaAddress(url);
+  if (address === null) throw new Error(`"${url}" is not an address like http://192.168.0.130:3001 (http or https, no path).`);
+  const config = loadConfig(paths.configFile);
+  const target = address ?? config.uptimeKumaUrl;
+  if (!target) throw new Error("Where is Uptime Kuma? Give its address with --url, e.g. --url http://192.168.0.130:3001.");
+
+  console.log(`An API key of Uptime Kuma at ${target}: in Uptime Kuma, Settings, API Keys, "Add API Key".`);
+  console.log('Such a key can read /metrics and nothing else.');
+  if (target.startsWith('http:')) console.log('The address is plain http: the key goes over your network unencrypted, like the metrics.');
+  const key = (await readSecret('Paste the key (input stays hidden): ')).trim();
+  if (!isUptimeKumaKey(key)) throw new Error('That is not an API key of Uptime Kuma (it starts with "uk" and a number). Nothing saved.');
+
+  // One round before saving, so a wrong key or address shows now, not on the display.
+  const trial = new UptimeKumaWatcher({ url: target, key, intervalMs: 0 });
+  await trial.poll();
+  if (trial.problem) throw new Error(`Uptime Kuma ${describeUptimeKumaProblem(trial.problem)} Nothing saved.`);
+  const { failing, up, maintenance } = trial.monitors!;
+  console.log(`Works: ${up} up, ${failing.length} failing, ${maintenance} in maintenance.`);
+
+  saveUptimeKumaKey(paths.uptimeKumaKeyFile, key);
+  if (target !== config.uptimeKumaUrl) setConfigValue(paths.configFile, 'uptimeKumaUrl', target);
+  console.log(`Saved to ${paths.uptimeKumaKeyFile} (readable by you only). Restart the hub to show the monitors.`);
 }
 
 async function codex(action: 'install' | 'uninstall', yes: boolean): Promise<void> {

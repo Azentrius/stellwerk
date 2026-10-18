@@ -9,7 +9,7 @@ import { pickTexts } from '../ui/src/i18n.ts';
 import { elapsed } from '../ui/src/time.ts';
 import { ICONS } from '../ui/src/icons.ts';
 import { naming } from '../ui/src/naming.ts';
-import { checksState, hubState, sessionState, state, type State } from '../ui/src/states.ts';
+import { checksState, failingFor, hubState, monitorState, sessionState, state, type State } from '../ui/src/states.ts';
 
 const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
 const en = languages[0]!;
@@ -80,7 +80,20 @@ test('every state in both languages has its icon and a word, never colour alone'
     assert.ok('tone' in connected);
     assertSpoken(connected);
     for (const reason of Object.values(texts.waitingFor)) assertSpoken(state('info', reason));
+    for (const status of ['down', 'pending'] as const) assertSpoken(monitorState(status, texts));
+    assertSpoken(state('success', texts.monitorsUp(35)));
   }
+});
+
+test('monitors: down is an error, pending (Uptime Kuma tries again) needs attention', () => {
+  assert.deepEqual(monitorState('down', en), { tone: 'danger', icon: 'exclamation-circle', text: 'Down' });
+  assert.deepEqual(monitorState('pending', languages[1]!), { tone: 'warning', icon: 'exclamation-triangle', text: 'Prüft erneut' });
+  assert.equal(en.monitorsUp(35), '35 up');
+  assert.equal(languages[1]!.monitorsUp(35), '35 in Ordnung');
+  // How long, as far as the hub saw it; nothing when it was already failing at the first answer.
+  assert.equal(failingFor({ name: 'Server', status: 'down', since: 0 }, 4 * 60_000 + 5_000, en), 'for 4 min');
+  assert.equal(failingFor({ name: 'Server', status: 'down', since: 0 }, 13_000, languages[1]!), 'seit 13 s');
+  assert.equal(failingFor({ name: 'Server', status: 'down', since: null }, 13_000, en), '');
 });
 
 test('a session is named by its title over its project; a chat without a project shows no second line', () => {

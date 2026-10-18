@@ -10,6 +10,7 @@ import type {
   PermissionOutcome,
   Provider,
   SessionStatus,
+  UptimeKumaProblem,
   WaitingFor,
 } from '../../src/shared/protocol.js';
 
@@ -39,6 +40,19 @@ export interface Texts {
   hardwareTitle: string;
   parts: { cpu: string; gpu: string; memory: string };
   hardware: { asking: string; problem: Record<HardwareProblem, string>; fix: Record<HardwareProblem, string> };
+  /** The column of Uptime Kuma's monitors. */
+  monitorsTitle: string;
+  monitorStatus: { down: string; pending: string };
+  /** The monitors that do not fail, as numbers only: "35 up", "1 in maintenance". */
+  monitorsUp: (n: number) => string;
+  monitorsMaintenance: (n: number) => string;
+  monitorsNone: string;
+  uptimeKuma: {
+    asking: string;
+    synced: (ago: string) => string;
+    problem: Record<UptimeKumaProblem, string>;
+    fix: Record<UptimeKumaProblem, string>;
+  };
   /** The title over a provider's limits: "Codex plan usage". */
   planTitle: (provider: string) => string;
   /** A limit's window by its length in minutes: "5 h", "Week". */
@@ -147,6 +161,25 @@ const en: Texts = {
       unexpected: 'Run `stellwerk hardware install` again as administrator.',
     },
   },
+  monitorsTitle: 'Monitoring',
+  monitorStatus: { down: 'Down', pending: 'Retrying' },
+  monitorsUp: (n) => `${n} up`,
+  monitorsMaintenance: (n) => `${n} in maintenance`,
+  monitorsNone: 'No monitors reported.',
+  uptimeKuma: {
+    asking: 'Uptime Kuma: asking',
+    synced: (ago) => `Uptime Kuma: updated ${ago}`,
+    problem: {
+      unreachable: 'Uptime Kuma: not reachable',
+      rejected: 'Uptime Kuma: key rejected',
+      unexpected: 'Uptime Kuma: unexpected answer',
+    },
+    fix: {
+      unreachable: 'Check that Uptime Kuma runs at its address; the hub asks again by itself.',
+      rejected: 'Create a new API key in Uptime Kuma and run `stellwerk kuma key`.',
+      unexpected: 'Check the address and set it again: `stellwerk kuma key --url ADDRESS`.',
+    },
+  },
   planTitle: (provider) => `${provider} plan usage`,
   planWindow: (m) =>
     m === 10_080 ? 'Week' : m % 1440 === 0 ? (m === 1440 ? 'Day' : `${m / 1440} days`) : m < 60 ? `${m} min` : `${Math.round(m / 60)} h`,
@@ -251,6 +284,25 @@ const de: Texts = {
       'not-running': 'Starte die Aufgabe „Stellwerk hardware“ oder melde dich neu an.',
       rejected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
       unexpected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
+    },
+  },
+  monitorsTitle: 'Überwachung',
+  monitorStatus: { down: 'Ausgefallen', pending: 'Prüft erneut' },
+  monitorsUp: (n) => `${n} in Ordnung`,
+  monitorsMaintenance: (n) => `${n} in Wartung`,
+  monitorsNone: 'Noch keine Monitore gemeldet.',
+  uptimeKuma: {
+    asking: 'Uptime Kuma: wird abgefragt',
+    synced: (ago) => `Uptime Kuma: aktualisiert ${ago}`,
+    problem: {
+      unreachable: 'Uptime Kuma: nicht erreichbar',
+      rejected: 'Uptime Kuma: Schlüssel abgelehnt',
+      unexpected: 'Uptime Kuma: unerwartete Antwort',
+    },
+    fix: {
+      unreachable: 'Prüfe, ob Uptime Kuma unter seiner Adresse läuft; der Hub fragt von selbst wieder.',
+      rejected: 'Lege in Uptime Kuma einen neuen API-Schlüssel an und führe `stellwerk kuma key` aus.',
+      unexpected: 'Prüfe die Adresse und setze sie neu: `stellwerk kuma key --url ADRESSE`.',
     },
   },
   planTitle: (provider) => `Abo-Nutzung ${provider}`,

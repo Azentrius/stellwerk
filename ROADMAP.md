@@ -71,10 +71,12 @@ person included. The sign-in was checked in a real Edge, also with a second loca
 
 ---
 
-## Stage 2 – System values and alerts
+## Stage 2 – System values and alerts ✅
 
-CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Still open: server and app alerts
-from Uptime Kuma, in the column kept free.
+CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime
+Kuma in the third column: done in 0.5.0 (see [CHANGELOG](CHANGELOG.md)). The hub reads Uptime Kuma's
+`/metrics` with an API key that opens nothing else; what is down stands out, retrying is quieter, what
+works is a number.
 
 ---
 

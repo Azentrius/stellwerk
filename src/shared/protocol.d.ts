@@ -130,6 +130,31 @@ export interface HardwareView {
   problem: HardwareProblem | null;
 }
 
+/** A monitor of Uptime Kuma that fails: down, or pending (Uptime Kuma tries again before it says down). */
+export interface FailingMonitor {
+  name: string;
+  status: 'down' | 'pending';
+  /** Since when the hub sees it so; null when it already was at the first answer the hub got. */
+  since: number | null;
+}
+
+export interface MonitorCounts {
+  /** Down first, then pending; the most recent first within each. */
+  failing: FailingMonitor[];
+  up: number;
+  maintenance: number;
+}
+
+/** Why the last question to Uptime Kuma failed. */
+export type UptimeKumaProblem = 'unreachable' | 'rejected' | 'unexpected';
+
+export interface UptimeKumaView {
+  /** Null before the first answer and while there is a problem: old states would mislead. */
+  monitors: MonitorCounts | null;
+  updatedAt: number | null;
+  problem: UptimeKumaProblem | null;
+}
+
 /** One usage limit of a plan: how much of it is used in its window (five hours, a week). */
 export interface PlanLimit {
   /** In percent of the limit, 0 to 100. */
@@ -165,6 +190,8 @@ export interface StateMessage {
   github: GitHubView | null;
   /** Null when the hardware monitor is not set up. */
   hardware: HardwareView | null;
+  /** The monitors of Uptime Kuma; null when it is not set up. */
+  uptimeKuma: UptimeKumaView | null;
   /** The usage of the plans' limits, one entry per provider that recorded any. */
   plans: PlanView[];
 }
