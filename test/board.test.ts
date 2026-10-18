@@ -488,6 +488,72 @@ describe('subagents', () => {
     assert.deepEqual(shown(), ['working', null, null]);
   });
 
+  for (const outcome of ['handed-to-app', 'timed-out'] as const) {
+    describe(`requests of a subagent ${outcome === 'timed-out' ? 'whose time ran out' : 'handed to the app'}`, () => {
+      /** Two Bash requests of subagent a1 at the app's card, at 10 and 20; seen from what the session shows. */
+      const twoAtTheApp = (withQuestion = false) => {
+        const board = new Board();
+        board.apply(event('UserPromptSubmit'), 1);
+        if (withQuestion) board.askUser(request({ questions: [{ question: 'Which branch?' }] }, { tool_name: 'AskUserQuestion' }), 2);
+        board.addPermission('r1', request({ command: 'echo one' }, { agent_id: 'a1' }), 5, HOLD);
+        board.addPermission('r2', request({ command: 'echo two' }, { agent_id: 'a1' }), 6, HOLD);
+        board.settle('r1', outcome, 10);
+        board.settle('r2', outcome, 20);
+        const shown = () => {
+          const s = board.view().sessions[0];
+          return [s?.status, s?.waitingFor, s?.waitingSince];
+        };
+        return { board, shown };
+      };
+      const ran = (input: Record<string, unknown> | undefined, extra: Record<string, unknown> = {}, name = 'PostToolUse') =>
+        event(name, { agent_id: 'a1', tool_name: 'Bash', ...(input ? { tool_input: input } : {}), ...extra });
+
+      test('an unrelated tool of the same subagent, run or failed, leaves them open', () => {
+        const { board, shown } = twoAtTheApp();
+        board.apply(event('PostToolUse', { agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'a.ts' } }), 30);
+        board.apply(event('PostToolUseFailure', { agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'b.ts' } }), 31);
+        board.apply(ran({ command: 'echo three' }), 32);
+        assert.deepEqual(shown(), ['waiting', 'permission', 10]);
+      });
+
+      test('the first one running leaves the second, with its own time; the last one ends the waiting', () => {
+        const { board, shown } = twoAtTheApp();
+        board.apply(ran({ command: 'echo one' }), 30);
+        assert.deepEqual(shown(), ['waiting', 'permission', 20]);
+        board.apply(ran({ command: 'echo two' }, {}, 'PostToolUseFailure'), 31);
+        assert.deepEqual(shown(), ['working', null, null]);
+      });
+
+      test('still matched after the cards are swept from the display', () => {
+        const { board, shown } = twoAtTheApp();
+        board.sweep(20 + SETTLED_VISIBLE_MS + 1);
+        assert.equal(board.view().permissions.length, 0, 'the cards are gone');
+        board.apply(ran({ command: 'echo two' }), 20 + SETTLED_VISIBLE_MS + 2);
+        assert.deepEqual(shown(), ['waiting', 'permission', 10]);
+      });
+
+      test('other agents, and an event without input that fits two, take nothing away; the stop takes all of its own', () => {
+        const { board, shown } = twoAtTheApp();
+        board.addPermission('r3', request({ command: 'echo one' }, { agent_id: 'a2' }), 21, HOLD);
+        board.settle('r3', outcome, 22);
+        board.apply(event('PostToolUse', { agent_id: 'a2', tool_name: 'Bash', tool_input: { command: 'echo one' } }), 30);
+        board.apply(event('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'echo one' } }), 31);
+        board.apply(ran(undefined), 32);
+        assert.deepEqual(shown(), ['waiting', 'permission', 10], 'none of them belonged to r1 or r2 for sure');
+        board.apply(event('SubagentStart', { agent_id: 'a1' }), 33);
+        board.apply(event('SubagentStop', { agent_id: 'a1' }), 34);
+        assert.deepEqual(shown(), ['working', null, null], 'a1 stopped: its requests are over, a2 had none left');
+      });
+
+      test("a question of the main agent stays first and keeps its time", () => {
+        const { board } = twoAtTheApp(true);
+        board.apply(ran({ command: 'echo one' }), 30);
+        const s = board.view().sessions[0];
+        assert.deepEqual([s?.status, s?.waitingFor, s?.question, s?.waitingSince], ['waiting', 'question', 'Which branch?', 2]);
+      });
+    });
+  }
+
   test('the stop of a subagent settles its own open requests', () => {
     const board = new Board();
     board.apply(event('SubagentStart', { agent_id: 'a1' }), 1);

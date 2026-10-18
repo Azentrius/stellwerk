@@ -83,7 +83,7 @@ interface Session {
    * nothing else (its question or input comes first), and end with the subagent's next event, its stop,
    * the end of the turn or a new prompt.
    */
-  subagentAppRequests: Map<string, { agentId: string; since: number }>;
+  subagentAppRequests: Map<string, { agentId: string; tool: string; inputKey: string; since: number }>;
   /** How full the context is, from the transcript; null until read. */
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
@@ -167,12 +167,18 @@ export class Board {
     const session = this.touch(event, now, provider);
     if (isOther(event)) return [];
     const agentId = event.agent_id ?? null;
-    // A subagent's request at the app's card is over with that subagent's next event (the tool ran or
-    // failed), its stop, the end of the turn or a new prompt.
+    // A subagent's request at the app's card is over when its own tool ran or failed (same agent, tool and
+    // input, matched like a held request), when the subagent stops, at the end of the turn or a new prompt.
     const name = event.hook_event_name;
     if (name === 'UserPromptSubmit' || name === 'Stop' || name === 'SessionEnd') session.subagentAppRequests.clear();
-    else if (agentId !== null && (name === 'PostToolUse' || name === 'PostToolUseFailure' || name === 'SubagentStop')) {
+    else if (agentId !== null && name === 'SubagentStop') {
       for (const [id, request] of session.subagentAppRequests) if (request.agentId === agentId) session.subagentAppRequests.delete(id);
+    } else if (agentId !== null && (name === 'PostToolUse' || name === 'PostToolUseFailure')) {
+      const candidates = [...session.subagentAppRequests].filter(([, r]) => r.agentId === agentId && r.tool === event.tool_name);
+      const inputKey = event.tool_input ? canonicalJson(event.tool_input) : null;
+      // Without the input, only a single candidate is sure; with it, the oldest request with that input.
+      const match = inputKey !== null ? candidates.find(([, r]) => r.inputKey === inputKey) : candidates.length === 1 ? candidates[0] : undefined;
+      if (match) session.subagentAppRequests.delete(match[0]);
     }
 
     switch (event.hook_event_name) {
@@ -355,7 +361,13 @@ export class Board {
       // A subagent's request: the main agent's status (a question it asked, and since when) stays. One that
       // goes on to the app's card is kept apart, so the session still says something waits in the app.
       if (outcome === 'handed-to-app' || outcome === 'timed-out') {
-        session.subagentAppRequests.set(permission.id, { agentId: permission.agentId, since: now });
+        // What it takes to match the tool's later run, kept here: the card itself is swept after a while.
+        session.subagentAppRequests.set(permission.id, {
+          agentId: permission.agentId,
+          tool: permission.tool,
+          inputKey: permission.inputKey,
+          since: now,
+        });
       }
     } else if (session && session.base !== 'ended') {
       if (outcome === 'allowed' || outcome === 'denied') setStatus(session, 'working');

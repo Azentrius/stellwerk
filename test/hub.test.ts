@@ -940,6 +940,31 @@ describe('permission requests', () => {
     screen.close();
   });
 
+  test("two requests of a subagent at the app's card, one handed over, one timed out: each ends with its own tool", async () => {
+    const { port } = await startTestHub({ holdMs: 600 });
+    const screen = await display(port);
+    await hook(port, { hook_event_name: 'UserPromptSubmit' }).reply;
+    const bash = (command: string) => ({ agent_id: 'a1', tool_name: 'Bash', tool_input: { command } });
+    const first = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo one') });
+    const id = await openRequestId(screen);
+    screen.decide(id, 'app');
+    assert.equal((await first.reply).body, '', 'handed to the app');
+    const second = hook(port, { hook_event_name: 'PermissionRequest', ...bash('echo two') });
+    assert.equal((await second.reply).body, '', 'the real hold timer ran out');
+    const waiting = await screen.state((s) => s.permissions.length === 2 && s.permissions.every((p) => p.outcome !== null));
+    const since = waiting.sessions[0]?.waitingSince;
+    assert.deepEqual([waiting.sessions[0]?.status, waiting.sessions[0]?.waitingFor], ['waiting', 'permission']);
+    await hook(port, { hook_event_name: 'PostToolUse', agent_id: 'a1', tool_name: 'Read', tool_input: { file_path: 'a.ts' } }).reply;
+    await hook(port, { hook_event_name: 'PostToolUse', ...bash('echo one') }).reply;
+    // The second request's own time shows now: it started waiting later than the first.
+    const after = await screen.state((s) => s.sessions[0]?.waitingFor === 'permission' && (s.sessions[0]?.waitingSince ?? 0) > since!);
+    assert.equal(after.sessions[0]?.status, 'waiting', 'the second is still open in the app');
+    await hook(port, { hook_event_name: 'PostToolUse', ...bash('echo two') }).reply;
+    const done = await screen.state((s) => s.sessions[0]?.status === 'working');
+    assert.equal(done.sessions[0]?.waitingFor, null);
+    screen.close();
+  });
+
   test('a question to the user (AskUserQuestion) goes straight back to the app: no card, no audit entry', async () => {
     const { port, auditFile } = await startTestHub();
     const screen = await display(port);

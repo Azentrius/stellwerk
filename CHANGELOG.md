@@ -27,8 +27,8 @@ ends on a broken display connection; open questions stay open; GitHub lists are 
 - **Subagents leave the main agent alone:** tool events, starts and requests of a subagent, and how its
   requests end (allowed, denied, handed to the app, timed out, decided in the app), no longer change what
   the session shows; a question the main agent asked stays open, with its time. A subagent's request left
-  to the app's card shows as waiting for a permission once the main agent waits for nothing else, until
-  the subagent goes on or stops.
+  to the app's card shows as waiting for a permission once the main agent waits for nothing else, each
+  until its own tool runs (the same subagent, tool and input) or the subagent stops.
 - **Complete GitHub lists:** repositories, pull requests and Actions runs are read to the last page,
   following GitHub's links only on `api.github.com`. A failed run on a later page now counts. A list of
   more than 1000 entries is reported as a problem of its own ("too many results") instead of being cut.
