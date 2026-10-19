@@ -18,8 +18,9 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   the last answer from the session's transcript.
 - **Permission requests on the display.** Each request becomes a card with the complete input: a shell
   command in full, a file change with path and content, an MCP call with server, tool and parameters.
-  **Allow**, **Deny**, or **In the app** to leave it to the Claude app. The oldest request is on top; the
-  card shows how long it has been waiting and how much of the hold time is left.
+  **Allow**, **Deny**, or **In the app** to leave it to the Claude app. The oldest request is on top and
+  the only one with a filled **Allow**; each card shows how long it has been waiting and how much of the
+  hold time is left.
 - **The app works as before.** The Claude desktop app shows its own card at the same time, and whichever
   decides first counts. If nobody decides on the display within the hold time (60 s), the request goes
   back to the app. If the hub is not running, Claude Code simply asks in the app, without error messages.
@@ -56,10 +57,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.5.1.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.5.1.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.5.1.zip -DestinationPath .
-cd stellwerk-0.5.1
+(Get-FileHash stellwerk-0.5.2.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.5.2.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.5.2.zip -DestinationPath .
+cd stellwerk-0.5.2
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```

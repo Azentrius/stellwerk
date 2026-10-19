@@ -7,6 +7,7 @@ import type { Decision, PermissionView } from '../../src/shared/protocol.js';
 import { naming } from './naming.ts';
 import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
+import { leadingRequest } from './leading.ts';
 import { duration } from './time.ts';
 import { renderToolInput } from './tool-input.ts';
 
@@ -17,6 +18,7 @@ interface Card {
   bar: HTMLElement;
   outcome: HTMLElement;
   buttons: HTMLButtonElement[];
+  allow: HTMLButtonElement;
   /** A decision was sent and its answer is still out. */
   busy: boolean;
 }
@@ -58,6 +60,12 @@ export class QueueView {
         card.root.remove();
         this.cards.delete(id);
       }
+    }
+    const leading = leadingRequest(permissions);
+    for (const card of this.cards.values()) {
+      const filled = card.view.id === leading;
+      card.allow.classList.toggle('az-btn--primary', filled);
+      card.allow.classList.toggle('az-btn--secondary', !filled);
     }
     this.list.hidden = permissions.length === 0;
     return added;
@@ -109,16 +117,17 @@ export class QueueView {
     hold.append(bar);
     root.append(hold);
 
-    // Allow is the card's main action, the only filled button; deny and leaving it to the app are outlined.
+    // Allow is the card's main action; deny and leaving it to the app are outlined. All start outlined:
+    // update fills the Allow of the oldest open request only.
     const actions = el('div', 'card__actions');
     const buttons = (
       [
-        ['allow', t.allow, 'az-btn--primary', 'check'],
-        ['deny', t.deny, 'az-btn--secondary', 'times'],
-        ['app', t.inApp, 'az-btn--secondary', 'external-link-alt'],
+        ['allow', t.allow, 'check'],
+        ['deny', t.deny, 'times'],
+        ['app', t.inApp, 'external-link-alt'],
       ] as const
-    ).map(([decision, text, variant, iconName]) => {
-      const button = el('button', `az-btn ${variant} btn`);
+    ).map(([decision, text, iconName]) => {
+      const button = el('button', 'az-btn az-btn--secondary btn');
       button.type = 'button';
       button.dataset.decision = decision;
       button.append(icon(iconName), text);
@@ -127,7 +136,7 @@ export class QueueView {
     actions.append(...buttons);
     const outcome = el('p', 'card__outcome');
     root.append(actions, outcome);
-    return { view, root, wait, bar, outcome, buttons, busy: false };
+    return { view, root, wait, bar, outcome, buttons, allow: buttons[0]!, busy: false };
   }
 
   private refresh(card: Card): void {

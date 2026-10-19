@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.2 – 2026-10-19
+
+One filled button on the display: only the oldest waiting request fills its **Allow**.
+
+- **Allow filled once:** with several requests waiting, every card filled its **Allow**, so the column
+  showed one gold button per card. Now only the top card fills it: the oldest request, whose hold time
+  ends first. The cards below show **Allow** outlined like **Deny** and **In the app**; it works the same.
+  When the top request is decided, the next one takes the filled button over. That is the design
+  system's rule: one filled button on a page.
+
 ## 0.5.1 – 2026-10-18
 
 The status column points to the log when the hub turned requests away or its raw hook log is on.
