@@ -82,7 +82,8 @@ something stays missing unnoticed.
 ## 0.5.2 – One filled Allow ✅
 
 Done in 0.5.2 (see [CHANGELOG](CHANGELOG.md)): with several requests waiting, only the oldest fills its
-**Allow**, so the display keeps the design system's one filled button on a page.
+**Allow**, so the display keeps the design system's one filled button on a page. More failing monitors
+than fit now scroll, down to the last one.
 
 ---
 

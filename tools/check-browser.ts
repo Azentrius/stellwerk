@@ -8,7 +8,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { randomBytes } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -18,28 +17,9 @@ import { pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
 import { HOOK_PATH } from '../src/config.ts';
 import { displayKey, displayStartPage, startHub } from '../src/hub/hub.ts';
+import { check, openEdge, pause, until, type Edge } from './edge.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
-const EDGE = [
-  path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-  path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-].find((file) => fs.existsSync(file));
-if (!EDGE) throw new Error('Edge is not installed.');
-
-function check(ok: boolean, message: string): void {
-  if (!ok) throw new Error(`FAILED: ${message}`);
-  console.log(`ok  ${message}`);
-}
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-async function until<T>(what: string, probe: () => Promise<T | null | undefined | false>, timeoutMs = 15_000): Promise<T> {
-  const end = Date.now() + timeoutMs;
-  for (;;) {
-    const value = await probe();
-    if (value) return value;
-    if (Date.now() > end) throw new Error(`FAILED: ${what} (timed out)`);
-    await pause(200);
-  }
-}
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-browser-'));
 const token = randomBytes(32).toString('hex');
@@ -68,40 +48,10 @@ const other = http.createServer((req, res) => {
 await new Promise<void>((resolve) => other.listen(0, '127.0.0.1', resolve));
 const otherPort = (other.address() as AddressInfo).port;
 
-const profile = path.join(dir, 'profile');
-const edge = spawn(EDGE, ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--no-first-run', 'about:blank'], {
-  stdio: 'ignore',
-});
-let browser: WebSocket | null = null;
+let edge: Edge | null = null;
 try {
-  const portFile = path.join(profile, 'DevToolsActivePort');
-  const debugPort = await until('Edge opens its debugging port', async () => fs.existsSync(portFile) && fs.readFileSync(portFile, 'utf8').split('\n')[0]);
-  const targets = await until('Edge lists its tab', async () => {
-    const list = (await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json()) as Array<{ type: string; webSocketDebuggerUrl: string }>;
-    return list.find((t) => t.type === 'page');
-  });
-  browser = new WebSocket(targets.webSocketDebuggerUrl);
-  await new Promise<void>((resolve, reject) => {
-    browser!.once('open', () => resolve());
-    browser!.once('error', reject);
-  });
-  let nextId = 1;
-  const send = (method: string, params: Record<string, unknown> = {}) =>
-    new Promise<Record<string, unknown>>((resolve) => {
-      const id = nextId++;
-      const onMessage = (data: unknown) => {
-        const message = JSON.parse(String(data)) as { id?: number; result?: Record<string, unknown> };
-        if (message.id !== id) return;
-        browser!.off('message', onMessage);
-        resolve(message.result ?? {});
-      };
-      browser!.on('message', onMessage);
-      browser!.send(JSON.stringify({ id, method, params }));
-    });
-  const evaluate = async (expression: string): Promise<unknown> => {
-    const result = (await send('Runtime.evaluate', { expression, returnByValue: true })) as { result?: { value?: unknown } };
-    return result.result?.value;
-  };
+  edge = await openEdge(path.join(dir, 'profile'));
+  const { send, evaluate } = edge;
   const hubState = () => evaluate("document.querySelector('#hub-state')?.textContent ?? ''") as Promise<string>;
   const connected = (text: string) => /Hub connected|Hub verbunden/.test(text);
 
@@ -168,10 +118,8 @@ try {
   await evaluate("[...document.querySelectorAll('button')].find((b) => /^(Allow|Erlauben)$/.test(b.textContent.trim())).click()");
   const decision = JSON.parse(await answer) as { hookSpecificOutput?: { decision?: { behavior?: string } } };
   check(decision.hookSpecificOutput?.decision?.behavior === 'allow', 'the signed-in display allows a request');
-  await send('Browser.close').catch(() => {});
 } finally {
-  browser?.close();
-  edge.kill();
+  await edge?.close();
   other.close();
   await hub.close();
   await pause(500);

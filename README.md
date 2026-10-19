@@ -226,6 +226,9 @@ monitor only its name and status:
 - **Everything else** is a number: "35 up", "1 in maintenance". Paused monitors are not counted, since
   Uptime Kuma leaves them out of its metrics, and neither are groups, which only sum up others.
 
+When more fail than fit, the list scrolls by finger, mouse wheel or keyboard; the numbers and the line at
+the foot stay in place.
+
 How long a monitor fails is what the hub saw itself: a monitor that was already failing when the hub
 started, or that changed while Uptime Kuma did not answer, shows no time until it changes again. At the
 foot of the column the display says when Uptime Kuma was last asked, or why that failed (not reachable,
