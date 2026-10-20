@@ -2,8 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-/** Status of a session as the display shows it, most urgent first. */
-export type SessionStatus = 'permission' | 'waiting' | 'working' | 'done' | 'ended';
+/**
+ * Status of a session as the display shows it, most urgent first. 'unknown': shown since a restart of the
+ * hub, which does not know what the session did in between, until its next event.
+ */
+export type SessionStatus = 'permission' | 'waiting' | 'working' | 'done' | 'unknown' | 'ended';
 
 /**
  * What a waiting session waits for: an answer to a question, some input, a permission whose card is open

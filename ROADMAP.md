@@ -87,11 +87,11 @@ than fit now scroll, down to the last one.
 
 ---
 
-## 0.5.3 – Times over a restart ✅
+## 0.5.3 – Over a restart ✅
 
-Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): since when a monitor fails survives a restart of the hub,
-the waiting column's fade follows its scrolling, and a release runs the browser checks too, now also for
-the agents and the waiting column.
+Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the sessions and since when a monitor fails survive a
+restart of the hub, the waiting column's fade follows its scrolling, and a release runs the browser checks
+too, now also for the agents and the waiting column.
 
 ---
 

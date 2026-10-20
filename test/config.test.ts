@@ -156,6 +156,7 @@ test('the files live under APPDATA and LOCALAPPDATA', () => {
   assert.equal(paths.auditFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'audit.jsonl'));
   assert.equal(paths.tokenFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'token'));
   assert.equal(paths.plansFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'plans.json'));
+  assert.equal(paths.sessionsFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'sessions.json'));
   assert.equal(paths.uptimeKumaStateFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'uptime-kuma.json'));
   assert.equal(paths.displayStartFile, path.join('C:\\Users\\u\\AppData\\Local', 'stellwerk', 'display.html'));
 });

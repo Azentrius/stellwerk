@@ -196,6 +196,8 @@ button { font: inherit; }
 .entry__icon--success { color: var(--status-success); }
 .entry__icon--danger { color: var(--status-danger); }
 .agent--ended .entry__name { color: var(--text-disabled); font-weight: 400; }
+/* Shown since a restart of the hub, until its next event: grey, as nothing is known of it yet. */
+.agent--unknown .entry__name { color: var(--text-subtle); }
 /* How full an agent's context is, in front of it over both lines: the percentage over a thin line, quiet in
    grey; attention from 80 %. */
 .entry--meter { display: grid; grid-template-columns: 2.8rem minmax(0, 1fr); column-gap: var(--sp-md); align-items: center; }
@@ -209,7 +211,7 @@ button { font: inherit; }
 .meter--warning .meter__fill { background: var(--status-warning); }
 .meter--danger { color: var(--status-danger); }
 .meter--danger .meter__fill { background: var(--status-danger); }
-.agent--ended .meter { opacity: 0.5; }
+.agent--ended .meter, .agent--unknown .meter { opacity: 0.5; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 
 /* More below than is in view: the bottom fades out. */

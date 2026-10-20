@@ -88,6 +88,10 @@ reachable only from the machine it runs on and only by the display it serves:
   changed and keeps only project names and which chat belongs to which; the
   title of a Claude Code session comes from its transcript like its token
   counts;
+- for the display after a restart, the hub keeps the sessions it shows in
+  its file `sessions.json`: id, folder, title, project, how full the context
+  is and the last activity; never a prompt, a question, a tool's input or a
+  request, and a request never comes back after a restart;
 - Codex events reach the hub through Stellwerk's forwarder, which Codex runs
   as a command hook: it reads the hook token from the token file, posts to
   `127.0.0.1` only, prints only the hub's answer and ends at once without a

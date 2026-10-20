@@ -124,6 +124,7 @@ const en: Texts = {
     waiting: 'Waiting for you',
     working: 'Working',
     done: 'Done',
+    unknown: 'Unknown',
     ended: 'Ended',
   },
   waitingFor: {
@@ -263,6 +264,7 @@ const de: Texts = {
     waiting: 'Wartet auf dich',
     working: 'Arbeitet',
     done: 'Fertig',
+    unknown: 'Unbekannt',
     ended: 'Beendet',
   },
   waitingFor: {

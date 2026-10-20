@@ -11,7 +11,9 @@ requests right there. Like a dispatcher who sees every train on the track diagra
 - **Every session at a glance.** In the left column, each session with its name (bold) and project, and
   its status: waiting for approval, waiting for you, working, done, ended. With whose agent it is
   ("Claude", "Codex", all alike), the number of running subagents and the time of the last activity. The
-  most urgent first.
+  most urgent first. After a restart of the hub the sessions of the last 12 hours are there again, grey
+  and "unknown", until each sends its next event; their open requests are not, as those went back to the
+  app when the hub stopped.
 - **How full the context is.** In front of each session the percentage of its context window that is
   used, 0 to 100 %, over a thin line; from 80 % it needs attention, from 90 % it is red (the app
   compacts the context at about 97 %). The hub takes the token counts of
@@ -379,6 +381,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma-key` | The API key of Uptime Kuma, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
+| `%LOCALAPPDATA%\stellwerk\sessions.json` | The sessions on the display (id, folder, title, project, context, last activity), for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` | Since when monitors of Uptime Kuma fail (ids and times only), for the display after a restart |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |

@@ -2,9 +2,15 @@
 
 ## 0.5.3 – 2026-10-20
 
-Failing monitors keep their time over a restart of the hub, the waiting column's fade follows its
-scrolling, and a release runs the browser checks too.
+Sessions and the times of failing monitors are there again after a restart of the hub, the waiting
+column's fade follows its scrolling, and a release runs the browser checks too.
 
+- **Sessions over a restart:** after a restart of the hub the agents column was empty until each session
+  sent its next event, and titles were missing until the next prompt. Now the hub keeps the sessions it
+  shows in `%LOCALAPPDATA%\stellwerk\sessions.json` (id, folder, title, project, context, last activity;
+  no prompt, question, tool input or request) and shows those of the last 12 hours again, grey and
+  **Unknown**, since it cannot know what they did in between. A session's next event gives it its real
+  status. Open requests never come back: they went back to the app when the hub stopped.
 - **Times over a restart:** the hub knew since when a monitor fails only while it ran, so after a restart
   every failing monitor showed no time until it changed again. Now it keeps those times in
   `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` (ids of failing monitors and since when, no names) and
