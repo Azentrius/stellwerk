@@ -22,7 +22,7 @@ export interface ListSpec {
   list: string;
   /** Its entries, within it. */
   entries: string;
-  /** Parts of an entry that must be readable; without them the entry as a whole. */
+  /** Parts of an entry that must be readable; where it has none of them, the entry as a whole. */
   parts?: string[];
   /** The part that holds an entry's name, for its text and whether it is cut. */
   name?: string;
@@ -83,7 +83,8 @@ const MEASURE = `(spec) => {
   };
   const entries = [...list.querySelectorAll(spec.entries)].map((item) => {
     const name = spec.name ? item.querySelector(spec.name) : null;
-    const parts = spec.parts ? spec.parts.flatMap((part) => [...item.querySelectorAll(part)]) : [item];
+    const found = spec.parts ? spec.parts.flatMap((part) => [...item.querySelectorAll(part)]) : [];
+    const parts = found.length > 0 ? found : [item];
     return {
       classes: item.className,
       text: (name ?? item).textContent,

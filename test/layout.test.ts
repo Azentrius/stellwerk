@@ -28,3 +28,10 @@ test("GitHub's line stands below the pull requests, Uptime Kuma's below the moni
   assert.equal(columnOf('rejected-state'), 'col--status');
   assert.equal(columnOf('raw-log-state'), 'col--status');
 });
+
+test("in the status column the hub's hints and the gauges share one area below the clock and the hub's state", () => {
+  const order = ['clock', 'hub-state', 'last-event', 'status-details', 'rejected-state', 'raw-log-state', 'gauge-sections'].map((id) => page.indexOf(`id="${id}"`));
+  assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!)), 'in this order');
+  const area = page.slice(page.lastIndexOf('<div', page.indexOf('id="status-details"')), page.indexOf('class="az-signature"'));
+  assert.equal((area.match(/<div/g) ?? []).length - (area.match(/<\/div>/g) ?? []).length, 0, 'the area closes before the signature');
+});

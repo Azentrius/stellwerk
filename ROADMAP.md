@@ -91,8 +91,9 @@ than fit now scroll, down to the last one.
 
 Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; Codex'
 command line is marked as such; the sessions and since when a monitor fails survive a restart of the hub;
-the waiting column's fade follows its scrolling; and a release runs the browser checks too, now also for
-the agents and the waiting column and for the display at rest.
+the status column's foot scrolls below its hints; the waiting column's fade follows its scrolling; and a
+release runs the browser checks too, now also for the agents, the waiting and the status column and for
+the display at rest.
 
 ---
 
