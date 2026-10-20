@@ -89,11 +89,11 @@ than fit now scroll, down to the last one.
 
 ## 0.5.3 – At rest and over a restart ✅
 
-Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; Codex'
-command line is marked as such; the sessions and since when a monitor fails survive a restart of the hub;
-the status column's foot scrolls below its hints; the waiting column's fade follows its scrolling; and a
-release runs the browser checks too, now also for the agents, the waiting and the status column and for
-the display at rest.
+Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; sessions at
+rest make way in one line; Codex' command line is marked as such; the sessions and since when a monitor
+fails survive a restart of the hub; the status column's foot scrolls below its hints; the waiting column's
+fade follows its scrolling; and a release runs the browser checks too, now also for the agents, the
+waiting and the status column and for the display at rest.
 
 ---
 

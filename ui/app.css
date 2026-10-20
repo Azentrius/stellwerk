@@ -213,6 +213,22 @@ button { font: inherit; }
 .meter--danger .meter__fill { background: var(--status-danger); }
 .agent--ended .meter, .agent--unknown .meter { opacity: 0.5; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
+/* The line behind which the sessions at rest wait: quiet, but as high as a button, so a finger finds it. */
+.resting { border-block-end: 1px solid var(--line); }
+.resting__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  width: 100%;
+  min-block-size: 3.2rem;
+  padding: 0 var(--sp-xs);
+  color: var(--text-subtle);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  text-align: start;
+}
 
 /* More below than is in view: the bottom fades out. */
 .waiting--more, .monitors__failing--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }

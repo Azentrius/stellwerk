@@ -9,13 +9,14 @@ import type { Decision, ServerMessage, StateMessage } from '../../src/shared/pro
 import { renderAgents } from './agents.ts';
 import { renderAnswers } from './answers.ts';
 import { waitingForAnswer } from './due.ts';
-import { alert, byId, icon, label } from './dom.ts';
+import { alert, byId, el, icon, label } from './dom.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { Rest, watched } from './quiet.ts';
+import { RestingLine, splitResting } from './resting.ts';
 import { shouldReload } from './reload.ts';
 import {
   githubLine,
@@ -56,6 +57,12 @@ const queue = new QueueView(byId('queue'), texts, decide);
 const agents = byId<HTMLUListElement>('agents');
 const agentsEmpty = byId('agents-empty');
 const agentsCount = byId('agents-count');
+/** The line at the foot of the agents column behind which the sessions at rest wait (resting.ts). */
+const restingLine = new RestingLine();
+const restingItem = el('li', 'resting');
+const restingButton = el('button', 'resting__toggle');
+restingButton.type = 'button';
+restingItem.append(restingButton);
 const answers = byId<HTMLUListElement>('answers');
 const answersSection = byId('answers-section');
 const pulls = byId<HTMLUListElement>('pulls');
@@ -180,7 +187,9 @@ function tick(): void {
   const now = Date.now() + clockOffset;
   queue.tick(now);
   const sessions = state?.sessions ?? [];
-  renderAgents(agents, sessions, now, texts);
+  renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, now, texts);
+  // With the line's button in it, the browser no longer makes the list a tab stop by itself.
+  markScrolling(agents);
   agentsEmpty.hidden = sessions.length > 0;
   agentsCount.textContent = sessions.length > 0 ? `(${sessions.length})` : '';
 
@@ -249,8 +258,8 @@ function fadeWhileMore(node: HTMLElement, className: string): void {
  * scrolls, its bottom fades out while more is below, and the keyboard can reach it only while there is
  * something to scroll.
  */
-function markScrolling(node: HTMLElement, className: string): void {
-  fadeWhileMore(node, className);
+function markScrolling(node: HTMLElement, className?: string): void {
+  if (className) fadeWhileMore(node, className);
   const scrolls = node.scrollHeight - node.clientHeight > 4;
   if (scrolls !== node.hasAttribute('tabindex')) {
     if (scrolls) node.tabIndex = 0;
@@ -308,6 +317,12 @@ void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
 waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
 monitorsFailing.addEventListener('scroll', () => markScrolling(monitorsFailing, 'monitors__failing--more'), { passive: true });
+restingButton.addEventListener('click', () => {
+  restingLine.toggle(Date.now() + clockOffset);
+  tick();
+});
+// Touching the agents column keeps an open line open.
+agents.addEventListener('pointerdown', () => restingLine.touched(Date.now() + clockOffset), { passive: true });
 statusDetails.addEventListener('scroll', () => markScrolling(statusDetails, 'status-details--more'), { passive: true });
 // A tap on the resting display wakes it and does nothing else: the click that follows goes nowhere.
 document.addEventListener(
