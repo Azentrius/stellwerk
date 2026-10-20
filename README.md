@@ -249,8 +249,8 @@ the display. `stellwerk kuma remove` deletes it; the hub then opens no connectio
 
 ## Codex
 
-Optional. Stellwerk shows the sessions of the Codex app too, marked "Codex", and lets you answer their
-approvals on the display:
+Optional. Stellwerk shows the sessions of the Codex app and of Codex' command line too, marked "Codex"
+and "Codex CLI", and lets you answer their approvals on the display:
 
 ```powershell
 stellwerk codex install
@@ -281,6 +281,14 @@ How Codex differs:
 - The context meter uses the window Codex records with its token counts.
 - With its token counts Codex also records how much of your plan's limits is used (see
   [Plan usage](#plan-usage)).
+
+Codex' command line (`codex` in a terminal) reads the same `%USERPROFILE%\.codex` as the app: the same
+hooks, allowed once for both. Its sessions show as "Codex CLI", named by Codex' session index, with the
+folder as the project; the hub tells them from the app's by the first line of their transcript. Its own
+question for an approval shows in the terminal, and like the app only after the hook has answered, so
+the third button of their cards says **In the terminal**. With Codex' default approval settings a
+command the sandbox blocks (a download, say) simply fails without asking; started with
+`codex -a on-request`, Codex asks, and the request comes to the display.
 
 `stellwerk codex uninstall` removes exactly these hooks.
 

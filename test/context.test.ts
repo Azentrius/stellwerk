@@ -9,13 +9,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
+  CODEX_TERMINAL_ORIGINATORS,
   ContextReader,
   DEFAULT_WINDOW,
   LARGE_WINDOW,
   checkedTranscript,
   claudeTitleOfLine,
+  codexOriginatorOfLine,
   contextWindow,
   readContextUsage,
+  readFirstLine,
   usageOfLine,
 } from '../src/hub/context.ts';
 import { contextPercent } from '../ui/src/context.ts';
@@ -126,4 +129,44 @@ test('the meter shows whole percent, at most 100: grey, attention from 80 %, red
   assert.equal(contextPercent(null), null);
   assert.equal(contextPercent({ used: 5, size: 0 }), null);
   assert.deepEqual([null, 0, 79, 80, 89, 90, 97, 100].map(meterTone), ['neutral', 'neutral', 'neutral', 'warning', 'warning', 'danger', 'danger', 'danger']);
+});
+
+test("Codex' command line names itself in its transcript's first line; the reader asks once per session", async () => {
+  const meta = (originator: string) =>
+    JSON.stringify({
+      timestamp: '2026-10-20T20:45:00.000Z',
+      type: 'session_meta',
+      payload: { id: 'x', cwd: 'C:\\x', originator, cli_version: '0.163.0', base_instructions: { text: 'secret instructions '.repeat(1000) } },
+    });
+  assert.equal(codexOriginatorOfLine(meta('codex-tui')), 'codex-tui');
+  assert.equal(codexOriginatorOfLine(JSON.stringify({ type: 'turn_context', payload: { originator: 'codex-tui' } })), null);
+  assert.equal(codexOriginatorOfLine(meta('x'.repeat(101))), null);
+  assert.ok(CODEX_TERMINAL_ORIGINATORS.has('codex-tui'));
+  assert.ok(!CODEX_TERMINAL_ORIGINATORS.has('codex_work_desktop') && !CODEX_TERMINAL_ORIGINATORS.has('Codex Desktop'));
+
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-ctx-')), 'sessions');
+  fs.mkdirSync(root, { recursive: true });
+  const usage = JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 1000 }, model_context_window: 258_400 } } });
+  const rollout = (name: string, originator: string) => {
+    const file = path.join(root, name);
+    fs.writeFileSync(file, `${meta(originator)}\n${usage}\n`);
+    return file;
+  };
+  const cli = rollout('rollout-cli.jsonl', 'codex-tui');
+  const app = rollout('rollout-app.jsonl', 'codex_work_desktop');
+  const terminals: string[] = [];
+  const reader = new ContextReader({ root: path.join(root, '..', 'projects'), codexRoot: root, onUsage: () => {}, onTerminal: (id) => terminals.push(id) });
+  await reader.read('cli', cli, 'codex');
+  await reader.read('cli', cli, 'codex');
+  await reader.read('app', app, 'codex');
+  assert.deepEqual(terminals, ['cli'], 'once, and only for the command line');
+  reader.stop();
+});
+
+test('the first line of a file is read only when it ends within the limit', async () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-ctx-')), 'first.jsonl');
+  fs.writeFileSync(file, 'first\nsecond\n');
+  assert.equal(await readFirstLine(file), 'first');
+  fs.writeFileSync(file, 'x'.repeat(200));
+  assert.equal(await readFirstLine(file, 100), null);
 });

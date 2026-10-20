@@ -89,10 +89,11 @@ than fit now scroll, down to the last one.
 
 ## 0.5.3 – At rest and over a restart ✅
 
-Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; the sessions
-and since when a monitor fails survive a restart of the hub; the status column's foot scrolls below its
-hints; the waiting column's fade follows its scrolling; and a release runs the browser checks too, now
-also for the agents, the waiting and the status column and for the display at rest.
+Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; Codex'
+command line is marked as such; the sessions and since when a monitor fails survive a restart of the hub;
+the status column's foot scrolls below its hints; the waiting column's fade follows its scrolling; and a
+release runs the browser checks too, now also for the agents, the waiting and the status column and for
+the display at rest.
 
 ---
 
@@ -122,11 +123,12 @@ stage begins with its own security review.
 
 ---
 
-## Stage 5 – Codex agents
+## Stage 5 – Codex agents ✅
 
 The Codex app for Windows: in 0.3.0, after a probe of the app (it runs command hooks once they are
 allowed, and shows its own approval card only after the hook). The usage of the plan, which Codex records
-in its transcripts (`rate_limits`), in 0.4.0. Still open: the Codex command line.
+in its transcripts (`rate_limits`), in 0.4.0. The command line in 0.5.3: it uses the same hooks, so its
+sessions came already; now they are marked "Codex CLI", and their cards hand over "In the terminal".
 
 ---
 

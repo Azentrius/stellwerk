@@ -106,6 +106,8 @@ interface Session {
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
   subagents: Set<string>;
+  /** Runs in Codex' command line (from its transcript); its own cards show in the terminal. */
+  terminal: boolean;
   lastActivity: number;
   endedAt: number | null;
 }
@@ -313,6 +315,14 @@ export class Board {
     return true;
   }
 
+  /** The session runs in Codex' command line; true when that is new. */
+  setTerminal(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.terminal) return false;
+    session.terminal = true;
+    return true;
+  }
+
   setContext(sessionId: string, usage: ContextUsage): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
@@ -450,6 +460,7 @@ export class Board {
           question: waiting?.question ?? null,
           context: s.context,
           subagents: s.subagents.size,
+          terminal: s.terminal,
           lastActivity: s.lastActivity,
           endedAt: s.endedAt,
         };
@@ -465,6 +476,7 @@ export class Board {
         id: p.id,
         sessionId: p.sessionId,
         provider: session?.provider ?? 'claude',
+        terminal: session?.terminal ?? false,
         project: session?.project ?? projectName(session?.cwd ?? ''),
         title: session?.title ?? null,
         tool: p.tool,
@@ -559,6 +571,7 @@ function newSession(id: string, provider: Provider, cwd: string, now: number): S
     subagentAppRequests: new Map(),
     context: null,
     subagents: new Set(),
+    terminal: false,
     lastActivity: now,
     endedAt: null,
   };

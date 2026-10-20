@@ -8,7 +8,7 @@ import type { ChecksState, SessionStatus } from '../src/shared/protocol.js';
 import { pickTexts } from '../ui/src/i18n.ts';
 import { elapsed } from '../ui/src/time.ts';
 import { ICONS } from '../ui/src/icons.ts';
-import { naming } from '../ui/src/naming.ts';
+import { naming, providerName } from '../ui/src/naming.ts';
 import { checksState, failingFor, hubState, monitorState, sessionState, state, type State } from '../ui/src/states.ts';
 
 const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
@@ -104,4 +104,12 @@ test('a session is named by its title over its project; a chat without a project
   assert.deepEqual(naming('Azentrius', null, 'abc12345xyz'), { name: 'Azentrius', project: '' }, 'no title yet: the project');
   assert.deepEqual(naming('', 'Webseite prüfen', 'abc12345xyz'), { name: 'Webseite prüfen', project: '' }, 'kept without a project');
   assert.deepEqual(naming('', null, 'abc12345xyz'), { name: 'abc12345', project: '' }, 'nothing known: the start of the id');
+});
+
+test("whose agent: the provider's name, and Codex CLI for Codex' command line, whose cards say the terminal", () => {
+  const de = languages[1]!;
+  assert.equal(providerName('codex', false, en), 'Codex');
+  assert.equal(providerName('codex', true, en), 'Codex CLI');
+  assert.equal(providerName('claude', false, de), 'Claude');
+  assert.deepEqual([en.inApp, en.inTerminal, de.inApp, de.inTerminal], ['In the app', 'In the terminal', 'In der App', 'Im Terminal']);
 });

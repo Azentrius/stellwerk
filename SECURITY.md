@@ -76,8 +76,10 @@ reachable only from the machine it runs on and only by the display it serves:
   events, only under `%USERPROFILE%\.claude\projects` and
   `%USERPROFILE%\.codex\sessions` (after following links), only from their
   end, and keeps only the token counts, the model, the context window and,
-  for Codex, who approves and the usage of the plan's limits; nothing else of
-  a transcript reaches its state, the display or its file `plans.json`;
+  for Codex, who approves and the usage of the plan's limits, and from the
+  first line only who wrote it (`originator`), to tell Codex' command line
+  from its app; nothing else of a transcript reaches its state, the display
+  or its file `plans.json`;
 - of what tools return, the hub looks only at the desktop app's answer to
   `get_usage` in a `PostToolUse` hook and keeps only the plan's limits from it;
 - for the names of Codex sessions the hub reads Codex' session index

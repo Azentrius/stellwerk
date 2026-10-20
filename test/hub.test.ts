@@ -730,6 +730,23 @@ describe('Codex', () => {
     screen.close();
   });
 
+  test("a session of Codex' command line is marked as such, also on its card", async () => {
+    const { codexRoot, transcript } = codexRollout('user');
+    const meta = { timestamp: RECORDED_AT, type: 'session_meta', payload: { id: 'codex-1', originator: 'codex-tui', cli_version: '0.163.0' } };
+    fs.writeFileSync(transcript, `${JSON.stringify(meta)}\n${fs.readFileSync(transcript, 'utf8')}`);
+    const { port, hub } = await startTestHub({ context: { root: codexRoot, codexRoot, intervalMs: 20 } });
+    const screen = await display(port);
+    await codexHook(port, { hook_event_name: 'UserPromptSubmit', transcript_path: transcript, prompt: 'a secret prompt' }).reply;
+    const state = await screen.state((s) => s.sessions[0]?.terminal === true);
+    assert.equal(state.sessions[0]?.provider, 'codex');
+    const pending = codexHook(port, { hook_event_name: 'PermissionRequest', transcript_path: transcript, tool_name: 'Bash', tool_input: { command: 'curl https://example.com' } });
+    assert.equal((await screen.state((s) => s.permissions.length === 1)).permissions[0]?.terminal, true);
+    assert.doesNotMatch(JSON.stringify(state), /secret/);
+    screen.close();
+    await hub.close();
+    assert.equal((await pending.reply).body, '', 'stopping, the hub gives it back to the terminal');
+  });
+
   test('after its own hold time the request goes back empty, so the Codex app shows its card', async () => {
     const { codexRoot, transcript } = codexRollout('user');
     const { port } = await startTestHub({ codexHoldMs: 150, context: { root: codexRoot, codexRoot } });
