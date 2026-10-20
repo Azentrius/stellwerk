@@ -230,7 +230,7 @@ const en: Texts = {
   },
   rawLog: {
     title: 'Raw hook log is on',
-    fix: 'It holds prompts and code. Set `debugRawLog` to false in `config.json` (or start without `--debug-raw`), restart the hub and delete `debug-raw.jsonl`.',
+    fix: 'It holds prompts and code. Set `debugRawLog` to false in `config.json` (or start without `--debug-raw`), restart the hub and run `stellwerk raw-log delete`.',
   },
   notSignedIn: 'Display not signed in',
   notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
@@ -374,7 +374,7 @@ const de: Texts = {
   },
   rawLog: {
     title: 'Rohprotokoll ist an',
-    fix: 'Es enthält Prompts und Code. Setze `debugRawLog` in `config.json` auf false (oder starte ohne `--debug-raw`), starte den Hub neu und lösche `debug-raw.jsonl`.',
+    fix: 'Es enthält Prompts und Code. Setze `debugRawLog` in `config.json` auf false (oder starte ohne `--debug-raw`), starte den Hub neu und führe `stellwerk raw-log delete` aus.',
   },
   notSignedIn: 'Anzeige nicht angemeldet',
   notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',

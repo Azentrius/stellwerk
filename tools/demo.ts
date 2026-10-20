@@ -125,7 +125,39 @@ fs.writeFileSync(
 // Codex names its threads in its session index, and the Codex app files them under its projects; the
 // demo's Codex session has both.
 const codexIndex = path.join(demoDir, 'codex', 'session_index.jsonl');
-fs.writeFileSync(codexIndex, `${JSON.stringify({ id: 'firmware', thread_name: 'CAN driver update', updated_at: new Date().toISOString() })}\n`);
+fs.writeFileSync(
+  codexIndex,
+  `${JSON.stringify({ id: 'firmware', thread_name: 'CAN driver update', updated_at: new Date().toISOString() })}\n` +
+    `${JSON.stringify({ id: 'webhooks', thread_name: 'Retry failed webhooks', updated_at: new Date().toISOString() })}\n`,
+);
+// A session of Codex' command line: its transcript's first line names it so ("Codex CLI" on the display).
+const codexCliRollout = path.join(codexSessions, '2026', 'rollout-cli.jsonl');
+fs.writeFileSync(
+  codexCliRollout,
+  `${JSON.stringify({ timestamp: new Date().toISOString(), type: 'session_meta', payload: { id: 'webhooks', originator: 'codex-tui' } })}\n` +
+    `${JSON.stringify({ type: 'turn_context', payload: { approval_policy: 'on-request', approvals_reviewer: 'user' } })}\n` +
+    `${JSON.stringify({ type: 'event_msg', payload: { type: 'token_count', info: { last_token_usage: { total_tokens: 41_000 }, model_context_window: 258_400 } } })}\n`,
+);
+// Sessions of the last run: one unknown since a short while, three at rest behind their line.
+const sessionsFile = path.join(demoDir, 'sessions.json');
+const lastRun = (id: string, title: string, project: string, minutesAgo: number) => ({
+  id,
+  provider: 'claude',
+  cwd: `C:\\Projects\\${project}`,
+  title,
+  project: null,
+  context: null,
+  lastActivity: Date.now() - minutesAgo * 60_000,
+});
+fs.writeFileSync(
+  sessionsFile,
+  JSON.stringify([
+    lastRun('billing', 'Invoice export', 'billing', 6),
+    lastRun('spike', 'Search spike', 'search', 120),
+    lastRun('onboarding', 'Onboarding docs', 'docs', 180),
+    lastRun('cleanup', 'Remove old flags', 'shop-api', 240),
+  ]),
+);
 const codexStateFile = path.join(demoDir, 'codex', '.codex-global-state.json');
 fs.writeFileSync(
   codexStateFile,
@@ -150,15 +182,16 @@ const hub = await startHub({
   uptimeKuma: { url: 'http://192.0.2.10:3001', key: `uk1_${'demo'.repeat(10)}`, intervalMs: 2000, fetch: demoKumaFetch },
   context: { root: transcripts, codexRoot: codexSessions, codexIndex, intervalMs: 300 },
   codexStateFile,
+  sessionsFile,
   // Made-up data with a token of its own: the demo's display needs no sign-in.
   openDisplay: true,
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
 
-function send(session: string, project: string, body: Record<string, unknown>, codex = false): void {
+function send(session: string, project: string, body: Record<string, unknown>, codex = false, rollout = codexRollout): void {
   const transcript = codex
-    ? { transcript_path: codexRollout }
+    ? { transcript_path: rollout }
     : session in CONTEXT_TOKENS
       ? { transcript_path: path.join(transcripts, 'demo', `${session}.jsonl`) }
       : {};
@@ -184,6 +217,7 @@ send('pipeline', 'data-pipeline', { hook_event_name: 'UserPromptSubmit', session
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a1', agent_type: 'Explore' });
 send('pipeline', 'data-pipeline', { hook_event_name: 'SubagentStart', agent_id: 'a2', agent_type: 'Plan' });
 send('firmware', 'car-firmware', { hook_event_name: 'UserPromptSubmit', model: 'gpt-6-astra', prompt: 'Update the CAN driver' }, true);
+send('webhooks', 'payments', { hook_event_name: 'UserPromptSubmit', model: 'gpt-6-astra', prompt: 'Retry failed webhooks' }, true, codexCliRollout);
 // A session asks the desktop app how much of the plan is used; the hook carries the answer.
 const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
 send('pipeline', 'data-pipeline', {

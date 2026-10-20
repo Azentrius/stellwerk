@@ -164,3 +164,10 @@ export function loadConfig(file: string): Config {
   }
   return parsed.data;
 }
+
+/** Deletes the raw hook log (it holds prompts and code); false when there is none. */
+export function deleteRawLog(file: string): boolean {
+  if (!fs.existsSync(file)) return false;
+  fs.rmSync(file);
+  return true;
+}

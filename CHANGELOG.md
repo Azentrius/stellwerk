@@ -48,6 +48,9 @@ too.
   scrolling, as in the monitor list. A new check in a real Edge (`tools/check-columns.ts`) scrolls the
   agents and the waiting column to their last entries by mouse wheel, finger and keyboard, and allows a
   request far down by a tap and by Enter.
+- **`stellwerk raw-log delete`:** deletes the raw hook log (`debug-raw.jsonl`), which holds prompts and
+  code; the display's hint while the raw log is on names it. The demo shows what is new (a session at rest
+  behind its line, one unknown, one of Codex' command line), and so does the README's screenshot.
 - **Release checks:** the release workflow now runs the checks in a real Edge as well (display sign-in,
   failing monitors, agents and waiting column, the display at rest), as the test workflow does.
 
