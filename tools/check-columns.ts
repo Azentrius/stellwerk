@@ -11,12 +11,11 @@
 
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { HOOK_PATH } from '../src/config.ts';
 import { displayKey, displayStartPage, startHub, type Hub } from '../src/hub/hub.ts';
 import { check, openEdge, pause, until, type Edge } from './edge.ts';
+import { answerOf, behaviorOf, hook } from './hooks.ts';
 import { countRenders, measure, openDisplay, press, screenshot, scrollWith, settled, swipe, tap, wheel, type Box, type Geometry, type ListSpec } from './lists.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
@@ -80,47 +79,20 @@ async function testHub(dir: string, pulls: number): Promise<{ hub: Hub; token: s
   return { hub, token, startFile };
 }
 
-/** A hook event as Claude Code sends it; resolves with the hub's answer. */
-function hook(hub: Hub, token: string, session: string, body: Record<string, unknown>): Promise<string> {
-  const payload = JSON.stringify({ session_id: session, cwd: `C:\\Projects\\${session.replace(/-\d+$/, '')}`, ...body });
-  return new Promise((resolve, reject) => {
-    const req = http.request({
-      host: '127.0.0.1',
-      port: hub.port,
-      method: 'POST',
-      path: HOOK_PATH,
-      agent: false,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-    });
-    req.on('response', (res) => {
-      let text = '';
-      res.on('data', (chunk) => (text += chunk));
-      res.on('end', () => resolve(text));
-    });
-    req.on('error', reject);
-    req.end(payload);
-  });
-}
-/** The hub's answer to a held request, or a failed check when it does not come. */
-function answerOf(reply: Promise<string>, what: string): Promise<string> {
-  return Promise.race([reply, pause(10_000).then(() => Promise.reject(new Error(`FAILED: ${what} (no answer)`)))]);
-}
-const behaviorOf = (reply: string) => (JSON.parse(reply) as { hookSpecificOutput?: { decision?: { behavior?: string } } }).hookSpecificOutput?.decision?.behavior;
-
 /** Sessions at work, sessions waiting for an answer in the app, and held requests; returns the requests' answers. */
 async function fill(hub: Hub, token: string, counts: { working: number; answers: number; cards: number }): Promise<Array<Promise<string>>> {
   for (let i = 1; i <= counts.working; i++) {
     const title = i === 13 ? `Session ${pad(i)} with a title long enough to run past the width of its column` : `Session ${pad(i)}`;
-    await hook(hub, token, `agent-${pad(i)}`, { hook_event_name: 'UserPromptSubmit', session_title: title, prompt: 'x' });
+    await hook(hub.port, token, `agent-${pad(i)}`, { hook_event_name: 'UserPromptSubmit', session_title: title, prompt: 'x' });
   }
   for (let i = 1; i <= counts.answers; i++) {
-    await hook(hub, token, `asking-${pad(i)}`, { hook_event_name: 'UserPromptSubmit', session_title: `Asking ${pad(i)}`, prompt: 'x' });
-    await hook(hub, token, `asking-${pad(i)}`, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'x' });
+    await hook(hub.port, token, `asking-${pad(i)}`, { hook_event_name: 'UserPromptSubmit', session_title: `Asking ${pad(i)}`, prompt: 'x' });
+    await hook(hub.port, token, `asking-${pad(i)}`, { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'x' });
   }
   const replies: Array<Promise<string>> = [];
   for (let i = 1; i <= counts.cards; i++) {
     replies.push(
-      hook(hub, token, `card-${pad(i)}`, {
+      hook(hub.port, token, `card-${pad(i)}`, {
         hook_event_name: 'PermissionRequest',
         session_title: `Request ${pad(i)}`,
         tool_name: 'Bash',
@@ -147,9 +119,11 @@ try {
   const lastReadable = (g: Geometry) => g.entries.at(-1)?.readable === true && !g.more && g.mask === 'none';
   /** The rectangle of a card's button, and whether it is in the list's view, outside the fade and uncovered. */
   const button = (card: number, decision: string) =>
-    browser.evaluate<{ box: Box; inView: boolean; disabled: boolean } | null>(`(() => {
+    browser.call<{ box: Box; inView: boolean; disabled: boolean } | null>(
+      `(card, decision) => {
       const list = document.querySelector('#waiting-list');
-      const node = document.querySelectorAll('.card')[${card}]?.querySelector('[data-decision="${decision}"]');
+      const buttons = document.querySelectorAll('.card')[card]?.querySelectorAll('[data-decision]') ?? [];
+      const node = [...buttons].find((b) => b.dataset.decision === decision);
       if (!node) return null;
       const r = node.getBoundingClientRect();
       const v = list.getBoundingClientRect();
@@ -160,7 +134,10 @@ try {
         inView: r.top >= v.top && r.bottom <= Math.min(innerHeight, v.top + list.clientHeight - fade) && hit !== null && node.contains(hit),
         disabled: node.disabled,
       };
-    })()`);
+    }`,
+      card,
+      decision,
+    );
 
   await openDisplay(browser, many.startFile);
   await until('the display shows all sessions, requests, answers and pull requests', async () => {
@@ -250,7 +227,7 @@ try {
   focused = false;
   for (let i = 0; i < 40 && !focused; i++) {
     await press(browser, 'Tab', 9);
-    focused = await browser.evaluate<boolean>(`document.activeElement === document.querySelectorAll('.card')[${before}]?.querySelector('[data-decision="allow"]')`);
+    focused = await browser.call<boolean>(`(card) => document.activeElement === document.querySelectorAll('.card')[card]?.querySelector('[data-decision="allow"]')`, before);
   }
   check(focused, 'Tab reaches the Allow of a card further down');
   allow = await button(before, 'allow');

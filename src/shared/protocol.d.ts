@@ -82,6 +82,8 @@ export interface HubView {
   startedAt: number;
   lastEventAt: number | null;
   sound: boolean;
+  /** The display dims after this long without anything new and without an open request; 0: never. */
+  quietAfterMs: number;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
   build: string;
   /**

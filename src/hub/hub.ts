@@ -102,6 +102,8 @@ export interface HubOptions {
   /** Stellwerk's version, named in the display's signature. */
   version: string;
   sound: boolean;
+  /** The display dims after this long without anything new (config quietAfterMinutes); 0 or none: never. */
+  quietAfterMs?: number;
   auditFile: string;
   /** ui/: index.html, styles, fonts. */
   uiRoot: string;
@@ -601,7 +603,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       now: now(),
       ...board.view(),
       pullRequests: github?.pullRequests ?? [],
-      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, build, rejected, rawLog: Boolean(options.rawLogFile) },
+      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, quietAfterMs: options.quietAfterMs ?? 0, build, rejected, rawLog: Boolean(options.rawLogFile) },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
       uptimeKuma: uptimeKuma?.view() ?? null,

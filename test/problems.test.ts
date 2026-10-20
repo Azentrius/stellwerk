@@ -86,7 +86,7 @@ test('the status lines are plain text, or a problem with its fix', () => {
 });
 
 test('requests turned away and the raw log are hints to look at the log, as warnings', () => {
-  const hub = (rejected: HubView['rejected'], rawLog = false): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, build: 'x', rejected, rawLog });
+  const hub = (rejected: HubView['rejected'], rawLog = false): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: 0, build: 'x', rejected, rawLog });
   const de = languages[1]!;
   assert.equal(rejectedLine(null, 0, en), null);
   assert.equal(rejectedLine(hub(null), 0, en), null);

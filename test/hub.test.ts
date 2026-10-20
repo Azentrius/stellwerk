@@ -964,6 +964,19 @@ describe('status hooks', () => {
   });
 });
 
+describe('the display at rest', () => {
+  test('the display gets the time after which it rests; without one, never', async () => {
+    const quiet = await startTestHub({ quietAfterMs: 600_000 });
+    const screen = await display(quiet.port);
+    assert.equal((await screen.state(() => true)).hub.quietAfterMs, 600_000);
+    screen.close();
+    const awake = await startTestHub();
+    const other = await display(awake.port);
+    assert.equal((await other.state(() => true)).hub.quietAfterMs, 0);
+    other.close();
+  });
+});
+
 describe('sessions over a restart', () => {
   test('they are there again after a restart, as unknown until their next event; no request comes back', async () => {
     const sessionsFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-hub-')), 'stellwerk', 'sessions.json');

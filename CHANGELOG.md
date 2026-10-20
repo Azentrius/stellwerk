@@ -2,9 +2,16 @@
 
 ## 0.5.3 – 2026-10-20
 
-Sessions and the times of failing monitors are there again after a restart of the hub, the waiting
-column's fade follows its scrolling, and a release runs the browser checks too.
+The display rests when nothing is new; sessions and the times of failing monitors are there again after a
+restart of the hub; the waiting column's fade follows its scrolling; a release runs the browser checks too.
 
+- **The display at rest:** after 10 minutes with nothing new and no open request, the display dims to
+  about a quarter, the clock still readable, so it does not glow on the desk all day and night. An open
+  request keeps it awake. Anything new wakes it: a request, an answer due in the app, a monitor going
+  down, a new pull request or failed checks, the hub going away; so does a tap, which presses nothing
+  else. `quietAfterMinutes` in `config.json` sets the time, 0 turns it off. The display dims its own page:
+  the hub starts no programs, so the screen's backlight stays on. Checked in a real Edge
+  (`tools/check-quiet.ts`, also in CI and in releases).
 - **Sessions over a restart:** after a restart of the hub the agents column was empty until each session
   sent its next event, and titles were missing until the next prompt. Now the hub keeps the sessions it
   shows in `%LOCALAPPDATA%\stellwerk\sessions.json` (id, folder, title, project, context, last activity;
@@ -23,7 +30,7 @@ column's fade follows its scrolling, and a release runs the browser checks too.
   agents and the waiting column to their last entries by mouse wheel, finger and keyboard, and allows a
   request far down by a tap and by Enter.
 - **Release checks:** the release workflow now runs the checks in a real Edge as well (display sign-in,
-  failing monitors, agents and waiting column), as the test workflow does.
+  failing monitors, agents and waiting column, the display at rest), as the test workflow does.
 
 ## 0.5.2 – 2026-10-20
 

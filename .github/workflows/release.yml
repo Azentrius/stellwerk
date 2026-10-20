@@ -53,6 +53,8 @@ jobs:
         run: node tools/check-monitors.ts
       - name: Agents and waiting column in a real Edge (the last entry, a card far down by tap and key)
         run: node tools/check-columns.ts
+      - name: The display at rest in a real Edge (dims, what wakes it, a tap presses nothing)
+        run: node tools/check-quiet.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
 

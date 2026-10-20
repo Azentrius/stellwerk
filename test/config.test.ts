@@ -31,6 +31,7 @@ test('without a file every setting has its default', () => {
     port: 4780,
     holdSeconds: 60,
     sound: false,
+    quietAfterMinutes: 10,
     scale: 1,
     debugRawLog: false,
     githubIntervalSeconds: 120,
@@ -39,6 +40,16 @@ test('without a file every setting has its default', () => {
     codexHoldSeconds: 30,
     contextWindows: {},
   });
+});
+
+test('the display rests after 0 (never) to 1440 minutes', () => {
+  const file = path.join(tempDir(), 'config.json');
+  fs.writeFileSync(file, '{ "quietAfterMinutes": 0 }');
+  assert.equal(loadConfig(file).quietAfterMinutes, 0);
+  for (const bad of ['{ "quietAfterMinutes": -1 }', '{ "quietAfterMinutes": 1441 }', '{ "quietAfterMinutes": 2.5 }']) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => loadConfig(file), bad);
+  }
 });
 
 test('the Codex hold time stays at least 10 s below its hook timeout of 45 s', () => {

@@ -7,13 +7,15 @@
 
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { renderAgents } from './agents.ts';
-import { renderAnswers, waitingForAnswer } from './answers.ts';
+import { renderAnswers } from './answers.ts';
+import { waitingForAnswer } from './due.ts';
 import { alert, byId, icon, label } from './dom.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
+import { Rest, watched } from './quiet.ts';
 import { shouldReload } from './reload.ts';
 import {
   githubLine,
@@ -87,6 +89,9 @@ let connected = false;
 let attempts = 0;
 let toastTimer: number | undefined;
 let audio: AudioContext | null = null;
+const rest = new Rest(Date.now());
+/** The tap that woke the resting display: its click does nothing. */
+let swallowClick = false;
 
 byId('all-clear-icon').append(icon('check-circle'));
 
@@ -225,6 +230,9 @@ function tick(): void {
   markFailingMonitors();
   const kumaNote = uptimeKumaLine(kuma, now, texts);
   if (kumaNote) show(monitorsState, kumaNote);
+
+  // At rest after a while with nothing new and no open request: dimmed (quiet.ts).
+  document.body.classList.toggle('quiet', rest.update(watched(state, connected), state?.hub.quietAfterMs ?? 0, now));
 }
 
 /**
@@ -299,3 +307,27 @@ void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
 waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
 monitorsFailing.addEventListener('scroll', () => markFailingMonitors(), { passive: true });
+// A tap on the resting display wakes it and does nothing else: the click that follows goes nowhere.
+document.addEventListener(
+  'pointerdown',
+  (event) => {
+    if (!document.body.classList.contains('quiet')) return;
+    rest.wake(Date.now() + clockOffset);
+    document.body.classList.remove('quiet');
+    swallowClick = true;
+    window.setTimeout(() => (swallowClick = false), 1000);
+    event.preventDefault();
+    event.stopPropagation();
+  },
+  { capture: true },
+);
+document.addEventListener(
+  'click',
+  (event) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  },
+  { capture: true },
+);

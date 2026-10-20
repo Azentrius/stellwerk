@@ -63,7 +63,8 @@ export interface Geometry {
   fixed: Record<string, { box: Box; shown: boolean }>;
 }
 
-const measureIn = (spec: ListSpec) => `((spec) => {
+/** Measures a list in the page; the spec goes in as an argument, never as code. */
+const MEASURE = `(spec) => {
   const list = document.querySelector(spec.list);
   const rect = (node) => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
   const outer = list.getBoundingClientRect();
@@ -103,10 +104,10 @@ const measureIn = (spec: ListSpec) => `((spec) => {
     focusable: list.tabIndex >= 0, scrollbar: list.offsetWidth - list.clientWidth - list.clientLeft * 2,
     overflowX: list.scrollWidth - list.clientWidth, view: list.offsetParent === null ? null : view, entries, content, fixed,
   };
-})(${JSON.stringify(spec)})`;
+}`;
 
 export function measure(edge: Edge, spec: ListSpec): Promise<Geometry> {
-  return edge.evaluate<Geometry>(measureIn(spec));
+  return edge.call<Geometry>(MEASURE, spec);
 }
 
 /** Waits until the list stands still (a wheel or a fling may still glide), then measures. */
@@ -180,10 +181,13 @@ export async function press(edge: Edge, key: string, code: number, text?: string
 
 /** Counts the changes to a list from now on, so a check knows the display drew it again. */
 export async function countRenders(edge: Edge, selector: string): Promise<() => Promise<number>> {
-  await edge.evaluate(`(() => {
-    window.__renders = 0;
-    new MutationObserver(() => window.__renders++).observe(document.querySelector(${JSON.stringify(selector)}), { childList: true, subtree: true, characterData: true });
-  })()`);
+  await edge.call(
+    `(selector) => {
+      window.__renders = 0;
+      new MutationObserver(() => window.__renders++).observe(document.querySelector(selector), { childList: true, subtree: true, characterData: true });
+    }`,
+    selector,
+  );
   return () => edge.evaluate<number>('window.__renders');
 }
 

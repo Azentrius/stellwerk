@@ -87,11 +87,12 @@ than fit now scroll, down to the last one.
 
 ---
 
-## 0.5.3 – Over a restart ✅
+## 0.5.3 – At rest and over a restart ✅
 
-Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the sessions and since when a monitor fails survive a
-restart of the hub, the waiting column's fade follows its scrolling, and a release runs the browser checks
-too, now also for the agents and the waiting column.
+Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): the display rests, dimmed, when nothing is new; the sessions
+and since when a monitor fails survive a restart of the hub; the waiting column's fade follows its
+scrolling; and a release runs the browser checks too, now also for the agents and the waiting column and
+for the display at rest.
 
 ---
 
