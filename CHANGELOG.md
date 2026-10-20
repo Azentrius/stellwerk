@@ -2,9 +2,10 @@
 
 ## 0.5.3 – 2026-10-21
 
-The display rests when nothing is new; Codex' command line is marked as such; sessions and the times of
-failing monitors are there again after a restart of the hub; the status column's foot scrolls; the waiting
-column's fade follows its scrolling; a release runs the browser checks too.
+The display rests when nothing is new; sessions at rest make way; Codex' command line is marked as such;
+sessions and the times of failing monitors are there again after a restart of the hub; the status
+column's foot scrolls; the waiting column's fade follows its scrolling; a release runs the browser checks
+too.
 
 - **The display at rest:** after 10 minutes with nothing new and no open request, the display dims to
   about a quarter, the clock still readable, so it does not glow on the desk all day and night. An open
@@ -13,6 +14,11 @@ column's fade follows its scrolling; a release runs the browser checks too.
   else. `quietAfterMinutes` in `config.json` sets the time, 0 turns it off. The display dims its own page:
   the hub starts no programs, so the screen's backlight stays on. Checked in a real Edge
   (`tools/check-quiet.ts`, also in CI and in releases).
+- **Sessions at rest make way:** with many sessions the ones at work or waiting got lost among those long
+  done. Sessions done or unknown without an event for 30 minutes now wait behind one line at the foot of
+  the agents column ("8 more at rest"); a tap opens it, the next closes it, and a minute after the last
+  touch it closes by itself. Sessions at work or waiting always stand on their own. While the agents list
+  scrolls it is a tab stop of its own. The column check in a real Edge covers it.
 - **Codex' command line:** its sessions came to the display already, through the same hooks as the
   app's, but looked like the app's. Now they show as **Codex CLI**, and the third button of their cards
   says **In the terminal**, where Codex then asks. The hub tells them apart by the first line of the

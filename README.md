@@ -11,9 +11,10 @@ requests right there. Like a dispatcher who sees every train on the track diagra
 - **Every session at a glance.** In the left column, each session with its name (bold) and project, and
   its status: waiting for approval, waiting for you, working, done, ended. With whose agent it is
   ("Claude", "Codex", all alike), the number of running subagents and the time of the last activity. The
-  most urgent first. After a restart of the hub the sessions of the last 12 hours are there again, grey
-  and "unknown", until each sends its next event; their open requests are not, as those went back to the
-  app when the hub stopped.
+  most urgent first. Sessions done or unknown without an event for 30 minutes wait behind one line at the
+  foot ("8 more at rest"), which a tap opens. After a restart of the hub the sessions of the last 12 hours
+  are there again, grey and "unknown", until each sends its next event; their open requests are not, as
+  those went back to the app when the hub stopped.
 - **How full the context is.** In front of each session the percentage of its context window that is
   used, 0 to 100 %, over a thin line; from 80 % it needs attention, from 90 % it is red (the app
   compacts the context at about 97 %). The hub takes the token counts of

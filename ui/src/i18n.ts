@@ -89,6 +89,9 @@ export interface Texts {
   ago: (n: number, unit: TimeUnit) => string;
   justNow: string;
   subagents: (n: number) => string;
+  /** The line behind which the sessions at rest wait, closed and open. */
+  restingMore: (n: number) => string;
+  restingHide: (n: number) => string;
   /** Whose agent a session is, shown for every session alike. */
   providers: Record<Provider, string>;
   /** Codex' command line, in place of the provider's name. */
@@ -236,6 +239,8 @@ const en: Texts = {
   ago: (n, unit) => `${n} ${unit} ago`,
   justNow: 'just now',
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
+  restingMore: (n) => `${n} more at rest`,
+  restingHide: (n) => (n === 1 ? 'Hide the one at rest' : `Hide the ${n} at rest`),
   providers: { claude: 'Claude', codex: 'Codex' },
   codexCli: 'Codex CLI',
   now: 'now',
@@ -378,6 +383,8 @@ const de: Texts = {
   ago: (n, unit) => `vor ${n} ${unit}`,
   justNow: 'gerade eben',
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
+  restingMore: (n) => (n === 1 ? '1 weitere ruht' : `${n} weitere ruhen`),
+  restingHide: (n) => (n === 1 ? 'Ruhende ausblenden' : `${n} ruhende ausblenden`),
   providers: { claude: 'Claude', codex: 'Codex' },
   codexCli: 'Codex CLI',
   now: 'jetzt',

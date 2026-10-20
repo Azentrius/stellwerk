@@ -106,6 +106,24 @@ function usage(port: number, token: string): Promise<string> {
   });
 }
 
+/** Ten sessions of the last run, idle for two hours: they come back as unknown, at rest. */
+const RESTING = 10;
+function restingSessions(dir: string): string {
+  const file = path.join(dir, 'sessions.json');
+  const lastActivity = Date.now() - 2 * 3_600_000;
+  const saved = Array.from({ length: RESTING }, (_, i) => ({
+    id: `rest-${pad(i + 1)}`,
+    provider: 'claude',
+    cwd: 'C:\\Projects\\rest',
+    title: `Ruht ${pad(i + 1)}`,
+    project: null,
+    context: null,
+    lastActivity,
+  }));
+  fs.writeFileSync(file, JSON.stringify(saved));
+  return file;
+}
+
 /**
  * A hub of its own with its start file, as `serve` writes it; with `alerts`, the raw log is on and a
  * request with a wrong token is turned away, so the status column shows two alerts above its gauges.
@@ -127,6 +145,7 @@ async function testHub(dir: string, pulls: number, alerts = false): Promise<{ hu
     github: { owner: 'example', token: `github_pat_${'check'.repeat(8)}`, intervalMs: 3_600_000, fetch: gitHub(pulls) },
     hardware: { settingsFile: path.join(dir, 'LibreHardwareMonitor.config'), intervalMs: 500, fetch: hardwareFetch },
     rawLogFile: alerts ? path.join(dir, 'debug-raw.jsonl') : null,
+    sessionsFile: alerts ? restingSessions(dir) : null,
   });
   if (hub.missingBuild) throw new Error('The display is not built. Run "npm run build" first.');
   const startFile = path.join(dir, 'display.html');
@@ -241,6 +260,43 @@ try {
   check(g.scrollTop === 0, 'a finger moves the agents back to the first');
   g = (await scrollWith(browser, AGENTS, swipe(browser, 300), 'end')).g;
   check(g.scrollTop >= g.max - 1 && lastReadable(g), 'a finger moves them to the last, which can be read');
+
+  // Sessions at rest: behind one line at the foot, which a tap opens and the next closes.
+  const line = () =>
+    browser.call<{ text: string; inView: boolean; box: Box } | null>(
+      `() => {
+      const node = document.querySelector('.resting__toggle');
+      if (!node || node.closest('[hidden]')) return null;
+      const r = node.getBoundingClientRect();
+      const list = document.querySelector('#agents').getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { text: node.textContent, inView: r.top >= list.top && r.bottom <= list.bottom && hit !== null && node.contains(hit), box: { top: r.top, bottom: r.bottom, left: r.left, right: r.right } };
+    }`,
+    );
+  let rest = await line();
+  check(rest?.inView === true && /^10 (more at rest|weitere ruhen)$/.test(rest.text), `the ten sessions at rest wait behind one line at the foot ("${rest?.text}")`);
+  check(g.entries.every((e) => !/Ruht \d/.test(e.text)), 'none of them stands on its own');
+  await tap(browser, (rest!.box.left + rest!.box.right) / 2, (rest!.box.top + rest!.box.bottom) / 2);
+  g = await until('a tap opens the line', async () => {
+    const now = await measure(browser, AGENTS);
+    return now.entries.length === sessions + RESTING ? now : null;
+  });
+  check(g.entries.slice(-RESTING).every((e) => /Ruht \d/.test(e.text)), 'a tap opens it: the ten show below it');
+  rest = await line();
+  check(/^(Hide the 10 at rest|10 ruhende ausblenden)$/.test(rest?.text ?? ''), `its word says how to close it ("${rest?.text}")`);
+  g = (await scrollWith(browser, AGENTS, swipe(browser, 300), 'end')).g;
+  check(lastReadable(g), 'a finger reaches the last one at rest');
+  g = (await scrollWith(browser, AGENTS, swipe(browser, -300), 'start')).g;
+  rest = await line();
+  for (let i = 0; i < 20 && rest && !rest.inView; i++) {
+    const view = g.view!;
+    await swipe(browser, 200)({ x: (view.left + view.right) / 2, y: (view.top + view.bottom) / 2 });
+    g = await settled(browser, AGENTS);
+    rest = await line();
+  }
+  await tap(browser, (rest!.box.left + rest!.box.right) / 2, (rest!.box.top + rest!.box.bottom) / 2);
+  await until('the next tap closes it', async () => (await measure(browser, AGENTS)).entries.length === sessions);
+  check(true, 'the next tap closes it');
 
   // ---------- the waiting column: cards, answers in the app, pull requests ----------
   g = await settled(browser, WAITING);
