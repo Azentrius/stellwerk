@@ -12,6 +12,7 @@ function request(id: string, receivedAt: number, outcome: PermissionOutcome | nu
     id,
     sessionId: 'session',
     provider: 'claude',
+    terminal: false,
     project: 'shop-api',
     title: null,
     tool: 'Bash',

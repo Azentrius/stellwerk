@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, PermissionView } from '../../src/shared/protocol.js';
-import { naming } from './naming.ts';
+import { naming, providerName } from './naming.ts';
 import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { leadingRequest } from './leading.ts';
@@ -19,6 +19,9 @@ interface Card {
   outcome: HTMLElement;
   buttons: HTMLButtonElement[];
   allow: HTMLButtonElement;
+  /** Whose agent and the project, and the third button's word: both differ for Codex' command line. */
+  project: HTMLElement;
+  appLabel: Text;
   /** A decision was sent and its answer is still out. */
   busy: boolean;
 }
@@ -103,13 +106,14 @@ export class QueueView {
     root.dataset.id = view.id;
 
     // As in the agents column: the session's name on top, the project below.
-    const { name, project } = naming(view.project, view.title, view.sessionId);
+    const { name } = naming(view.project, view.title, view.sessionId);
     const head = el('header', 'card__head');
     const line = el('p', 'card__line');
     const wait = el('span', 'card__wait');
     line.append(el('span', 'card__name', name), el('span', 'card__sep', '·'), el('span', 'card__tool', view.tool), wait);
     head.append(line);
-    head.append(el('p', 'card__project', [t.providers[view.provider], project].filter(Boolean).join(' · ')));
+    const projectLine = el('p', 'card__project');
+    head.append(projectLine);
     root.append(head, renderToolInput(view.tool, view.input, view.mcpServer, t));
 
     const hold = el('div', 'card__hold');
@@ -130,16 +134,21 @@ export class QueueView {
       const button = el('button', 'az-btn az-btn--secondary btn');
       button.type = 'button';
       button.dataset.decision = decision;
-      button.append(icon(iconName), text);
+      button.append(icon(iconName), document.createTextNode(text));
       return button;
     });
     actions.append(...buttons);
     const outcome = el('p', 'card__outcome');
     root.append(actions, outcome);
-    return { view, root, wait, bar, outcome, buttons, allow: buttons[0]!, busy: false };
+    return { view, root, wait, bar, outcome, buttons, allow: buttons[0]!, busy: false, project: projectLine, appLabel: buttons[2]!.lastChild as Text };
   }
 
   private refresh(card: Card): void {
+    const t = this.texts;
+    // Known only after the first read of the session's transcript, so it can change while the card stands.
+    const { project } = naming(card.view.project, card.view.title, card.view.sessionId);
+    card.project.textContent = [providerName(card.view.provider, card.view.terminal, t), project].filter(Boolean).join(' · ');
+    card.appLabel.data = card.view.terminal ? t.inTerminal : t.inApp;
     const settled = card.view.outcome !== null;
     card.root.classList.toggle('card--settled', settled);
     card.outcome.textContent = settled ? this.texts.outcome[card.view.outcome!] : '';

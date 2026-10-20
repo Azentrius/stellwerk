@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { DueSession } from './due.ts';
-import { naming } from './naming.ts';
+import { naming, providerName } from './naming.ts';
 import { entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { state } from './states.ts';
@@ -18,7 +18,7 @@ export function renderAnswers(list: HTMLElement, sessions: DueSession[], now: nu
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);
       // Whose agent it is, with how long it has been waiting ("Codex · 0:42").
-      const since = [texts.providers[session.provider], session.waitingSince === null ? '' : duration(now - session.waitingSince)]
+      const since = [providerName(session.provider, session.terminal, texts), session.waitingSince === null ? '' : duration(now - session.waitingSince)]
         .filter(Boolean)
         .join(' · ');
       // The same state as "waiting for you" in the agents column: a note, with the reason as its word.

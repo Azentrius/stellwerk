@@ -67,6 +67,8 @@ export interface Texts {
   allow: string;
   deny: string;
   inApp: string;
+  /** The same for a session of Codex' command line, whose own card shows in its terminal. */
+  inTerminal: string;
   outcome: Record<PermissionOutcome, string>;
   hubConnected: string;
   hubDisconnected: string;
@@ -89,6 +91,8 @@ export interface Texts {
   subagents: (n: number) => string;
   /** Whose agent a session is, shown for every session alike. */
   providers: Record<Provider, string>;
+  /** Codex' command line, in place of the provider's name. */
+  codexCli: string;
   /** A moment ago, short (with the provider, in place of "just now"). */
   now: string;
   /** The context ring of an agent: how full, as its name and tooltip; or not known yet. */
@@ -199,6 +203,7 @@ const en: Texts = {
   allow: 'Allow',
   deny: 'Deny',
   inApp: 'In the app',
+  inTerminal: 'In the terminal',
   outcome: {
     allowed: 'Allowed',
     denied: 'Denied',
@@ -232,6 +237,7 @@ const en: Texts = {
   justNow: 'just now',
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
   providers: { claude: 'Claude', codex: 'Codex' },
+  codexCli: 'Codex CLI',
   now: 'now',
   context: (percent) => `Context ${percent} used`,
   contextUnknown: 'Context not known yet',
@@ -339,6 +345,7 @@ const de: Texts = {
   allow: 'Erlauben',
   deny: 'Ablehnen',
   inApp: 'In der App',
+  inTerminal: 'Im Terminal',
   outcome: {
     allowed: 'Erlaubt',
     denied: 'Abgelehnt',
@@ -372,6 +379,7 @@ const de: Texts = {
   justNow: 'gerade eben',
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
   providers: { claude: 'Claude', codex: 'Codex' },
+  codexCli: 'Codex CLI',
   now: 'jetzt',
   context: (percent) => `Kontext ${percent} genutzt`,
   contextUnknown: 'Kontext noch unbekannt',

@@ -746,6 +746,18 @@ describe('over a restart of the hub', () => {
   });
 });
 
+describe("Codex' command line", () => {
+  test('a session that runs in the terminal says so, also on its requests', () => {
+    const board = new Board();
+    assert.equal(board.setTerminal(SESSION), false, 'no session yet');
+    board.addPermission('r1', request(), 1000, HOLD, 'codex');
+    assert.deepEqual([board.view().sessions[0]?.terminal, board.view().permissions[0]?.terminal], [false, false]);
+    assert.equal(board.setTerminal(SESSION), true);
+    assert.equal(board.setTerminal(SESSION), false, 'once');
+    assert.deepEqual([board.view().sessions[0]?.terminal, board.view().permissions[0]?.terminal], [true, true]);
+  });
+});
+
 describe('helpers', () => {
   test('projectName takes the last part of Windows and POSIX paths', () => {
     assert.equal(projectName('C:\\Users\\dev\\Projekte\\stellwerk'), 'stellwerk');

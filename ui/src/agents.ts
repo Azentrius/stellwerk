@@ -10,7 +10,7 @@ import { contextPercent } from './context.ts';
 import { el, entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { meterTone } from './levels.ts';
-import { naming } from './naming.ts';
+import { naming, providerName } from './naming.ts';
 import { sessionState } from './states.ts';
 import { elapsed } from './time.ts';
 
@@ -20,7 +20,7 @@ export function renderAgents(list: HTMLElement, sessions: SessionView[], now: nu
       const { name, project } = naming(session.project, session.title, session.id);
       const details = [project, session.subagents > 0 ? texts.subagents(session.subagents) : ''].filter(Boolean).join(' · ');
       // Whose agent it is, for every session alike, with the time, which is kept short for it ("12 s").
-      const time = `${texts.providers[session.provider]} · ${elapsed(now - session.lastActivity, texts)}`;
+      const time = `${providerName(session.provider, session.terminal, texts)} · ${elapsed(now - session.lastActivity, texts)}`;
       const item = entry(`agent agent--${session.status} entry--meter`, name, time, details, sessionState(session.status, texts));
       item.title = session.cwd;
       item.prepend(contextMeter(session.context, texts));

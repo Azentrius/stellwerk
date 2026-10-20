@@ -2,8 +2,9 @@
 
 ## 0.5.3 – 2026-10-20
 
-The display rests when nothing is new; sessions and the times of failing monitors are there again after a
-restart of the hub; the waiting column's fade follows its scrolling; a release runs the browser checks too.
+The display rests when nothing is new; Codex' command line is marked as such; sessions and the times of
+failing monitors are there again after a restart of the hub; the waiting column's fade follows its
+scrolling; a release runs the browser checks too.
 
 - **The display at rest:** after 10 minutes with nothing new and no open request, the display dims to
   about a quarter, the clock still readable, so it does not glow on the desk all day and night. An open
@@ -12,6 +13,11 @@ restart of the hub; the waiting column's fade follows its scrolling; a release r
   else. `quietAfterMinutes` in `config.json` sets the time, 0 turns it off. The display dims its own page:
   the hub starts no programs, so the screen's backlight stays on. Checked in a real Edge
   (`tools/check-quiet.ts`, also in CI and in releases).
+- **Codex' command line:** its sessions came to the display already, through the same hooks as the
+  app's, but looked like the app's. Now they show as **Codex CLI**, and the third button of their cards
+  says **In the terminal**, where Codex then asks. The hub tells them apart by the first line of the
+  session's transcript, of which it keeps only who wrote it (`codex-tui` for the command line). The
+  README says how Codex' approval settings decide whether it asks at all.
 - **Sessions over a restart:** after a restart of the hub the agents column was empty until each session
   sent its next event, and titles were missing until the next prompt. Now the hub keeps the sessions it
   shows in `%LOCALAPPDATA%\stellwerk\sessions.json` (id, folder, title, project, context, last activity;

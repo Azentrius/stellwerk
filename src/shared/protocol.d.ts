@@ -40,6 +40,8 @@ export interface SessionView {
   context: ContextUsage | null;
   /** Subagents started and not yet stopped. */
   subagents: number;
+  /** Runs in Codex' command line, not in an app: its own card for a request shows in the terminal. */
+  terminal: boolean;
   lastActivity: number;
   endedAt: number | null;
 }
@@ -57,6 +59,8 @@ export interface PermissionView {
   id: string;
   sessionId: string;
   provider: Provider;
+  /** The session runs in Codex' command line: the request's own card shows in the terminal. */
+  terminal: boolean;
   project: string;
   title: string | null;
   tool: string;

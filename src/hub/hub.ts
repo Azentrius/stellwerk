@@ -279,6 +279,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         onName: (sessionId, name) => {
           if (board.setTitle(sessionId, name)) scheduleBroadcast();
         },
+        onTerminal: (sessionId) => {
+          if (board.setTerminal(sessionId)) scheduleBroadcast();
+        },
       })
     : null;
 
