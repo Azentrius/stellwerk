@@ -31,6 +31,8 @@ jobs:
         run: node tools/check-browser.ts
       - name: Failing monitors in a real Edge (wheel, touch and keyboard reach the last one)
         run: node tools/check-monitors.ts
+      - name: Agents and waiting column in a real Edge (the last entry, a card far down by tap and key)
+        run: node tools/check-columns.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
       - name: Changelog has a section for the current version

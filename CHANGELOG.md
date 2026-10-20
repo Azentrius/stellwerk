@@ -2,7 +2,8 @@
 
 ## 0.5.3 – 2026-10-20
 
-Failing monitors keep their time over a restart of the hub, and a release runs the browser checks too.
+Failing monitors keep their time over a restart of the hub, the waiting column's fade follows its
+scrolling, and a release runs the browser checks too.
 
 - **Times over a restart:** the hub knew since when a monitor fails only while it ran, so after a restart
   every failing monitor showed no time until it changed again. Now it keeps those times in
@@ -10,8 +11,13 @@ Failing monitors keep their time over a restart of the hub, and a release runs t
   takes them again if its last answer is no more than 15 minutes old. A monitor that changed while the
   hub was away, or one after a longer break, still shows no time: it may have come back and failed again
   unseen.
-- **Release checks:** the release workflow now runs the two checks in a real Edge as well (display
-  sign-in, failing monitors), as the test workflow does.
+- **The waiting column's fade:** scrolled to its foot, the waiting column kept its fade over the last
+  entry for up to a second, since the fade followed only the display's clock. Now it follows the
+  scrolling, as in the monitor list. A new check in a real Edge (`tools/check-columns.ts`) scrolls the
+  agents and the waiting column to their last entries by mouse wheel, finger and keyboard, and allows a
+  request far down by a tap and by Enter.
+- **Release checks:** the release workflow now runs the checks in a real Edge as well (display sign-in,
+  failing monitors, agents and waiting column), as the test workflow does.
 
 ## 0.5.2 – 2026-10-20
 
