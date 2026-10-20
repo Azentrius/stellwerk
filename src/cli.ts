@@ -10,7 +10,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { format, parseArgs } from 'node:util';
-import { GITHUB_OWNER, HOST, defaultPaths, loadConfig, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
+import { GITHUB_OWNER, HOST, defaultPaths, deleteRawLog, loadConfig, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
 import { UptimeKumaWatcher, describeUptimeKumaProblem } from './hub/kuma.ts';
 import {
@@ -138,6 +138,8 @@ Usage:
       Then restart the Codex app and allow the hooks there.
   stellwerk codex uninstall [--yes]
       Remove exactly these hooks.
+  stellwerk raw-log delete
+      Delete the raw hook log (debug-raw.jsonl), which holds prompts and code.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -177,6 +179,7 @@ async function main(): Promise<void> {
   if (command === 'kuma' && (action === 'key' || action === 'remove')) return uptimeKumaKey(action, values.url);
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
+  if (command === 'raw-log' && action === 'delete') return rawLogDelete();
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -651,3 +654,12 @@ main().catch((err: Error) => {
   console.error(err.message);
   process.exitCode = 1;
 });
+
+/** Deletes the raw hook log; says when the configuration would have the hub write it again. */
+function rawLogDelete(): void {
+  const paths = defaultPaths();
+  console.log(deleteRawLog(paths.rawLogFile) ? `Deleted ${paths.rawLogFile}.` : 'There is no raw hook log.');
+  if (loadConfig(paths.configFile).debugRawLog) {
+    console.log('debugRawLog is still true in config.json: set it to false and restart the hub, or it writes the log again.');
+  }
+}

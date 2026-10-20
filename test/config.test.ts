@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { defaultPaths, loadConfig, setConfigValue } from '../src/config.ts';
+import { defaultPaths, deleteRawLog, loadConfig, setConfigValue } from '../src/config.ts';
 import {
   ensureToken,
   isGitHubToken,
@@ -210,4 +210,12 @@ test('a damaged token file is reported', () => {
   const file = path.join(tempDir(), 'token');
   fs.writeFileSync(file, 'not-a-token');
   assert.throws(() => readToken(file), /valid token/);
+});
+
+test('the raw hook log is deleted on request; without one there is nothing to delete', () => {
+  const file = path.join(tempDir(), 'debug-raw.jsonl');
+  fs.writeFileSync(file, '{"prompt":"secret"}\n');
+  assert.equal(deleteRawLog(file), true);
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(deleteRawLog(file), false);
 });
