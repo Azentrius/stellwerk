@@ -320,6 +320,8 @@ try {
   await screenshot(browser, shots, 'status-bottom');
   check(g.scrollTop >= g.max - 1, `the mouse wheel scrolls the gauges to the end (${Math.round(g.scrollTop)} of ${Math.round(g.max)} px)`);
   check(lastReadable(g), 'then the last limit of the plans can be read in full: no fade over it');
+  const room = await browser.call<number>(`(selector, parts) => { const list = document.querySelector(selector); const right = list.getBoundingClientRect().left + list.clientLeft + list.clientWidth; return Math.min(...[...list.querySelectorAll(parts)].map((n) => right - n.getBoundingClientRect().right)); }`, STATUS.list, '.gauge__percent, .gauge__extra');
+  check(room >= 7.5, `the values keep room to the scroll bar (${Math.round(room)} px)`);
   check(statusByWheel.read.size === g.entries.length, `on the way both alerts and every gauge could be read (${statusByWheel.read.size} of ${g.entries.length})`);
   check(shown(g), 'the clock, the hub and its last event are still shown');
   renders = await countRenders(browser, STATUS.list);
@@ -357,6 +359,8 @@ try {
     ['waiting', WAITING],
     ['status', STATUS],
   ];
+  const flush = await browser.call<number>(`(selector, parts) => { const list = document.querySelector(selector); const right = list.getBoundingClientRect().left + list.clientLeft + list.clientWidth; return Math.min(...[...list.querySelectorAll(parts)].map((n) => right - n.getBoundingClientRect().right)); }`, STATUS.list, '.gauge__percent, .gauge__extra');
+  check(Math.abs(flush) <= 0.5, `without a scroll bar the values stand at the edge as before (${Math.round(flush)} px)`);
   for (const [name, spec] of quiet) {
     g = await settled(browser, spec);
     check(g.max <= 0 && !g.more && g.mask === 'none' && g.scrollbar === 0, `the ${name} column: nothing to scroll, no fade, no scroll bar`);

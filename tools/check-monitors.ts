@@ -120,12 +120,17 @@ try {
   check(g.scrollTop >= g.max - 1 && g.scrollTop > 0, `the mouse wheel scrolls the list to its end (${Math.round(g.scrollTop)} of ${Math.round(g.max)} px)`);
   check(lastReadable(g), 'then the last monitor, its name and its state, can be read in full: no fade over it');
   check(byWheel.read.size === failing, `on the way every one of the ${failing} could be read (${byWheel.read.size})`);
-  check(g.entries.slice(DOWN.length).every((e) => e.readable), 'all pending monitors after the down ones are in view at the end');
+  check(
+    g.entries.slice(DOWN.length).every((e) => statusOf(e) === 'pending') && g.entries.at(-1)!.readable,
+    'the pending monitors after the down ones end the list, the last one in view at the end',
+  );
   check(fixedShown(g), 'title, number up and the line of the last answer are still shown');
   const shown = new Set(g.entries.map((e) => e.text));
   check([...DOWN, ...PENDING].every((name) => shown.has(name)), 'every failing monitor is in the list with its whole name');
   check(g.entries.every((e) => !e.clipped), 'no name is cut off: long names wrap');
   check(g.overflowX <= 0, 'nothing runs out of the column to the side');
+  const room = await browser.call<number>(`(selector, parts) => { const list = document.querySelector(selector); const right = list.getBoundingClientRect().left + list.clientLeft + list.clientWidth; return Math.min(...[...list.querySelectorAll(parts)].map((n) => right - n.getBoundingClientRect().right)); }`, MONITORS.list, '.entry__time, .az-label');
+  check(room >= 11.5, `the times keep room to the scroll bar (${Math.round(room)} px: the entry's own 4 and 8 more)`);
 
   // 2. The display's regular renders (each second, and with each answer of Uptime Kuma) keep the place.
   const renders = await countRenders(browser, MONITORS.list);
@@ -179,6 +184,8 @@ try {
   check(g.max <= 0 && !g.more && g.mask === 'none', 'three fit: nothing to scroll, no fade');
   check(g.scrollbar === 0, 'no scroll bar takes room');
   check(!g.focusable, 'the list is no stop for Tab when there is nothing to scroll');
+  const flush = await browser.call<number>(`(selector, parts) => { const list = document.querySelector(selector); const right = list.getBoundingClientRect().left + list.clientLeft + list.clientWidth; return Math.min(...[...list.querySelectorAll(parts)].map((n) => right - n.getBoundingClientRect().right)); }`, MONITORS.list, '.entry__time');
+  check(Math.abs(flush - 4) <= 0.5, `without a scroll bar the times stand where they did (${Math.round(flush)} px, the entry's own)`);
   const few = g.view!;
   check(Math.abs(few.bottom - few.top - g.content) <= 1, 'the list is as high as what it holds');
   check(g.fixed.ok!.box.top - few.bottom <= 8.5, 'the number up follows right below');

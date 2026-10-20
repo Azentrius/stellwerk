@@ -34,8 +34,9 @@ column's fade follows its scrolling; a release runs the browser checks too.
   on), the hardware values and the plans' usage at the foot of the status column were cut off at the
   bottom and could not be reached; with two hints only one row was left. Now the hints and the gauges
   share one area below the clock and the hub's state, which scrolls like the lists by finger, mouse wheel
-  and keyboard, the hints first. Without hints the column looks as before. The column check in a real
-  Edge (`tools/check-columns.ts`) covers it.
+  and keyboard, the hints first. Without hints the column looks as before. While it scrolls, its values
+  keep a little room to the scroll bar, as do the times in the monitor list (seen in a touch test on the
+  display). The column check in a real Edge (`tools/check-columns.ts`) covers it.
 - **The waiting column's fade:** scrolled to its foot, the waiting column kept its fade over the last
   entry for up to a second, since the fade followed only the display's clock. Now it follows the
   scrolling, as in the monitor list. A new check in a real Edge (`tools/check-columns.ts`) scrolls the
