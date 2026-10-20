@@ -87,6 +87,13 @@ than fit now scroll, down to the last one.
 
 ---
 
+## 0.5.3 – Times over a restart ✅
+
+Done in 0.5.3 (see [CHANGELOG](CHANGELOG.md)): since when a monitor fails survives a restart of the hub,
+and a release runs the browser checks too.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

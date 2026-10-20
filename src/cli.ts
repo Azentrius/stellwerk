@@ -203,7 +203,7 @@ async function serve(
   const kumaKey = config.uptimeKumaUrl ? readUptimeKumaKey(paths.uptimeKumaKeyFile) : null;
   const uptimeKuma =
     config.uptimeKumaUrl && kumaKey
-      ? { url: config.uptimeKumaUrl, key: kumaKey, intervalMs: config.uptimeKumaIntervalSeconds * 1000 }
+      ? { url: config.uptimeKumaUrl, key: kumaKey, intervalMs: config.uptimeKumaIntervalSeconds * 1000, stateFile: paths.uptimeKumaStateFile }
       : null;
   let hub;
   try {

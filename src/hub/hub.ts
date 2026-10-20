@@ -114,8 +114,11 @@ export interface HubOptions {
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
   hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch } | null;
-  /** The monitors of Uptime Kuma: its /metrics at the address set up, with its API key. */
-  uptimeKuma?: { url: string; key: string; intervalMs: number; fetch?: typeof fetch } | null;
+  /**
+   * The monitors of Uptime Kuma: its /metrics at the address set up, with its API key. Since when they
+   * fail is remembered in `stateFile` between runs; without it, in memory only.
+   */
+  uptimeKuma?: { url: string; key: string; intervalMs: number; stateFile?: string | null; fetch?: typeof fetch } | null;
   /**
    * How full each session's context is: the token counts of the last answer in its transcript, read only
    * under `root` (~/.claude/projects). Windows by model from the configuration.
@@ -674,7 +677,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         server.close(() => resolve());
         server.closeAllConnections();
       });
-      await Promise.all([audit.flush(), plans.flush()]);
+      await Promise.all([audit.flush(), plans.flush(), uptimeKuma?.flush()]);
     },
   };
 }

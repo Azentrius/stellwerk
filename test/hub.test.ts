@@ -651,6 +651,30 @@ describe("Uptime Kuma's monitors", () => {
     assert.equal(calls[0]!.authorization, `Basic ${Buffer.from(`stellwerk:${key}`).toString('base64')}`);
     screen.close();
   });
+
+  test('since when a monitor fails is there again after a restart of the hub', async () => {
+    const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-hub-')), 'stellwerk', 'uptime-kuma.json');
+    let rounds = 0;
+    // Up at the first answer, down from the second on: the hub sees it go down.
+    const fakeFetch = (async () =>
+      new Response(
+        `# TYPE monitor_status gauge\nmonitor_status{monitor_id="1",monitor_name="Server - web",monitor_type="ping"} ${rounds++ === 0 ? 1 : 0}\n`,
+        { status: 200 },
+      )) as typeof fetch;
+    const kuma = { url: 'http://192.0.2.10:3001', key: `uk1_${'k3Y-_'.repeat(8)}`, intervalMs: 30, stateFile, fetch: fakeFetch };
+    const first = await startTestHub({ uptimeKuma: kuma });
+    const screen = await display(first.port);
+    const down = await screen.state((s) => typeof s.uptimeKuma?.monitors?.failing[0]?.since === 'number');
+    const since = down.uptimeKuma!.monitors!.failing[0]!.since;
+    screen.close();
+    await first.hub.close();
+
+    const second = await startTestHub({ uptimeKuma: { ...kuma, intervalMs: 60_000 } });
+    const again = await display(second.port);
+    const state = await again.state((s) => (s.uptimeKuma?.monitors?.failing.length ?? 0) > 0);
+    assert.deepEqual(state.uptimeKuma?.monitors?.failing, [{ name: 'Server - web', status: 'down', since }], 'the time of the last run');
+    again.close();
+  });
 });
 
 describe('Codex', () => {
