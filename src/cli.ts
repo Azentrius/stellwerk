@@ -230,6 +230,7 @@ async function serve(
         windows: config.contextWindows,
       },
       plansFile: paths.plansFile,
+      sessionsFile: paths.sessionsFile,
       codexStateFile: codexStateFile(paths.codexHome),
     });
   } catch (err) {

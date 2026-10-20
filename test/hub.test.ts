@@ -964,6 +964,33 @@ describe('status hooks', () => {
   });
 });
 
+describe('sessions over a restart', () => {
+  test('they are there again after a restart, as unknown until their next event; no request comes back', async () => {
+    const sessionsFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-hub-')), 'stellwerk', 'sessions.json');
+    const first = await startTestHub({ sessionsFile });
+    await hook(first.port, { hook_event_name: 'UserPromptSubmit', session_title: 'Login', prompt: 'secret prompt' }).reply;
+    const held = permissionRequest(first.port, 'git push origin main');
+    const screen = await display(first.port);
+    await screen.state((s) => s.permissions.length === 1);
+    screen.close();
+    await first.hub.close();
+    // Stopping, the hub gave the held request back to the app's own card.
+    assert.equal((await held.reply).status, 200);
+    assert.doesNotMatch(fs.readFileSync(sessionsFile, 'utf8'), /secret prompt|git push/);
+
+    const lines: string[] = [];
+    const second = await startTestHub({ sessionsFile, log: (line) => lines.push(line) });
+    const again = await display(second.port);
+    const state = await again.state((s) => s.sessions.length === 1);
+    assert.deepEqual([state.sessions[0]?.status, state.sessions[0]?.title, state.sessions[0]?.project], ['unknown', 'Login', 'shop-api']);
+    assert.deepEqual(state.permissions, [], 'no request comes back');
+    assert.ok(lines.some((line) => /^Sessions of the last run: 1,/.test(line)));
+    await hook(second.port, { hook_event_name: 'Stop' }).reply;
+    assert.equal((await again.state((s) => s.sessions[0]?.status !== 'unknown')).sessions[0]?.status, 'done', 'its next event says what it does');
+    again.close();
+  });
+});
+
 describe('permission requests', () => {
   test('"Allow" on the display answers Claude Code with allow; a second decision is refused', async () => {
     const { port, auditFile } = await startTestHub();

@@ -53,13 +53,15 @@ export function state(tone: Tone, text: string, neutralIcon: IconName | null = n
 /**
  * Waiting for approval needs attention: the agent stands until someone decides, and the request goes back
  * to the app when the hold time is up. Waiting for you (a question, some input, a permission open in the
- * app, or idle) has no such deadline, so it is a note.
+ * app, or idle) has no such deadline, so it is a note. Unknown (shown since a restart of the hub, until the
+ * session's next event) carries no judgement.
  */
 const SESSION_TONE: Record<SessionStatus, Tone> = {
   permission: 'warning',
   waiting: 'info',
   working: 'success',
   done: 'neutral',
+  unknown: 'neutral',
   ended: 'neutral',
 };
 

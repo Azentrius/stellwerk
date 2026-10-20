@@ -9,10 +9,12 @@ import {
   ENDED_VISIBLE_MS,
   IDLE_FORGET_MS,
   MAX_QUESTION,
+  MAX_SESSIONS,
   SETTLED_VISIBLE_MS,
   WRAP_UP_TOOL,
   canonicalJson,
   projectName,
+  type SavedSession,
   type Settlement,
 } from '../src/hub/board.ts';
 import type { HookEvent, PermissionRequestEvent } from '../src/hub/hook-input.ts';
@@ -643,6 +645,104 @@ describe('subagents', () => {
     board.addPermission('main', request(), 3, HOLD);
     const settled = board.apply(event('SubagentStop', { agent_id: 'a1' }), 4);
     assert.deepEqual(settled.map((s) => s.permission.id), ['sub']);
+  });
+});
+
+describe('over a restart of the hub', () => {
+  const saved = (id: string, lastActivity: number, extra: Partial<SavedSession> = {}): SavedSession => ({
+    id,
+    provider: 'claude',
+    cwd: CWD,
+    title: `Title of ${id}`,
+    project: null,
+    context: { used: 42, size: 100 },
+    lastActivity,
+    ...extra,
+  });
+
+  test('the sessions of the last run come back as unknown, with name, project, context and their time', () => {
+    const board = new Board();
+    const now = 10 * 3_600_000;
+    const restored = board.restore([saved('a', now - 60_000), saved('b', now - 3_600_000, { provider: 'codex', project: 'Lautwerk - Codex' })], now);
+    assert.equal(restored, 2);
+    assert.deepEqual(
+      board.view().sessions.map((s) => [s.id, s.status, s.provider, s.project, s.title, s.context?.used, s.lastActivity, s.waitingFor]),
+      [
+        ['a', 'unknown', 'claude', 'shop-api', 'Title of a', 42, now - 60_000, null],
+        ['b', 'unknown', 'codex', 'Lautwerk - Codex', 'Title of b', 42, now - 3_600_000, null],
+      ],
+    );
+    assert.deepEqual(board.view().permissions, [], 'no request comes back');
+    assert.equal(board.lastEventAt, null, 'no event yet');
+  });
+
+  test('only what the running hub would still show: active within IDLE_FORGET_MS, not twice, not over the limit', () => {
+    const board = new Board();
+    const now = 100 * 3_600_000;
+    board.apply({ ...event('UserPromptSubmit'), session_id: 'live' } as HookEvent, now);
+    const list = [
+      saved('live', now - 1000),
+      saved('old', now - IDLE_FORGET_MS),
+      saved('ahead', now + 1000),
+      ...Array.from({ length: MAX_SESSIONS + 5 }, (_, i) => saved(`s${i}`, now - i)),
+    ];
+    assert.equal(board.restore(list, now), MAX_SESSIONS - 1);
+    assert.equal(statusOf(board, 'live'), 'working', 'a session already there keeps what it is');
+    assert.equal(statusOf(board, 'old'), undefined);
+    assert.equal(statusOf(board, 'ahead'), undefined);
+    assert.equal(board.view().sessions.length, MAX_SESSIONS);
+  });
+
+  test('unknown stands after done and before ended; its next event says what it does', () => {
+    const board = new Board();
+    board.restore([saved(SESSION, 900), saved('other', 800), saved('third', 700), saved('fourth', 600), saved('fifth', 500)], 1000);
+    board.apply({ ...event('Stop'), session_id: 'other' } as HookEvent, 1000);
+    board.apply({ ...event('SessionEnd', { reason: 'other' }), session_id: 'third' } as HookEvent, 1000);
+    assert.deepEqual(
+      board.view().sessions.map((s) => [s.id, s.status]),
+      [
+        ['other', 'done'],
+        [SESSION, 'unknown'],
+        ['fourth', 'unknown'],
+        ['fifth', 'unknown'],
+        ['third', 'ended'],
+      ],
+    );
+    board.apply(event('UserPromptSubmit'), 1100);
+    assert.equal(statusOf(board), 'working');
+    board.apply({ ...event('SubagentStart', { agent_id: 'a1', agent_type: 'Explore' }), session_id: 'fourth' } as HookEvent, 1100);
+    assert.equal(statusOf(board, 'fourth'), 'working', "a subagent's event says the session runs");
+    board.addPermission('r1', { ...request(), session_id: 'fifth' }, 1100, HOLD);
+    assert.equal(statusOf(board, 'fifth'), 'permission');
+  });
+
+  test('the snapshot holds what restore needs and nothing else; ended sessions are left out', () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit', { session_title: 'Fix the login', prompt: 'secret prompt' }), 1000);
+    board.askUser(request({ questions: [{ question: 'Which contrast level?', options: [] }] }, { tool_name: 'AskUserQuestion' }), 1100);
+    board.addPermission('r1', { ...request({ command: 'git push' }), session_id: 'other' }, 1200, HOLD);
+    board.apply({ ...event('SessionEnd', { reason: 'other' }), session_id: 'gone' } as HookEvent, 1300);
+    const snapshot = board.snapshot();
+    assert.deepEqual(snapshot, [
+      { id: SESSION, provider: 'claude', cwd: CWD, title: 'Fix the login', project: null, context: null, lastActivity: 1100 },
+      { id: 'other', provider: 'claude', cwd: CWD, title: null, project: null, context: null, lastActivity: 1200 },
+    ]);
+    assert.doesNotMatch(JSON.stringify(snapshot), /secret prompt|contrast|git push/);
+    const again = new Board();
+    again.restore(snapshot, 2000);
+    assert.deepEqual(again.view().sessions.map((s) => [s.id, s.status, s.title]), [
+      ['other', 'unknown', null],
+      [SESSION, 'unknown', 'Fix the login'],
+    ]);
+  });
+
+  test('forgotten like any idle session, IDLE_FORGET_MS after its last activity', () => {
+    const board = new Board();
+    board.restore([saved(SESSION, 1000)], 2000);
+    board.sweep(1000 + IDLE_FORGET_MS - 1);
+    assert.equal(statusOf(board), 'unknown');
+    board.sweep(1000 + IDLE_FORGET_MS);
+    assert.equal(statusOf(board), undefined);
   });
 });
 

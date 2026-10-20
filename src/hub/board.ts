@@ -22,6 +22,18 @@ export const SETTLED_VISIBLE_MS = 6_000;
 export const IDLE_FORGET_MS = 12 * 60 * 60_000;
 export const MAX_SESSIONS = 100;
 
+/** A session as the hub remembers it over a restart (sessions.json): what the display shows of it, no more. */
+export interface SavedSession {
+  id: string;
+  provider: Provider;
+  cwd: string;
+  title: string | null;
+  /** As the agent's app names it ('' for none); null: the last part of cwd. */
+  project: string | null;
+  context: ContextUsage | null;
+  lastActivity: number;
+}
+
 /** Notifications that mean the session waits for the user, and for what. */
 const WAITING_NOTIFICATIONS: Readonly<Record<string, WaitingFor>> = {
   idle_prompt: 'idle',
@@ -56,7 +68,7 @@ export const WRAP_UP_TOOL = 'mcp__ccd_turn__wrap_up';
 /** A question longer than this is cut; the display shows it in one line anyway. */
 export const MAX_QUESTION = 300;
 
-const STATUS_ORDER: Record<SessionStatus, number> = { permission: 0, waiting: 1, working: 2, done: 3, ended: 4 };
+const STATUS_ORDER: Record<SessionStatus, number> = { permission: 0, waiting: 1, working: 2, done: 3, unknown: 4, ended: 5 };
 
 /** The status a session has apart from open requests. */
 type BaseStatus = Exclude<SessionStatus, 'permission'>;
@@ -308,30 +320,14 @@ export class Board {
     return true;
   }
 
-  /** Notes an event without changing the status. */
+  /** Notes an event without changing the status; a session known only from the last run is at work again. */
   touch(event: HookEvent, now: number, provider: Provider = 'claude'): Session {
     this.lastEventAt = now;
     let session = this.sessions.get(event.session_id);
     if (!session) {
       this.makeRoom();
-      session = {
-        id: event.session_id,
-        provider,
-        cwd: event.cwd ?? '',
-        title: null,
-        project: this.projectsAhead.get(event.session_id) ?? null,
-        base: 'done',
-        waitingFor: null,
-        waitingSince: null,
-        question: null,
-        wrapUp: null,
-        openQuestion: null,
-        subagentAppRequests: new Map(),
-        context: null,
-        subagents: new Set(),
-        lastActivity: now,
-        endedAt: null,
-      };
+      session = newSession(event.session_id, provider, event.cwd ?? '', now);
+      session.project = this.projectsAhead.get(event.session_id) ?? null;
       this.sessions.set(session.id, session);
       this.projectsAhead.delete(session.id);
     }
@@ -343,7 +339,38 @@ export class Board {
       setStatus(session, 'done');
       session.endedAt = null;
     }
+    // Shown since a restart of the hub without knowing what it does: an event says it runs, and what it
+    // says beyond that follows.
+    if (session.base === 'unknown') setStatus(session, 'working');
     return session;
+  }
+
+  /**
+   * The sessions the last run of the hub showed, after a restart: until its next event, what a session
+   * does is unknown. Only those active within IDLE_FORGET_MS, as the running hub keeps them; never with a
+   * request, since the held ones ended with the last run. Returns how many it took.
+   */
+  restore(saved: SavedSession[], now: number): number {
+    let restored = 0;
+    for (const s of saved) {
+      if (this.sessions.size >= MAX_SESSIONS) break;
+      if (this.sessions.has(s.id) || s.lastActivity > now || now - s.lastActivity >= IDLE_FORGET_MS) continue;
+      const session = newSession(s.id, s.provider, s.cwd, s.lastActivity);
+      session.base = 'unknown';
+      session.title = s.title;
+      session.project = s.project;
+      session.context = s.context;
+      this.sessions.set(session.id, session);
+      restored++;
+    }
+    return restored;
+  }
+
+  /** What restore() needs of the sessions shown, for the next run: no question, no prompt, no request. */
+  snapshot(): SavedSession[] {
+    return [...this.sessions.values()]
+      .filter((s) => s.base !== 'ended')
+      .map((s) => ({ id: s.id, provider: s.provider, cwd: s.cwd, title: s.title, project: s.project, context: s.context, lastActivity: s.lastActivity }));
   }
 
   /**
@@ -514,6 +541,27 @@ export class Board {
     const oldest = candidates[0];
     if (oldest) this.sessions.delete(oldest.id);
   }
+}
+
+function newSession(id: string, provider: Provider, cwd: string, now: number): Session {
+  return {
+    id,
+    provider,
+    cwd,
+    title: null,
+    project: null,
+    base: 'done',
+    waitingFor: null,
+    waitingSince: null,
+    question: null,
+    wrapUp: null,
+    openQuestion: null,
+    subagentAppRequests: new Map(),
+    context: null,
+    subagents: new Set(),
+    lastActivity: now,
+    endedAt: null,
+  };
 }
 
 /**

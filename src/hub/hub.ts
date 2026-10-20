@@ -37,6 +37,7 @@ import { HardwareWatcher } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 import { PlanBook, claudePlanOfHook } from './plans.ts';
+import { SessionFile } from './sessions.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
@@ -133,6 +134,11 @@ export interface HubOptions {
   } | null;
   /** Where the hub remembers the usage of the plans' limits between runs; without it, in memory only. */
   plansFile?: string | null;
+  /**
+   * Where the hub remembers the sessions it shows, so they are there again after a restart (as unknown
+   * until their next event); without it, in memory only.
+   */
+  sessionsFile?: string | null;
   /** The Codex app's state file, for the projects it files its chats under; without it, the folder shows. */
   codexStateFile?: string | null;
   /** Demo only: the display needs no sign-in. The command line never sets it. */
@@ -184,6 +190,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   const now = options.now ?? Date.now;
   const log = options.log ?? ((line: string) => console.log(line));
   const board = new Board();
+  const sessionFile = new SessionFile(options.sessionsFile ?? null, log);
+  const restored = board.restore(sessionFile.load(), now());
+  if (restored > 0) log(`Sessions of the last run: ${restored}, shown as unknown until they report again.`);
   const audit = new AuditLog(options.auditFile);
   const held = new Map<string, Held>();
   const startedAt = now();
@@ -606,6 +615,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       broadcastTimer = null;
       const message = JSON.stringify(stateMessage());
       for (const client of wss.clients) if (client.readyState === WebSocket.OPEN) client.send(message);
+      sessionFile.save(board.snapshot());
     }, BROADCAST_DELAY_MS);
   }
 
@@ -677,7 +687,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         server.close(() => resolve());
         server.closeAllConnections();
       });
-      await Promise.all([audit.flush(), plans.flush(), uptimeKuma?.flush()]);
+      sessionFile.save(board.snapshot());
+      await Promise.all([audit.flush(), plans.flush(), uptimeKuma?.flush(), sessionFile.flush()]);
     },
   };
 }

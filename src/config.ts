@@ -39,6 +39,8 @@ export interface Paths {
   uptimeKumaStateFile: string;
   /** The last usage of the plans' limits, so the display has it again after a restart. */
   plansFile: string;
+  /** The sessions on the display, so they are there again after a restart. */
+  sessionsFile: string;
   /** The display's start file: signs the display in at the hub; only the current user can read it. */
   displayStartFile: string;
   /**
@@ -66,6 +68,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     uptimeKumaKeyFile: path.join(dataDir, 'uptime-kuma-key'),
     uptimeKumaStateFile: path.join(dataDir, 'uptime-kuma.json'),
     plansFile: path.join(dataDir, 'plans.json'),
+    sessionsFile: path.join(dataDir, 'sessions.json'),
     displayStartFile: path.join(dataDir, 'display.html'),
     hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),
     codexHome: env.CODEX_HOME || path.join(home, '.codex'),

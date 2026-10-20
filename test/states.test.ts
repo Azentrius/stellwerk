@@ -13,7 +13,7 @@ import { checksState, failingFor, hubState, monitorState, sessionState, state, t
 
 const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
 const en = languages[0]!;
-const STATUSES: SessionStatus[] = ['permission', 'waiting', 'working', 'done', 'ended'];
+const STATUSES: SessionStatus[] = ['permission', 'waiting', 'working', 'done', 'unknown', 'ended'];
 const CHECKS: ChecksState[] = ['passing', 'failing', 'pending', 'none'];
 
 const FIXED_ICON = {
@@ -36,8 +36,10 @@ function assertSpoken(s: State): void {
 
 test('sessions: waiting for approval needs attention, waiting for you is a note, working is good', () => {
   const tones = Object.fromEntries(STATUSES.map((status) => [status, sessionState(status, en).tone]));
-  assert.deepEqual(tones, { permission: 'warning', waiting: 'info', working: 'success', done: 'neutral', ended: 'neutral' });
+  assert.deepEqual(tones, { permission: 'warning', waiting: 'info', working: 'success', done: 'neutral', unknown: 'neutral', ended: 'neutral' });
   assert.equal(sessionState('ended', en).icon, 'ban');
+  assert.equal(sessionState('unknown', en).icon, null);
+  assert.equal(sessionState('unknown', en).text, 'Unknown');
   assert.equal(sessionState('done', en).icon, null);
   assert.equal(sessionState('permission', en).text, 'Waiting for approval');
 });
