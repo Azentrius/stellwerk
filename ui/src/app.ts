@@ -190,8 +190,7 @@ function tick(): void {
   const nothing = (state?.permissions.length ?? 0) === 0 && due.length === 0 && open.length === 0;
   waitingEmpty.hidden = !nothing;
   waitingList.hidden = nothing;
-  const below = waitingList.scrollHeight - waitingList.scrollTop - waitingList.clientHeight;
-  waitingList.classList.toggle('waiting--more', below > 4);
+  fadeWhileMore(waitingList, 'waiting--more');
   clockNode.textContent = clock(now);
   show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
@@ -229,13 +228,20 @@ function tick(): void {
 }
 
 /**
- * More failing monitors than fit: the list scrolls. Its bottom fades out while more is below, so the last
- * one can be read in full at the end; and the keyboard can reach it only while there is something to scroll.
+ * A list's bottom fades out while more of it is below, so its last entry can be read in full at the end. At
+ * each render and as the list scrolls, not only with the next second.
+ */
+function fadeWhileMore(node: HTMLElement, className: string): void {
+  node.classList.toggle(className, node.scrollHeight - node.scrollTop - node.clientHeight > 4);
+}
+
+/**
+ * More failing monitors than fit: the list scrolls, its bottom fades out while more is below, and the
+ * keyboard can reach it only while there is something to scroll.
  */
 function markFailingMonitors(): void {
   const node = monitorsFailing;
-  const below = node.scrollHeight - node.scrollTop - node.clientHeight;
-  node.classList.toggle('monitors__failing--more', below > 4);
+  fadeWhileMore(node, 'monitors__failing--more');
   const scrolls = node.scrollHeight - node.clientHeight > 4;
   if (scrolls !== node.hasAttribute('tabindex')) {
     if (scrolls) node.tabIndex = 0;
@@ -291,4 +297,5 @@ window.setInterval(tick, 1000);
 // What fits in the columns depends on the fonts and the window; measure again when they change.
 void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
+waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
 monitorsFailing.addEventListener('scroll', () => markFailingMonitors(), { passive: true });
