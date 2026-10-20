@@ -65,7 +65,7 @@ const hardwareSection = byId('hardware');
 const gauges = byId('gauges');
 const hardwareState = byId('hardware-state');
 const plansNode = byId('plans');
-const gaugeSections = byId('gauge-sections');
+const statusDetails = byId('status-details');
 const monitorsNode = byId('monitors');
 const monitorsCount = byId('monitors-count');
 const monitorsFailing = byId('monitors-failing');
@@ -219,7 +219,7 @@ function tick(): void {
   const plans = state?.plans ?? [];
   plansNode.hidden = plans.length === 0;
   renderPlans(plansNode, plans, now, texts);
-  gaugeSections.classList.toggle('gauge-sections--more', gaugeSections.scrollHeight - gaugeSections.clientHeight > 4);
+  markScrolling(statusDetails, 'status-details--more');
 
   // Uptime Kuma's column; while the hub is away its monitors are old news too.
   const kuma = connected ? (state?.uptimeKuma ?? null) : null;
@@ -227,7 +227,7 @@ function tick(): void {
   const failing = renderMonitors(monitorNodes, kuma, now, texts);
   monitorsCount.textContent = failing > 0 ? `(${failing})` : '';
   monitorsFailing.hidden = failing === 0;
-  markFailingMonitors();
+  markScrolling(monitorsFailing, 'monitors__failing--more');
   const kumaNote = uptimeKumaLine(kuma, now, texts);
   if (kumaNote) show(monitorsState, kumaNote);
 
@@ -244,12 +244,13 @@ function fadeWhileMore(node: HTMLElement, className: string): void {
 }
 
 /**
- * More failing monitors than fit: the list scrolls, its bottom fades out while more is below, and the
- * keyboard can reach it only while there is something to scroll.
+ * A list that holds more than fits only now and then (the failing monitors; the status column's hints and
+ * gauges): it
+ * scrolls, its bottom fades out while more is below, and the keyboard can reach it only while there is
+ * something to scroll.
  */
-function markFailingMonitors(): void {
-  const node = monitorsFailing;
-  fadeWhileMore(node, 'monitors__failing--more');
+function markScrolling(node: HTMLElement, className: string): void {
+  fadeWhileMore(node, className);
   const scrolls = node.scrollHeight - node.clientHeight > 4;
   if (scrolls !== node.hasAttribute('tabindex')) {
     if (scrolls) node.tabIndex = 0;
@@ -306,7 +307,8 @@ window.setInterval(tick, 1000);
 void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
 waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
-monitorsFailing.addEventListener('scroll', () => markFailingMonitors(), { passive: true });
+monitorsFailing.addEventListener('scroll', () => markScrolling(monitorsFailing, 'monitors__failing--more'), { passive: true });
+statusDetails.addEventListener('scroll', () => markScrolling(statusDetails, 'status-details--more'), { passive: true });
 // A tap on the resting display wakes it and does nothing else: the click that follows goes nowhere.
 document.addEventListener(
   'pointerdown',

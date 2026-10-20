@@ -1,9 +1,11 @@
 // The agents and the waiting column in a real Edge at the display's 1920×720: with more than fit, each
 // scrolls by mouse wheel, finger and keyboard to its last entry, which can then be read in full, and keeps
 // its place while the display updates; the column titles and GitHub's line stay in place; the Allow of a
-// card far down can be reached and pressed by finger and by keyboard; with only a few nothing scrolls and
-// nothing moves. Isolated hubs with made-up tokens; sessions and requests come as hook events, GitHub's
-// answers are made up here, nothing goes online. Needs the display built (npm run build) and Edge.
+// card far down can be reached and pressed by finger and by keyboard; below two alerts in the status
+// column, the hardware values and the plans' usage scroll the same way, the clock and the alerts staying in
+// place; with only a few nothing scrolls and nothing moves. Isolated hubs with made-up tokens; sessions,
+// requests and the plans' usage come as hook events, the answers of GitHub and LibreHardwareMonitor are made
+// up here, nothing goes online. Needs the display built (npm run build) and Edge.
 //
 // Usage: node tools/check-columns.ts [folder for screenshots]
 //
@@ -28,6 +30,14 @@ const AGENTS: ListSpec = {
   parts: ['.entry__name', '.az-label'],
   name: '.entry__name',
   fixed: { title: 'agents-title' },
+};
+/** Below the hub's state in the status column: its hints, then hardware and the plans' usage. */
+const STATUS: ListSpec = {
+  list: '#status-details',
+  entries: '.log-state:not([hidden]), .gauge',
+  parts: ['.gauge__label', '.gauge__load'],
+  fade: 'status-details--more',
+  fixed: { clock: 'clock', hub: 'hub-state', lastEvent: 'last-event' },
 };
 const WAITING: ListSpec = {
   list: '#waiting-list',
@@ -56,8 +66,51 @@ function gitHub(pulls: number): typeof fetch {
   }) as typeof fetch;
 }
 
-/** A hub of its own with its start file, as `serve` writes it. */
-async function testHub(dir: string, pulls: number): Promise<{ hub: Hub; token: string; startFile: string }> {
+// ---------- LibreHardwareMonitor, made up ----------
+const sensor = (id: string, name: string, type: string, value: string) => ({ Text: name, SensorId: id, Type: type, RawValue: value, Children: [] });
+const hardwareFetch = (async () =>
+  new Response(
+    JSON.stringify({
+      Text: 'Sensor',
+      Children: [
+        {
+          Text: 'CHECK-PC',
+          Children: [
+            sensor('/intelcpu/0/load/0', 'CPU Total', 'Load', '23.0 %'),
+            sensor('/intelcpu/0/temperature/13', 'CPU Package', 'Temperature', '61.0 °C'),
+            sensor('/gpu-nvidia/0/load/0', 'GPU Core', 'Load', '8.0 %'),
+            sensor('/gpu-nvidia/0/temperature/0', 'GPU Core', 'Temperature', '48.0 °C'),
+            sensor('/ram/load/0', 'Memory', 'Load', '45.2 %'),
+            sensor('/ram/data/0', 'Memory Used', 'Data', '14.3 GB'),
+            sensor('/ram/data/1', 'Memory Available', 'Data', '17.4 GB'),
+          ],
+        },
+      ],
+    }),
+    { status: 200 },
+  )) as typeof fetch;
+
+/** The plans' usage as the desktop app's get_usage answers it, carried by a PostToolUse hook. */
+function usage(port: number, token: string): Promise<string> {
+  const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+  const windows = [
+    { label: '5-hour limit', percentUsed: 28, resetsAt: inHours(1.4) },
+    { label: 'Weekly · all models', percentUsed: 57, resetsAt: inHours(69) },
+    { label: 'Weekly · Fable', percentUsed: 86, resetsAt: inHours(69) },
+  ];
+  return hook(port, token, 'usage-01', {
+    hook_event_name: 'PostToolUse',
+    tool_name: 'mcp__ccd_session_mgmt__get_usage',
+    tool_input: {},
+    tool_response: [{ type: 'text', text: JSON.stringify({ plan: { status: 'ok', windows } }) }],
+  });
+}
+
+/**
+ * A hub of its own with its start file, as `serve` writes it; with `alerts`, the raw log is on and a
+ * request with a wrong token is turned away, so the status column shows two alerts above its gauges.
+ */
+async function testHub(dir: string, pulls: number, alerts = false): Promise<{ hub: Hub; token: string; startFile: string }> {
   fs.mkdirSync(dir, { recursive: true });
   const token = randomBytes(32).toString('hex');
   const hub = await startHub({
@@ -72,10 +125,14 @@ async function testHub(dir: string, pulls: number): Promise<{ hub: Hub; token: s
     webRoot: path.join(ROOT, 'dist', 'ui'),
     log: () => {},
     github: { owner: 'example', token: `github_pat_${'check'.repeat(8)}`, intervalMs: 3_600_000, fetch: gitHub(pulls) },
+    hardware: { settingsFile: path.join(dir, 'LibreHardwareMonitor.config'), intervalMs: 500, fetch: hardwareFetch },
+    rawLogFile: alerts ? path.join(dir, 'debug-raw.jsonl') : null,
   });
   if (hub.missingBuild) throw new Error('The display is not built. Run "npm run build" first.');
   const startFile = path.join(dir, 'display.html');
   fs.writeFileSync(startFile, displayStartPage(hub.port, displayKey(token)));
+  await usage(hub.port, token);
+  if (alerts) await hook(hub.port, 'not-the-token', 'stranger-01', { hook_event_name: 'Stop' });
   return { hub, token, startFile };
 }
 
@@ -105,13 +162,14 @@ async function fill(hub: Hub, token: string, counts: { working: number; answers:
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-columns-'));
-const many = await testHub(path.join(dir, 'many'), 8);
+const many = await testHub(path.join(dir, 'many'), 8, true);
 let few: Awaited<ReturnType<typeof testHub>> | null = null;
 let edge: Edge | null = null;
 try {
   const COUNTS = { working: 26, answers: 4, cards: 5 };
   const replies = await fill(many.hub, many.token, COUNTS);
-  const sessions = COUNTS.working + COUNTS.answers + COUNTS.cards;
+  // The session that reported the plans' usage counts too.
+  const sessions = COUNTS.working + COUNTS.answers + COUNTS.cards + 1;
 
   edge = await openEdge(path.join(dir, 'profile'));
   const browser = edge;
@@ -223,7 +281,10 @@ try {
 
   // Keyboard: Tab to the Allow of the card before it, which comes into view; End to the foot; Enter allows.
   const before = last - 1;
-  await browser.evaluate('document.activeElement?.blur()');
+  // Tab from the top of the page: from the card tapped last it would go on past the page's last element
+  // and leave the page for the browser's own controls, after which this headless Edge no longer scrolls by
+  // keys.
+  await browser.evaluate("document.querySelector('#agents').focus()");
   focused = false;
   for (let i = 0; i < 40 && !focused; i++) {
     await press(browser, 'Tab', 9);
@@ -234,22 +295,67 @@ try {
   check(allow?.inView === true, 'focused, it is scrolled into view');
   await press(browser, 'End', 35);
   g = await settled(browser, WAITING);
-  check(g.scrollTop >= g.max - 1 && lastReadable(g), 'End scrolls the column to its foot, which can be read');
+  check(
+    g.scrollTop >= g.max - 1 && lastReadable(g),
+    `End scrolls the column to its foot, which can be read (${Math.round(g.scrollTop)} of ${Math.round(g.max)} px, fade ${g.more}, last ${g.entries.at(-1)?.readable}, focus ${await browser.evaluate<string>('document.activeElement?.id || document.activeElement?.className')})`,
+  );
   await press(browser, 'Enter', 13, '\r');
   check(behaviorOf(await answerOf(replies[before]!, 'Enter')) === 'allow', 'Enter allows that request');
+
+  // ---------- the status column: hardware and the plans' usage below two alerts ----------
+  await browser.evaluate('document.activeElement?.blur()');
+  g = await until('the status column shows the hardware and the plans', async () => {
+    const now = await measure(browser, STATUS);
+    return now.entries.length >= 8 ? now : null;
+  });
+  check(g.max > 20 && g.more, `two alerts and the gauges are more than fit (${Math.round(g.max)} px more), the bottom fades out`);
+  await screenshot(browser, shots, 'status-top');
+  check(
+    g.entries[0]!.classes.includes('log-state') && g.entries[1]!.classes.includes('log-state') && g.entries[0]!.readable,
+    'the alerts come first, the first one in view in full',
+  );
+  check(shown(g), 'the clock, the hub and its last event are shown, outside');
+  const statusByWheel = await scrollWith(browser, STATUS, wheel(browser, 120), 'end');
+  g = statusByWheel.g;
+  await screenshot(browser, shots, 'status-bottom');
+  check(g.scrollTop >= g.max - 1, `the mouse wheel scrolls the gauges to the end (${Math.round(g.scrollTop)} of ${Math.round(g.max)} px)`);
+  check(lastReadable(g), 'then the last limit of the plans can be read in full: no fade over it');
+  check(statusByWheel.read.size === g.entries.length, `on the way both alerts and every gauge could be read (${statusByWheel.read.size} of ${g.entries.length})`);
+  check(shown(g), 'the clock, the hub and its last event are still shown');
+  renders = await countRenders(browser, STATUS.list);
+  await pause(2500);
+  after = await measure(browser, STATUS);
+  check((await renders()) > 0 && after.scrollTop === g.scrollTop && lastReadable(after), 'the gauges keep their place over the renders');
+  focused = false;
+  for (let i = 0; i < 60 && !focused; i++) {
+    await press(browser, 'Tab', 9);
+    focused = await browser.evaluate<boolean>("document.activeElement?.id === 'status-details'");
+  }
+  check(focused, 'Tab reaches the hints and gauges');
+  await press(browser, 'Home', 36);
+  g = await settled(browser, STATUS);
+  check(g.scrollTop === 0, 'Home goes back to the first alert');
+  g = (await scrollWith(browser, STATUS, () => press(browser, 'PageDown', 34), 'end')).g;
+  check(g.scrollTop >= g.max - 1 && lastReadable(g), 'Page Down scrolls to the last, which can be read');
+  await browser.evaluate('document.activeElement?.blur()');
+  g = (await scrollWith(browser, STATUS, swipe(browser, -200), 'start')).g;
+  check(g.scrollTop === 0, 'a finger moves them back to the first alert');
+  g = (await scrollWith(browser, STATUS, swipe(browser, 200), 'end')).g;
+  check(g.scrollTop >= g.max - 1 && lastReadable(g), 'a finger moves them to the last, which can be read');
 
   // ---------- only a few: they fit, nothing scrolls, nothing moves ----------
   few = await testHub(path.join(dir, 'few'), 1);
   await fill(few.hub, few.token, { working: 2, answers: 1, cards: 1 });
   await openDisplay(browser, few.startFile);
   await until('the display shows the few', async () => {
-    const [agents, waiting] = await Promise.all([measure(browser, AGENTS), measure(browser, WAITING)]);
-    return agents.entries.length === 4 && waiting.entries.length === 3;
+    const [agents, waiting, status] = await Promise.all([measure(browser, AGENTS), measure(browser, WAITING), measure(browser, STATUS)]);
+    return agents.entries.length === 5 && waiting.entries.length === 3 && status.entries.length >= 6;
   });
   await screenshot(browser, shots, 'columns-few');
   const quiet: Array<[string, ListSpec]> = [
     ['agents', AGENTS],
     ['waiting', WAITING],
+    ['status', STATUS],
   ];
   for (const [name, spec] of quiet) {
     g = await settled(browser, spec);
