@@ -56,15 +56,17 @@
         <p class="clock" id="clock"></p>
         <div class="hub-state" id="hub-state"></div>
         <p class="last-event" id="last-event"></p>
-        <div class="log-state" id="rejected-state" hidden></div>
-        <div class="log-state" id="raw-log-state" hidden></div>
-        <div class="gauge-sections" id="gauge-sections">
-          <section class="gauge-section" id="hardware" aria-labelledby="hardware-title" hidden>
-            <h2 class="section-title" id="hardware-title" data-text="hardwareTitle"></h2>
-            <dl class="gauges" id="gauges"></dl>
-            <div class="hardware-state" id="hardware-state" hidden></div>
-          </section>
-          <div class="plans" id="plans" hidden></div>
+        <div class="status-details" id="status-details">
+          <div class="log-state" id="rejected-state" hidden></div>
+          <div class="log-state" id="raw-log-state" hidden></div>
+          <div class="gauge-sections" id="gauge-sections">
+            <section class="gauge-section" id="hardware" aria-labelledby="hardware-title" hidden>
+              <h2 class="section-title" id="hardware-title" data-text="hardwareTitle"></h2>
+              <dl class="gauges" id="gauges"></dl>
+              <div class="hardware-state" id="hardware-state" hidden></div>
+            </section>
+            <div class="plans" id="plans" hidden></div>
+          </div>
         </div>
         <footer class="az-signature">
           <span class="az-signature__mark">Azentrius</span>

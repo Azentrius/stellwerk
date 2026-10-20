@@ -3,7 +3,8 @@
 ## 0.5.3 – 2026-10-20
 
 The display rests when nothing is new; sessions and the times of failing monitors are there again after a
-restart of the hub; the waiting column's fade follows its scrolling; a release runs the browser checks too.
+restart of the hub; the status column's foot scrolls; the waiting column's fade follows its scrolling; a
+release runs the browser checks too.
 
 - **The display at rest:** after 10 minutes with nothing new and no open request, the display dims to
   about a quarter, the clock still readable, so it does not glow on the desk all day and night. An open
@@ -24,6 +25,12 @@ restart of the hub; the waiting column's fade follows its scrolling; a release r
   takes them again if its last answer is no more than 15 minutes old. A monitor that changed while the
   hub was away, or one after a longer break, still shows no time: it may have come back and failed again
   unseen.
+- **The status column's foot within reach:** with a hint above them (requests turned away, the raw log
+  on), the hardware values and the plans' usage at the foot of the status column were cut off at the
+  bottom and could not be reached; with two hints only one row was left. Now the hints and the gauges
+  share one area below the clock and the hub's state, which scrolls like the lists by finger, mouse wheel
+  and keyboard, the hints first. Without hints the column looks as before. The column check in a real
+  Edge (`tools/check-columns.ts`) covers it.
 - **The waiting column's fade:** scrolled to its foot, the waiting column kept its fade over the last
   entry for up to a second, since the fade followed only the display's clock. Now it follows the
   scrolling, as in the monitor list. A new check in a real Edge (`tools/check-columns.ts`) scrolls the
