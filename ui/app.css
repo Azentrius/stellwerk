@@ -280,6 +280,13 @@ button { font: inherit; }
 .col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-md); padding-block-start: var(--sp-md); font-size: 1rem; }
 .az-signature__mark { font-size: 1.3rem; }
 
+/* ---------- at rest: nothing new for a while and no open request (quiet.ts) ---------- */
+/* Dimmed to about a quarter; the status column with the clock a little less, so the time can still be
+   read. Into rest slowly, out of it at once. */
+.col { transition: filter 0.2s; }
+.quiet .col { filter: brightness(0.25); transition: filter 2s; }
+.quiet .col--status { filter: brightness(0.4); }
+
 /* ---------- toast: a note, with its icon ---------- */
 .toast {
   position: fixed;

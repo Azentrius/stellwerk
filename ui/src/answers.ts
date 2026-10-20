@@ -5,23 +5,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SessionView, WaitingFor } from '../../src/shared/protocol.js';
+import type { DueSession } from './due.ts';
 import { naming } from './naming.ts';
 import { entry } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { state } from './states.ts';
 import { duration } from './time.ts';
 
-type DueFor = Exclude<WaitingFor, 'idle'>;
-
-/** Sessions waiting for an answer in the app, the longest waiting first. Mere idleness does not count. */
-export function waitingForAnswer(sessions: SessionView[]): Array<SessionView & { waitingFor: DueFor }> {
-  return sessions
-    .filter((s): s is SessionView & { waitingFor: DueFor } => s.status === 'waiting' && s.waitingFor !== null && s.waitingFor !== 'idle')
-    .sort((a, b) => (a.waitingSince ?? 0) - (b.waitingSince ?? 0));
-}
-
-export function renderAnswers(list: HTMLElement, sessions: Array<SessionView & { waitingFor: DueFor }>, now: number, texts: Texts): void {
+/** The sessions of waitingForAnswer (due.ts), one line each. */
+export function renderAnswers(list: HTMLElement, sessions: DueSession[], now: number, texts: Texts): void {
   list.replaceChildren(
     ...sessions.map((session) => {
       const { name, project } = naming(session.project, session.title, session.id);

@@ -103,6 +103,8 @@ const configSchema = z.strictObject({
     .max(PERMISSION_HOOK_TIMEOUT_S - HOLD_MARGIN_S)
     .default(60),
   sound: z.boolean().default(false),
+  /** The display dims after this many minutes without anything new and without an open request; 0: never. */
+  quietAfterMinutes: z.number().int().min(0).max(1440).default(10),
   scale: z.number().min(0.5).max(3).default(1),
   debugRawLog: z.boolean().default(false),
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */

@@ -40,6 +40,9 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
+- **At rest when nothing is new.** After 10 minutes with nothing new and no open request the display
+  dims, the clock still readable; anything new or a tap wakes it (`quietAfterMinutes`, see
+  [Configuration](#configuration)).
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else and needs a token for every hook
   request. The display loads nothing from the internet. The hub opens connections to other machines only
   to `api.github.com` and to your Uptime Kuma, each only once you set it up.
@@ -347,7 +350,7 @@ session appears with its first event, which in the desktop app is the first prom
 `%APPDATA%\stellwerk\config.json`, all optional:
 
 ```json
-{ "port": 4780, "holdSeconds": 60, "sound": false, "scale": 1, "debugRawLog": false }
+{ "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "scale": 1, "debugRawLog": false }
 ```
 
 | Setting | Meaning |
@@ -355,6 +358,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `port` | Port on 127.0.0.1. After a change run `stellwerk hooks install` again. The address cannot be changed. |
 | `holdSeconds` | How long a request waits on the display before it goes back to the app: 10 to 80 (at least 10 s below the hook timeout of 90 s). |
 | `sound` | A soft chime for each new request. |
+| `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request or failed checks wake it, and so does a tap, which presses nothing else. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code. |
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
