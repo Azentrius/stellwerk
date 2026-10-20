@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.3 – 2026-10-20
+## 0.5.3 – 2026-10-21
 
 The display rests when nothing is new; Codex' command line is marked as such; sessions and the times of
 failing monitors are there again after a restart of the hub; the status column's foot scrolls; the waiting
