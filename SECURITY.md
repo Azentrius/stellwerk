@@ -98,6 +98,11 @@ reachable only from the machine it runs on and only by the display it serves:
   as a command hook: it reads the hook token from the token file, posts to
   `127.0.0.1` only, prints only the hub's answer and ends at once without a
   hub; the hub checks these events like all others;
+- `stellwerk update` takes a release you downloaded only if it matches the
+  `SHA256SUMS` next to it, unpacks it into its own folder (refusing any file
+  name that would leave it), runs `npm ci --omit=dev` there and the new
+  version's `autostart install`, with fixed arguments and no shell; it
+  downloads nothing itself;
 - `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
   archive, pinned in the code by URL, size and SHA-256, unpacks it only into
   its own folder in Program Files (refusing any file name that would leave

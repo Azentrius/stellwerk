@@ -100,6 +100,20 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
    Windows account can read it. It signs the display in at the hub, which answers with the display and the
    token it connects with. Opened at `http://127.0.0.1:4780` alone, the display says it is not signed in.
 
+## Updating
+
+Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
+
+```powershell
+stellwerk update stellwerk-0.5.3.zip
+```
+
+It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
+(`%LOCALAPPDATA%\stellwerk\releases\stellwerk-VERSION`), runs `npm ci --omit=dev` there and points the
+two logon tasks at it; then restart them. Stellwerk downloads nothing itself. Settings, token and keys stay
+where they are. Codex' hooks keep running the forwarder of the version that set them up, until you run
+`stellwerk codex install` from the new folder.
+
 ## Start with Windows
 
 ```powershell

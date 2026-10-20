@@ -4,6 +4,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +24,7 @@ import {
 import { codexStateFile } from './hub/codex-projects.ts';
 import { codexSessionIndex, codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
 import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
+import { checkRelease, releaseDir, releaseFiles, releaseVersion } from './setup/update.ts';
 import { displayKey, displayStartPage, startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -140,6 +142,9 @@ Usage:
       Remove exactly these hooks.
   stellwerk raw-log delete
       Delete the raw hook log (debug-raw.jsonl), which holds prompts and code.
+  stellwerk update <stellwerk-X.Y.Z.zip> [--yes]
+      Set up a downloaded release (SHA256SUMS next to it): check it against SHA256SUMS, unpack it to
+      %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -180,6 +185,7 @@ async function main(): Promise<void> {
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
+  if (command === 'update') return update(action, values.yes);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -662,4 +668,41 @@ function rawLogDelete(): void {
   if (loadConfig(paths.configFile).debugRawLog) {
     console.log('debugRawLog is still true in config.json: set it to false and restart the hub, or it writes the log again.');
   }
+}
+
+/** Sets up a downloaded release in a folder of its own and points the logon tasks at it (setup/update.ts). */
+async function update(zipFile: string | undefined, yes: boolean): Promise<void> {
+  if (!zipFile) throw new Error('Name the release: stellwerk update <stellwerk-X.Y.Z.zip>, with SHA256SUMS next to it.');
+  const paths = defaultPaths();
+  const name = path.basename(zipFile);
+  const version = releaseVersion(name);
+  const sumsFile = path.join(path.dirname(path.resolve(zipFile)), 'SHA256SUMS');
+  if (!fs.existsSync(sumsFile)) throw new Error(`${sumsFile} is missing: download it with the release.`);
+  const zip = fs.readFileSync(zipFile);
+  checkRelease(zip, fs.readFileSync(sumsFile, 'utf8'), name);
+  const target = releaseDir(paths.releasesDir, version);
+  if (fs.existsSync(target)) throw new Error(`${target} is there already; remove it first to set it up again.`);
+  const files = releaseFiles(unzip(zip), version);
+  const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (!fs.existsSync(npmCli)) throw new Error(`npm is not next to Node.js (${npmCli}).`);
+  console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there; then the logon tasks start it.`);
+  if (!(await confirm(yes))) return void console.log('Nothing changed.');
+  for (const file of files) {
+    const to = path.join(target, file.path);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.writeFileSync(to, file.data);
+  }
+  // Fixed arguments, no shell: npm through the Node.js that runs this, then the new version's own setup.
+  runStep(process.execPath, [npmCli, 'ci', '--omit=dev'], target);
+  runStep(process.execPath, [path.join(target, 'dist', 'cli.js'), 'autostart', 'install', '--yes'], target);
+  console.log(`Stellwerk ${version} is set up. Restart the hub and the display: schtasks /End and then /Run for "Stellwerk hub" and "Stellwerk display".`);
+  const codexHooks = codexHooksFile(paths.codexHome);
+  if (fs.existsSync(codexHooks) && fs.readFileSync(codexHooks, 'utf8').includes('hook.js')) {
+    console.log(`Codex' hooks still run the forwarder of the version that set them up; "stellwerk codex install" from ${target} moves them (the Codex app then asks to allow them again).`);
+  }
+}
+
+function runStep(command: string, args: string[], cwd: string): void {
+  const result = spawnSync(command, args, { cwd, stdio: 'inherit' });
+  if (result.status !== 0) throw new Error(`${args.slice(1).join(' ')} in ${cwd} failed (${result.status ?? result.error?.message}).`);
 }

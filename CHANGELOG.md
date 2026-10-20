@@ -51,6 +51,10 @@ too.
 - **`stellwerk raw-log delete`:** deletes the raw hook log (`debug-raw.jsonl`), which holds prompts and
   code; the display's hint while the raw log is on names it. The demo shows what is new (a session at rest
   behind its line, one unknown, one of Codex' command line), and so does the README's screenshot.
+- **`stellwerk update <zip>`:** sets up a release you downloaded: it checks the zip against the
+  `SHA256SUMS` next to it, unpacks it into its own folder under `%LOCALAPPDATA%\stellwerk\releases`, runs
+  `npm ci --omit=dev` there and points the logon tasks at it. So the display runs a release, not a working
+  copy. Stellwerk downloads nothing itself.
 - **Release checks:** the release workflow now runs the checks in a real Edge as well (display sign-in,
   failing monitors, agents and waiting column, the display at rest), as the test workflow does.
 
