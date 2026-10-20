@@ -1,14 +1,20 @@
 # Changelog
 
-## 0.5.2 – 2026-10-19
+## 0.5.2 – 2026-10-20
 
-One filled button on the display: only the oldest waiting request fills its **Allow**.
+One filled button on the display: only the oldest waiting request fills its **Allow**. And every failing
+monitor can be reached.
 
 - **Allow filled once:** with several requests waiting, every card filled its **Allow**, so the column
   showed one gold button per card. Now only the top card fills it: the oldest request, whose hold time
   ends first. The cards below show **Allow** outlined like **Deny** and **In the app**; it works the same.
   When the top request is decided, the next one takes the filled button over. That is the design
   system's rule: one filled button on a page.
+- **Every failing monitor within reach:** with more failing monitors than fit, the third column cut the
+  list off at the bottom, and the monitors below could not be reached (since 0.5.0). Now the list scrolls
+  like the other columns, by finger, mouse wheel and keyboard, and keeps its place while the display
+  updates; title and the lines below stay put. The fade shows only while more is below, and long names
+  wrap instead of being cut off. Checked in a real Edge (`tools/check-monitors.ts`, also in CI).
 
 ## 0.5.1 – 2026-10-18
 

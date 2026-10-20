@@ -223,9 +223,24 @@ function tick(): void {
   const failing = renderMonitors(monitorNodes, kuma, now, texts);
   monitorsCount.textContent = failing > 0 ? `(${failing})` : '';
   monitorsFailing.hidden = failing === 0;
-  monitorsFailing.classList.toggle('monitors__failing--more', monitorsFailing.scrollHeight - monitorsFailing.clientHeight > 4);
+  markFailingMonitors();
   const kumaNote = uptimeKumaLine(kuma, now, texts);
   if (kumaNote) show(monitorsState, kumaNote);
+}
+
+/**
+ * More failing monitors than fit: the list scrolls. Its bottom fades out while more is below, so the last
+ * one can be read in full at the end; and the keyboard can reach it only while there is something to scroll.
+ */
+function markFailingMonitors(): void {
+  const node = monitorsFailing;
+  const below = node.scrollHeight - node.scrollTop - node.clientHeight;
+  node.classList.toggle('monitors__failing--more', below > 4);
+  const scrolls = node.scrollHeight - node.clientHeight > 4;
+  if (scrolls !== node.hasAttribute('tabindex')) {
+    if (scrolls) node.tabIndex = 0;
+    else node.removeAttribute('tabindex');
+  }
 }
 
 /**
@@ -276,3 +291,4 @@ window.setInterval(tick, 1000);
 // What fits in the columns depends on the fonts and the window; measure again when they change.
 void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
+monitorsFailing.addEventListener('scroll', () => markFailingMonitors(), { passive: true });
