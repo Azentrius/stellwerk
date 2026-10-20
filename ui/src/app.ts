@@ -261,6 +261,8 @@ function fadeWhileMore(node: HTMLElement, className: string): void {
 function markScrolling(node: HTMLElement, className?: string): void {
   if (className) fadeWhileMore(node, className);
   const scrolls = node.scrollHeight - node.clientHeight > 4;
+  // For the stylesheet: room between the text and the scroll bar, only while there is one.
+  node.toggleAttribute('data-scrolls', scrolls);
   if (scrolls !== node.hasAttribute('tabindex')) {
     if (scrolls) node.tabIndex = 0;
     else node.removeAttribute('tabindex');

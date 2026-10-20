@@ -264,6 +264,8 @@ button { font: inherit; }
    drawn outside. */
 .status-details { display: flex; flex-direction: column; gap: var(--sp-sm); flex: 1; }
 .status-details:focus-visible { outline-offset: -2px; }
+/* While they scroll, a little room between the values and the scroll bar. */
+.monitors__failing[data-scrolls], .status-details[data-scrolls] { padding-inline-end: var(--sp-sm); }
 .status-details--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent); }
 /* The product name as the design system sets a name without suffix: in the font of the place, with the
    word mark's dot in signature. */
