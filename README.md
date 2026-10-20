@@ -57,10 +57,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.5.2.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.5.2.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.5.2.zip -DestinationPath .
-cd stellwerk-0.5.2
+(Get-FileHash stellwerk-0.5.3.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.5.3.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.5.3.zip -DestinationPath .
+cd stellwerk-0.5.3
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -230,7 +230,10 @@ When more fail than fit, the list scrolls by finger, mouse wheel or keyboard; th
 the foot stay in place.
 
 How long a monitor fails is what the hub saw itself: a monitor that was already failing when the hub
-started, or that changed while Uptime Kuma did not answer, shows no time until it changes again. At the
+first asked, or that changed while Uptime Kuma did not answer, shows no time until it changes again. The
+hub remembers these times in `uptime-kuma.json` (only the ids of failing monitors and since when), so they
+survive a restart of the hub if its last answer is no more than 15 minutes old. After a longer break they
+are not taken: a monitor may have come back and failed again unseen. At the
 foot of the column the display says when Uptime Kuma was last asked, or why that failed (not reachable,
 key rejected, unexpected answer) and how to fix it.
 
@@ -376,6 +379,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma-key` | The API key of Uptime Kuma, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
+| `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` | Since when monitors of Uptime Kuma fail (ids and times only), for the display after a restart |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |

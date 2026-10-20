@@ -1,12 +1,16 @@
 // Uptime Kuma's monitors: what the hub reads from /metrics, how it asks (only /metrics at the address set
-// up, the API key as the password, no redirects), since when a monitor fails, and how asking fails.
+// up, the API key as the password, no redirects), since when a monitor fails, also over a restart of the
+// hub, and how asking fails.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import { uptimeKumaAddress } from '../src/config.ts';
-import { UptimeKumaWatcher, parseSample, readMonitors } from '../src/hub/kuma.ts';
+import { RESUME_WITHIN_MS, UptimeKumaWatcher, parseSample, readMonitors } from '../src/hub/kuma.ts';
 
 const URL_ = 'http://192.0.2.10:3001';
 const KEY = `uk3_${'aB3-_'.repeat(8)}`;
@@ -221,5 +225,123 @@ describe('asking Uptime Kuma', () => {
     await w.poll();
     await w.poll();
     assert.equal(changes, 2);
+  });
+});
+
+describe('since when, over a restart of the hub', () => {
+  const stateFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-kuma-')), 'stellwerk', 'uptime-kuma.json');
+  /** A run of the hub: a watcher with the state file and the monitors Uptime Kuma answers. */
+  function run(file: string, lines: () => Line[], now: () => number, options: { url?: string; log?: (line: string) => void } = {}) {
+    const w = new UptimeKumaWatcher({
+      url: options.url ?? URL_,
+      key: KEY,
+      intervalMs: 60_000,
+      stateFile: file,
+      fetch: fakeKuma(() => answer(lines())).fetch,
+      now,
+      log: options.log,
+    });
+    w.load();
+    return w;
+  }
+  /** The last run: Alpha, Bravo and Charlie fail since 2000; Delta was failing before it started. */
+  async function lastRun(file: string) {
+    let now = 1000;
+    let lines: Line[] = [[1, 'Alpha', 1], [2, 'Bravo', 1], [3, 'Charlie', 1], [4, 'Delta', 0], [5, 'Echo', 3]];
+    const w = run(file, () => lines, () => now);
+    await w.poll();
+    now = 2000;
+    lines = [[1, 'Alpha', 0], [2, 'Bravo', 2], [3, 'Charlie', 0], [4, 'Delta', 0], [5, 'Echo', 3]];
+    await w.poll();
+    await w.flush();
+  }
+
+  test('only the times of failing monitors are kept: by id, without names', async () => {
+    const file = stateFile();
+    await lastRun(file);
+    const text = fs.readFileSync(file, 'utf8');
+    assert.deepEqual(JSON.parse(text), {
+      url: URL_,
+      at: 2000,
+      failing: [
+        { id: '1', status: 'down', since: 2000 },
+        { id: '2', status: 'pending', since: 2000 },
+        { id: '3', status: 'down', since: 2000 },
+      ],
+    });
+    assert.doesNotMatch(text, /Alpha|Bravo|Charlie|Delta|Echo/);
+    assert.doesNotMatch(text, new RegExp(KEY));
+  });
+
+  test('a restart a short while later keeps the time of what still fails the same way', async () => {
+    const file = stateFile();
+    await lastRun(file);
+    let now = 2000 + RESUME_WITHIN_MS;
+    let lines: Line[] = [[1, 'Alpha', 0], [2, 'Bravo', 0], [3, 'Charlie', 1], [4, 'Delta', 0], [5, 'Echo', 3]];
+    const w = run(file, () => lines, () => now);
+    await w.poll();
+    assert.deepEqual(w.monitors?.failing, [
+      // Still down: since 2000, as the last run saw it.
+      { name: 'Alpha', status: 'down', since: 2000 },
+      // From pending to down while the hub was away: the hub did not see when.
+      { name: 'Bravo', status: 'down', since: null },
+      // Already failing when the last run started: still no time.
+      { name: 'Delta', status: 'down', since: null },
+    ]);
+    // From then on as always: a change seen now happened since the last answer.
+    now += 60_000;
+    lines = [[1, 'Alpha', 0], [2, 'Bravo', 0], [3, 'Charlie', 0], [4, 'Delta', 0], [5, 'Echo', 3]];
+    await w.poll();
+    assert.deepEqual(w.monitors?.failing.find((m) => m.name === 'Charlie'), { name: 'Charlie', status: 'down', since: now });
+    await w.flush();
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).at, now);
+  });
+
+  test("after a longer break, or for another Uptime Kuma, the last run's times are not taken", async () => {
+    const lines = (): Line[] => [[1, 'Alpha', 0]];
+    const file = stateFile();
+    await lastRun(file);
+    const late = run(file, lines, () => 2000 + RESUME_WITHIN_MS + 1);
+    await late.poll();
+    assert.deepEqual(late.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
+    await late.flush();
+
+    const other = stateFile();
+    await lastRun(other);
+    const elsewhere = run(other, lines, () => 3000, { url: 'http://192.0.2.11:3001' });
+    await elsewhere.poll();
+    assert.deepEqual(elsewhere.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
+    await elsewhere.flush();
+  });
+
+  test('a broken file is reported and written again; a missing one is no message', async () => {
+    const file = stateFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ url: URL_, at: 'yesterday', failing: [] }));
+    const log: string[] = [];
+    const w = run(file, () => [[1, 'Alpha', 0]], () => 5000, { log: (line) => log.push(line) });
+    await w.poll();
+    await w.flush();
+    assert.equal(log.length, 1);
+    assert.match(log[0]!, /is not readable; it is written again/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { url: URL_, at: 5000, failing: [] });
+
+    const quiet: string[] = [];
+    run(stateFile(), () => [], () => 5000, { log: (line) => quiet.push(line) });
+    assert.deepEqual(quiet, []);
+  });
+
+  test('a file that cannot be written is reported once, and the monitors still show', async () => {
+    // A folder where the file should be.
+    const file = stateFile();
+    fs.mkdirSync(file, { recursive: true });
+    const log: string[] = [];
+    const w = run(file, () => [[1, 'Alpha', 0]], () => 5000, { log: (line) => log.push(line) });
+    await w.poll();
+    await w.poll();
+    await w.flush();
+    assert.equal(log.length, 1);
+    assert.match(log[0]!, /^Uptime Kuma: /);
+    assert.deepEqual(w.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
   });
 });

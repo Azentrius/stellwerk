@@ -35,6 +35,8 @@ export interface Paths {
   githubTokenFile: string;
   /** The API key of Uptime Kuma, for its monitors. */
   uptimeKumaKeyFile: string;
+  /** Since when monitors of Uptime Kuma fail, so the display keeps that over a restart. */
+  uptimeKumaStateFile: string;
   /** The last usage of the plans' limits, so the display has it again after a restart. */
   plansFile: string;
   /** The display's start file: signs the display in at the hub; only the current user can read it. */
@@ -62,6 +64,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
     uptimeKumaKeyFile: path.join(dataDir, 'uptime-kuma-key'),
+    uptimeKumaStateFile: path.join(dataDir, 'uptime-kuma.json'),
     plansFile: path.join(dataDir, 'plans.json'),
     displayStartFile: path.join(dataDir, 'display.html'),
     hardwareDir: path.join(env.ProgramFiles ?? 'C:\\Program Files', 'Stellwerk', 'LibreHardwareMonitor'),

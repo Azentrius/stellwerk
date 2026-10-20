@@ -47,6 +47,10 @@ jobs:
           npm run typecheck
           npm run build
           npm test
+      - name: Display sign-in in a real Edge (another local service gets nothing to decide with)
+        run: node tools/check-browser.ts
+      - name: Failing monitors in a real Edge (wheel, touch and keyboard reach the last one)
+        run: node tools/check-monitors.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
 

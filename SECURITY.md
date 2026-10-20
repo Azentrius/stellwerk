@@ -66,7 +66,8 @@ reachable only from the machine it runs on and only by the display it serves:
   Uptime Kuma 2 opens `/metrics` and nothing else), kept like the hook
   token, never logged, never sent to the display; redirects are not
   followed, and of the answer the hub keeps only each monitor's name and
-  status;
+  status; its file `uptime-kuma.json` holds only the ids of failing
+  monitors and since when they fail;
 - besides that the hub asks only LibreHardwareMonitor on `127.0.0.1:8085`
   for `data.json`, when the hardware monitor is set up, with the password
   from LibreHardwareMonitor's settings file, and never sends that password

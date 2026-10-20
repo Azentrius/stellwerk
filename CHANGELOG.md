@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.3 – 2026-10-20
+
+Failing monitors keep their time over a restart of the hub, and a release runs the browser checks too.
+
+- **Times over a restart:** the hub knew since when a monitor fails only while it ran, so after a restart
+  every failing monitor showed no time until it changed again. Now it keeps those times in
+  `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` (ids of failing monitors and since when, no names) and
+  takes them again if its last answer is no more than 15 minutes old. A monitor that changed while the
+  hub was away, or one after a longer break, still shows no time: it may have come back and failed again
+  unseen.
+- **Release checks:** the release workflow now runs the two checks in a real Edge as well (display
+  sign-in, failing monitors), as the test workflow does.
+
 ## 0.5.2 – 2026-10-20
 
 One filled button on the display: only the oldest waiting request fills its **Allow**. And every failing

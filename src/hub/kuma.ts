@@ -1,10 +1,14 @@
 // The monitors of Uptime Kuma on the display: which fail, and how many are up. Every minute the hub asks
 // the address set up with `stellwerk kuma key` for /metrics, with the API key as the password (Uptime
 // Kuma's API keys can read the metrics and nothing else), and keeps of each monitor only its name and
-// status. It asks for nothing else there and changes nothing.
+// status. It asks for nothing else there and changes nothing. Since when a monitor fails it remembers in a
+// file of its own, so the display keeps that over a restart of the hub.
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { z } from 'zod';
 import type { FailingMonitor, MonitorCounts, UptimeKumaProblem, UptimeKumaView } from '../shared/protocol.js';
 
 export const KUMA_METRICS_PATH = '/metrics';
@@ -12,6 +16,11 @@ const REQUEST_TIMEOUT_MS = 5000;
 const MAX_ANSWER_BYTES = 4 * 1024 * 1024;
 /** Longer names are cut; a name is set by hand in Uptime Kuma. */
 const MAX_NAME = 200;
+/**
+ * A restart, not a night: when the last answer before a restart is longer ago, a monitor may have come
+ * back and failed again unseen, so the times of the last run are not taken.
+ */
+export const RESUME_WITHIN_MS = 15 * 60_000;
 
 /** Uptime Kuma's monitor_status, by its value: 0 down, 1 up, 2 pending, 3 maintenance. */
 const STATUSES = ['down', 'up', 'pending', 'maintenance'] as const;
@@ -100,12 +109,24 @@ export interface UptimeKumaWatcherOptions {
   /** An API key of Uptime Kuma ("uk1_…"), sent as the password; never logged. */
   key: string;
   intervalMs: number;
+  /** Where the hub remembers since when monitors fail, between runs; without it, in memory only. */
+  stateFile?: string | null;
   /** For tests; the global fetch otherwise. */
   fetch?: typeof fetch;
   now?: () => number;
   onChange?: () => void;
   log?: (line: string) => void;
 }
+
+/** The state file: since when the failing monitors fail, by id, as of the last answer of Uptime Kuma. */
+const storedState = z.object({
+  url: z.string().max(2000),
+  at: z.number().nonnegative(),
+  failing: z
+    .array(z.object({ id: z.string().max(200), status: z.enum(['down', 'pending']), since: z.number().nonnegative() }))
+    .max(100_000),
+});
+type Seen = Map<string, { status: MonitorStatus; since: number | null }>;
 
 export class UptimeKumaWatcher {
   monitors: MonitorCounts | null = null;
@@ -118,9 +139,13 @@ export class UptimeKumaWatcher {
   private timer: NodeJS.Timeout | null = null;
   private polling: Promise<void> | null = null;
   /** Each monitor's status and since when the hub sees it, by id. */
-  private seen = new Map<string, { status: MonitorStatus; since: number | null }>();
+  private seen: Seen = new Map();
   /** The last round got an answer: a change seen now happened since then. */
   private watching = false;
+  /** What the last run saw, until the first answer of this one. */
+  private resume: { at: number; seen: Seen } | null = null;
+  private writes: Promise<void> = Promise.resolve();
+  private writeFailed = false;
 
   constructor(options: UptimeKumaWatcherOptions) {
     this.options = options;
@@ -131,6 +156,7 @@ export class UptimeKumaWatcher {
   }
 
   start(): void {
+    this.load();
     void this.poll();
     this.timer = setInterval(() => void this.poll(), this.options.intervalMs);
   }
@@ -142,6 +168,39 @@ export class UptimeKumaWatcher {
 
   view(): UptimeKumaView {
     return { monitors: this.monitors, updatedAt: this.updatedAt, problem: this.problem };
+  }
+
+  /** Waits for the writes of the state file started so far (tests, closing). */
+  flush(): Promise<void> {
+    return this.writes;
+  }
+
+  /**
+   * Takes since when monitors failed in the last run, for the first answer of this one. A missing file, a
+   * broken one or one of another Uptime Kuma leaves nothing to take.
+   */
+  load(): void {
+    const file = this.options.stateFile;
+    if (!file) return;
+    let text: string;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch {
+      return;
+    }
+    let stored: z.infer<typeof storedState>;
+    try {
+      stored = storedState.parse(JSON.parse(text));
+    } catch {
+      this.options.log?.(`Uptime Kuma: ${file} is not readable; it is written again with the next answer.`);
+      return;
+    }
+    if (stored.url !== this.options.url) return;
+    const seen: Seen = new Map();
+    for (const monitor of stored.failing) {
+      if (monitor.since <= stored.at) seen.set(monitor.id, { status: monitor.status, since: monitor.since });
+    }
+    this.resume = { at: stored.at, seen };
   }
 
   /** One round; a round still running is not started twice. */
@@ -167,6 +226,7 @@ export class UptimeKumaWatcher {
       this.monitors = this.count(monitors);
       this.updatedAt = this.now();
       this.problem = null;
+      this.save(this.updatedAt);
       if (problemBefore !== null) this.options.log?.('Uptime Kuma answers again.');
     } catch (err) {
       this.monitors = null;
@@ -181,11 +241,17 @@ export class UptimeKumaWatcher {
 
   /**
    * Counts the monitors and notes since when each one is in its status. What was already so at the first
-   * answer, or changed while Uptime Kuma did not answer, has no time: the hub did not see it change.
+   * answer, or changed while Uptime Kuma did not answer, has no time: the hub did not see it change. After
+   * a restart of the hub the first answer is taken like one after such a break, with the times of the last
+   * run, if its last answer was a short while ago.
    */
   private count(monitors: KumaMonitor[]): MonitorCounts {
     const now = this.now();
-    const seen = new Map<string, { status: MonitorStatus; since: number | null }>();
+    if (this.resume) {
+      if (now >= this.resume.at && now - this.resume.at <= RESUME_WITHIN_MS) this.seen = this.resume.seen;
+      this.resume = null;
+    }
+    const seen: Seen = new Map();
     for (const monitor of monitors) {
       const before = this.seen.get(monitor.id);
       seen.set(monitor.id, { status: monitor.status, since: before?.status === monitor.status ? before.since : this.watching ? now : null });
@@ -206,6 +272,28 @@ export class UptimeKumaWatcher {
       up: monitors.filter((m) => m.status === 'up').length,
       maintenance: monitors.filter((m) => m.status === 'maintenance').length,
     };
+  }
+
+  /** Remembers since when the failing monitors fail; only those with a time, nothing else of them. */
+  private save(at: number): void {
+    const file = this.options.stateFile;
+    if (!file) return;
+    const failing = [...this.seen]
+      .filter(([, m]) => (m.status === 'down' || m.status === 'pending') && m.since !== null)
+      .map(([id, m]) => ({ id, status: m.status, since: m.since }));
+    const text = `${JSON.stringify({ url: this.options.url, at, failing })}\n`;
+    // One write after the other, so the last answer is the one that stays.
+    this.writes = this.writes.then(async () => {
+      try {
+        await fs.promises.mkdir(path.dirname(file), { recursive: true });
+        await fs.promises.writeFile(file, text, { encoding: 'utf8', mode: 0o600 });
+        this.writeFailed = false;
+      } catch (err) {
+        // Once, not every round.
+        if (!this.writeFailed) this.options.log?.(`Uptime Kuma: ${(err as Error).message}`);
+        this.writeFailed = true;
+      }
+    });
   }
 
   private ask(): Promise<Response> {
