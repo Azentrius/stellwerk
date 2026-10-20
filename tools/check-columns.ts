@@ -119,9 +119,11 @@ try {
   const lastReadable = (g: Geometry) => g.entries.at(-1)?.readable === true && !g.more && g.mask === 'none';
   /** The rectangle of a card's button, and whether it is in the list's view, outside the fade and uncovered. */
   const button = (card: number, decision: string) =>
-    browser.evaluate<{ box: Box; inView: boolean; disabled: boolean } | null>(`(() => {
+    browser.call<{ box: Box; inView: boolean; disabled: boolean } | null>(
+      `(card, decision) => {
       const list = document.querySelector('#waiting-list');
-      const node = document.querySelectorAll('.card')[${card}]?.querySelector('[data-decision="${decision}"]');
+      const buttons = document.querySelectorAll('.card')[card]?.querySelectorAll('[data-decision]') ?? [];
+      const node = [...buttons].find((b) => b.dataset.decision === decision);
       if (!node) return null;
       const r = node.getBoundingClientRect();
       const v = list.getBoundingClientRect();
@@ -132,7 +134,10 @@ try {
         inView: r.top >= v.top && r.bottom <= Math.min(innerHeight, v.top + list.clientHeight - fade) && hit !== null && node.contains(hit),
         disabled: node.disabled,
       };
-    })()`);
+    }`,
+      card,
+      decision,
+    );
 
   await openDisplay(browser, many.startFile);
   await until('the display shows all sessions, requests, answers and pull requests', async () => {
@@ -222,7 +227,7 @@ try {
   focused = false;
   for (let i = 0; i < 40 && !focused; i++) {
     await press(browser, 'Tab', 9);
-    focused = await browser.evaluate<boolean>(`document.activeElement === document.querySelectorAll('.card')[${before}]?.querySelector('[data-decision="allow"]')`);
+    focused = await browser.call<boolean>(`(card) => document.activeElement === document.querySelectorAll('.card')[card]?.querySelector('[data-decision="allow"]')`, before);
   }
   check(focused, 'Tab reaches the Allow of a card further down');
   allow = await button(before, 'allow');

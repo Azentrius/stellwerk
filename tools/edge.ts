@@ -18,6 +18,11 @@ export interface Edge {
   send(method: string, params?: Record<string, unknown>): Promise<Record<string, unknown>>;
   /** An expression in the page, its value as JSON; rejects when it throws. */
   evaluate<T = unknown>(expression: string): Promise<T>;
+  /**
+   * A function in the page, called with `args` as values, never built into its code; its result as JSON,
+   * after a promise it returns; rejects when it throws.
+   */
+  call<T = unknown>(fn: string, ...args: unknown[]): Promise<T>;
   close(): Promise<void>;
 }
 
@@ -80,12 +85,24 @@ export async function openEdge(profile: string): Promise<Edge> {
       if (result.exceptionDetails) throw new Error(`In the page: ${JSON.stringify(result.exceptionDetails)}`);
       return result.result?.value as T;
     };
+    const call = async <T>(fn: string, ...args: unknown[]): Promise<T> => {
+      const page = (await send('Runtime.evaluate', { expression: 'globalThis' })) as { result?: { objectId?: string } };
+      const result = (await send('Runtime.callFunctionOn', {
+        functionDeclaration: fn,
+        objectId: page.result?.objectId,
+        arguments: args.map((value) => ({ value })),
+        returnByValue: true,
+        awaitPromise: true,
+      })) as { result?: { value?: unknown }; exceptionDetails?: unknown };
+      if (result.exceptionDetails) throw new Error(`In the page: ${JSON.stringify(result.exceptionDetails)}`);
+      return result.result?.value as T;
+    };
     const close = async () => {
       await send('Browser.close').catch(() => {});
       socket.close();
       edge.kill();
     };
-    return { send, evaluate, close };
+    return { send, evaluate, call, close };
   } catch (error) {
     edge.kill();
     throw error;

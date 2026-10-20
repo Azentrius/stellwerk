@@ -80,7 +80,10 @@ try {
     check(true, `${why} wakes the display`);
   };
   const rect = (selector: string) =>
-    browser.evaluate<Box | null>(`(() => { const n = document.querySelector(${JSON.stringify(selector)}); if (!n) return null; const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; })()`);
+    browser.call<Box | null>(
+      '(selector) => { const n = document.querySelector(selector); if (!n) return null; const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }',
+      selector,
+    );
   const center = (b: Box) => ({ x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 });
 
   await openDisplay(browser, startFile);
