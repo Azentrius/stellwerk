@@ -34,7 +34,9 @@ import {
   displayTask,
   hubTask,
   pickScreen,
+  screenNumber,
   taskXml,
+  updateScreen,
 } from './setup/autostart.ts';
 import {
   DEFAULT_SETTINGS_FILE,
@@ -75,6 +77,7 @@ import {
   setUserEnv,
   startTask,
   stopProgram,
+  taskDefinition,
   taskExists,
 } from './setup/windows.ts';
 import {
@@ -142,9 +145,11 @@ Usage:
       Remove exactly these hooks.
   stellwerk raw-log delete
       Delete the raw hook log (debug-raw.jsonl), which holds prompts and code.
-  stellwerk update <stellwerk-X.Y.Z.zip> [--yes]
+  stellwerk update <stellwerk-X.Y.Z.zip> [--yes] [--screen <number>]
       Set up a downloaded release (SHA256SUMS next to it): check it against SHA256SUMS, unpack it to
       %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it.
+      The display stays on its screen, or goes to the one given; when its screen is gone (or on a
+      first setup, the 1920x720 screen cannot be told), nothing changes until one is given.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -185,7 +190,7 @@ async function main(): Promise<void> {
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
-  if (command === 'update') return update(action, values.yes);
+  if (command === 'update') return update(action, values.yes, values.screen);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -369,7 +374,7 @@ function firewall(command: 'install' | 'uninstall'): void {
   );
 }
 
-async function autostart(action: 'install' | 'uninstall', yes: boolean, screenNumber: string | undefined): Promise<void> {
+async function autostart(action: 'install' | 'uninstall', yes: boolean, screenOption: string | undefined): Promise<void> {
   const paths = defaultPaths();
   const config = loadConfig(paths.configFile);
 
@@ -385,9 +390,9 @@ async function autostart(action: 'install' | 'uninstall', yes: boolean, screenNu
 
   const cli = path.join(ROOT, 'dist', 'cli.js');
   if (!fs.existsSync(cli)) throw new Error('dist/cli.js is missing. Run "npm run build" first.');
-  if (screenNumber !== undefined && !/^[1-9]\d*$/.test(screenNumber)) throw new Error('--screen takes the number of a screen.');
+  const given = screenNumber(screenOption);
   const screens = listScreens();
-  const screen = pickScreen(screens, screenNumber === undefined ? undefined : Number(screenNumber));
+  const screen = pickScreen(screens, given);
   const user = currentUser();
   const tasks = [
     hubTask({ node: process.execPath, cli, root: ROOT, logFile: paths.hubLogFile, conhost: conhostPath() }),
@@ -670,9 +675,13 @@ function rawLogDelete(): void {
   }
 }
 
-/** Sets up a downloaded release in a folder of its own and points the logon tasks at it (setup/update.ts). */
-async function update(zipFile: string | undefined, yes: boolean): Promise<void> {
+/**
+ * Sets up a downloaded release in a folder of its own and points the logon tasks at it (setup/update.ts),
+ * the display on the screen it has now unless another is given.
+ */
+async function update(zipFile: string | undefined, yes: boolean, screenOption: string | undefined): Promise<void> {
   if (!zipFile) throw new Error('Name the release: stellwerk update <stellwerk-X.Y.Z.zip>, with SHA256SUMS next to it.');
+  const given = screenNumber(screenOption);
   const paths = defaultPaths();
   const name = path.basename(zipFile);
   const version = releaseVersion(name);
@@ -685,6 +694,11 @@ async function update(zipFile: string | undefined, yes: boolean): Promise<void> 
   const files = releaseFiles(unzip(zip), version);
   const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
   if (!fs.existsSync(npmCli)) throw new Error(`npm is not next to Node.js (${npmCli}).`);
+  // The screen before anything changes, so the new version's setup neither fails late nor moves the display.
+  const screens = listScreens();
+  const screen = updateScreen(screens, given, taskDefinition(DISPLAY_TASK));
+  const why = { given: 'as given', kept: 'where it is now', only: 'the only one of 1920×720' }[screen.reason];
+  console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screen.number} (${why}).\n`);
   console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there; then the logon tasks start it.`);
   if (!(await confirm(yes))) return void console.log('Nothing changed.');
   for (const file of files) {
@@ -694,7 +708,7 @@ async function update(zipFile: string | undefined, yes: boolean): Promise<void> 
   }
   // Fixed arguments, no shell: npm through the Node.js that runs this, then the new version's own setup.
   runStep(process.execPath, [npmCli, 'ci', '--omit=dev'], target);
-  runStep(process.execPath, [path.join(target, 'dist', 'cli.js'), 'autostart', 'install', '--yes'], target);
+  runStep(process.execPath, [path.join(target, 'dist', 'cli.js'), 'autostart', 'install', '--yes', '--screen', String(screen.number)], target);
   console.log(`Stellwerk ${version} is set up. Restart the hub and the display: schtasks /End and then /Run for "Stellwerk hub" and "Stellwerk display".`);
   const codexHooks = codexHooksFile(paths.codexHome);
   if (fs.existsSync(codexHooks) && fs.readFileSync(codexHooks, 'utf8').includes('hook.js')) {

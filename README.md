@@ -63,10 +63,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.5.3.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.5.3.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.5.3.zip -DestinationPath .
-cd stellwerk-0.5.3
+(Get-FileHash stellwerk-0.5.4.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.5.4.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.5.4.zip -DestinationPath .
+cd stellwerk-0.5.4
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -105,12 +105,14 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.5.3.zip
+stellwerk update stellwerk-0.5.4.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
 (`%LOCALAPPDATA%\stellwerk\releases\stellwerk-VERSION`), runs `npm ci --omit=dev` there and points the
-two logon tasks at it; then restart them. Stellwerk downloads nothing itself. Settings, token and keys stay
+two logon tasks at it; then restart them. The display stays on the screen its task uses now; give
+`--screen <number>` (as `autostart install` lists them) to move it, or when that screen is gone: then
+the update stops before it changes anything. Stellwerk downloads nothing itself. Settings, token and keys stay
 where they are. Codex' hooks keep running the forwarder of the version that set them up, until you run
 `stellwerk codex install` from the new folder.
 

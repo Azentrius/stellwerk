@@ -39,6 +39,53 @@ export function pickScreen(screens: Screen[], number?: number): Screen {
   );
 }
 
+/** The value of --screen as a number; undefined without it. */
+export function screenNumber(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!/^[1-9]\d*$/.test(value)) throw new Error('--screen takes the number of a screen.');
+  return Number(value);
+}
+
+/** Where the display task puts the display: its --window-position and --window-size; null without them. */
+export function displayPlacement(definition: string): { x: number; y: number; width: number; height: number } | null {
+  const position = /--window-position=(-?\d+),(-?\d+)/.exec(definition);
+  const size = /--window-size=(\d+),(\d+)/.exec(definition);
+  if (!position || !size) return null;
+  return { x: Number(position[1]), y: Number(position[2]), width: Number(size[1]), height: Number(size[2]) };
+}
+
+export interface ScreenChoice {
+  /** 1-based, as listed. */
+  number: number;
+  /** Given with --screen, kept from the display task, or the only 1920×720 screen (no display task yet). */
+  reason: 'given' | 'kept' | 'only';
+}
+
+/**
+ * The screen for the display when `stellwerk update` sets up a release: the one given; otherwise the one the
+ * display task uses now (exactly one screen at its place and size); without a display task, the only screen
+ * of 1920×720. A display task whose screen cannot be told is not overwritten by a guess: then a screen has
+ * to be given. Throws before anything is changed.
+ */
+export function updateScreen(screens: Screen[], given: number | undefined, displayTask: string | null): ScreenChoice {
+  if (given !== undefined) {
+    pickScreen(screens, given);
+    return { number: given, reason: 'given' };
+  }
+  if (displayTask === null) return { number: screens.indexOf(pickScreen(screens)) + 1, reason: 'only' };
+  const place = displayPlacement(displayTask);
+  if (!place) {
+    throw new Error(`The task "${DISPLAY_TASK}" names no screen. Choose one with --screen <number>.\n${describeScreens(screens)}`);
+  }
+  const matching = screens.flatMap((s, i) => (s.x === place.x && s.y === place.y && s.width === place.width && s.height === place.height ? [i + 1] : []));
+  if (matching.length === 1) return { number: matching[0]!, reason: 'kept' };
+  throw new Error(
+    `The task "${DISPLAY_TASK}" shows the display at ${place.x},${place.y} in ${place.width}×${place.height}, ` +
+      `${matching.length === 0 ? 'where no screen is now' : 'where several screens are'}. ` +
+      `Choose one with --screen <number>.\n${describeScreens(screens)}`,
+  );
+}
+
 export function describeScreens(screens: Screen[]): string {
   return screens
     .map((s, i) => `  ${i + 1}  ${s.width}×${s.height} at ${s.x},${s.y}${s.primary ? '  (main screen)' : ''}`)
