@@ -1016,6 +1016,17 @@ describe('the display at rest', () => {
     assert.equal((await other.state(() => true)).hub.quietAfterMs, 0);
     other.close();
   });
+
+  test('the display gets the time after which an open request reminds; without one, never', async () => {
+    const reminding = await startTestHub({ remindAfterMs: 20_000 });
+    const screen = await display(reminding.port);
+    assert.equal((await screen.state(() => true)).hub.remindAfterMs, 20_000);
+    screen.close();
+    const silent = await startTestHub();
+    const other = await display(silent.port);
+    assert.equal((await other.state(() => true)).hub.remindAfterMs, 0);
+    other.close();
+  });
 });
 
 describe('sessions over a restart', () => {

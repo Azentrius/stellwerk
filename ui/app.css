@@ -111,6 +111,16 @@ button { font: inherit; }
 
 /* A decided request stays a few seconds, inactive like a switched-off table row; its outcome stays readable. */
 .card--settled .card__actions, .card--settled .card__hold { display: none; }
+/* A request that has waited long reminds: its card pulses in the colour of attention; without motion, it
+   keeps that colour as a frame. */
+.card--remind { animation: remind 1.6s ease-in-out infinite; }
+@keyframes remind {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px var(--status-warning); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card--remind { animation: none; box-shadow: 0 0 0 2px var(--status-warning); }
+}
 .card--settled :is(.card__head, .input), .card--settled :is(.card__head, .input) * { color: var(--text-disabled); }
 
 /* ---------- the tool input ---------- */

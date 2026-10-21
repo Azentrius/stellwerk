@@ -105,6 +105,8 @@ export interface HubOptions {
   sound: boolean;
   /** The display dims after this long without anything new (config quietAfterMinutes); 0 or none: never. */
   quietAfterMs?: number;
+  /** An open request reminds after this long (config remindAfterSeconds); 0 or none: never. */
+  remindAfterMs?: number;
   auditFile: string;
   /** ui/: index.html, styles, fonts. */
   uiRoot: string;
@@ -626,6 +628,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         lastEventAt: board.lastEventAt,
         sound: options.sound,
         quietAfterMs: options.quietAfterMs ?? 0,
+        remindAfterMs: options.remindAfterMs ?? 0,
         build,
         rejected,
         rawLog: Boolean(options.rawLogFile),

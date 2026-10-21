@@ -9,7 +9,7 @@ import type { Decision, ServerMessage, StateMessage } from '../../src/shared/pro
 import { AgentItems, renderAgents } from './agents.ts';
 import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
-import { waitingForAnswer } from './due.ts';
+import { newReminders, waitingForAnswer } from './due.ts';
 import { alert, byId, el, icon, label } from './dom.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
@@ -61,6 +61,8 @@ const agentsEmpty = byId('agents-empty');
 const agentsCount = byId('agents-count');
 /** The line at the foot of the agents column behind which the sessions at rest wait (resting.ts). */
 const restingLine = new RestingLine();
+/** The open requests that have reminded already, each once. */
+const reminded = new Set<string>();
 const restingItem = el('li', 'resting');
 const restingButton = el('button', 'resting__toggle');
 /** The sessions' elements, and whose details a tap opened. */
@@ -197,7 +199,9 @@ function render(): string[] {
 /** Everything that changes with time alone. */
 function tick(): void {
   const now = Date.now() + clockOffset;
-  queue.tick(now);
+  queue.tick(now, state?.hub.remindAfterMs ?? 0);
+  // A request that waits long reminds once more with the tones, when sound is on.
+  if (newReminders(state?.permissions ?? [], state?.hub.remindAfterMs ?? 0, now, reminded).length > 0 && state?.hub.sound) chime();
   const sessions = state?.sessions ?? [];
   renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, { items: agentItems, toggle: toggleDetails }, now, texts);
   // With the line's button in it, the browser no longer makes the list a tab stop by itself.

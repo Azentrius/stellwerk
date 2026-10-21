@@ -43,6 +43,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
 - **A session's details.** A tap on a session opens its folder, model, context in tokens, subagents and
   the tool it used last below it; the next tap closes them.
+- **A reminder.** A request that waits longer than 20 seconds pulses, and with sound on the tones come
+  once more (`remindAfterSeconds`).
 - **The last decisions.** In the status column one line folds the last ten decisions on permission
   requests: what, when, whose session, and how each ended. A click opens it, the next closes it; a restart
   of the hub keeps them (they come from the audit log).
@@ -388,7 +390,7 @@ session appears with its first event, which in the desktop app is the first prom
 `%APPDATA%\stellwerk\config.json`, all optional:
 
 ```json
-{ "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "scale": 1, "debugRawLog": false }
+{ "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "remindAfterSeconds": 20, "scale": 1, "debugRawLog": false }
 ```
 
 | Setting | Meaning |
@@ -396,6 +398,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `port` | Port on 127.0.0.1. After a change run `stellwerk hooks install` again. The address cannot be changed. |
 | `holdSeconds` | How long a request waits on the display before it goes back to the app: 10 to 80 (at least 10 s below the hook timeout of 90 s). |
 | `sound` | A soft chime for each new request. |
+| `remindAfterSeconds` | An open request reminds after this many seconds: its card pulses (a frame without motion), and with `sound` the tones come once more: 0 (never) to 300, 20 by default. |
 | `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request or failed checks wake it, and so does a tap, which presses nothing else. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code; `stellwerk raw-log delete` deletes it. |

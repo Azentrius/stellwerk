@@ -149,9 +149,10 @@ function earlierDecisions(file: string, count: number): void {
 /**
  * A hub of its own with its start file, as `serve` writes it; with `alerts`, the raw log is on and a
  * request with a wrong token is turned away, so the status column shows two alerts above its gauges;
- * with `decisions`, that many decisions of an earlier run are in its audit log.
+ * with `decisions`, that many decisions of an earlier run are in its audit log; with `remindAfterMs`, an open
+ * request reminds after that long.
  */
-async function testHub(dir: string, pulls: number, alerts = false, decisions = 0): Promise<{ hub: Hub; token: string; startFile: string }> {
+async function testHub(dir: string, pulls: number, alerts = false, decisions = 0, remindAfterMs = 0): Promise<{ hub: Hub; token: string; startFile: string }> {
   fs.mkdirSync(dir, { recursive: true });
   if (decisions > 0) earlierDecisions(path.join(dir, 'audit.jsonl'), decisions);
   const token = randomBytes(32).toString('hex');
@@ -170,6 +171,7 @@ async function testHub(dir: string, pulls: number, alerts = false, decisions = 0
     hardware: { settingsFile: path.join(dir, 'LibreHardwareMonitor.config'), intervalMs: 500, fetch: hardwareFetch },
     rawLogFile: alerts ? path.join(dir, 'debug-raw.jsonl') : null,
     sessionsFile: alerts ? restingSessions(dir) : null,
+    remindAfterMs,
   });
   if (hub.missingBuild) throw new Error('The display is not built. Run "npm run build" first.');
   const startFile = path.join(dir, 'display.html');
@@ -598,7 +600,7 @@ try {
   check(g.scrollTop >= g.max - 1 && lastReadable(g), 'a finger moves them to the last, which can be read');
 
   // ---------- only a few: they fit, nothing scrolls, nothing moves ----------
-  few = await testHub(path.join(dir, 'few'), 1, false, 12);
+  few = await testHub(path.join(dir, 'few'), 1, false, 12, 1500);
   await fill(few.hub, few.token, { working: 2, answers: 1, cards: 1 });
   await openDisplay(browser, few.startFile);
   await until('the display shows the few', async () => {
@@ -687,6 +689,39 @@ try {
     return now.expanded === 'false' && now.names.length === 0 ? now : null;
   });
   check(true, 'the next click opens them again, and the one after that folds them');
+
+  // ---------- a request that waits long reminds: its card pulses until it is decided ----------
+  const card = () =>
+    browser.call<{ remind: boolean; animation: string; shadow: string; allow: Box | null }>(
+      `() => {
+      const node = document.querySelector('.card');
+      const allow = node.querySelector('[data-decision="allow"]');
+      const r = allow ? allow.getBoundingClientRect() : null;
+      return {
+        remind: node.classList.contains('card--remind'),
+        animation: getComputedStyle(node).animationName,
+        shadow: getComputedStyle(node).boxShadow,
+        allow: r && r.width > 0 ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null,
+      };
+    }`,
+    );
+  // Motion as the system would allow it; this machine's Windows may have turned animations off.
+  await browser.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  let waited = await until('the card reminds', async () => {
+    const now = await card();
+    return now.remind ? now : null;
+  });
+  check(waited.animation === 'remind', `a request that waited longer than its reminder time pulses (${waited.animation}, ${waited.shadow})`);
+  await browser.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  waited = await card();
+  check(waited.remind && waited.animation === 'none' && waited.shadow !== 'none', 'without motion it keeps a frame instead');
+  await browser.send('Emulation.setEmulatedMedia', { features: [] });
+  await tap(browser, (waited.allow!.left + waited.allow!.right) / 2, (waited.allow!.top + waited.allow!.bottom) / 2);
+  waited = await until('the decided card stops reminding', async () => {
+    const now = await card();
+    return !now.remind && now.allow === null ? now : null;
+  });
+  check(waited.animation === 'none', 'once decided it stops');
 } finally {
   await edge?.close();
   await many.hub.close();

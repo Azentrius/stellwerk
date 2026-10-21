@@ -8,6 +8,7 @@ import { naming, providerName } from './naming.ts';
 import { el, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { leadingRequest } from './leading.ts';
+import { reminds } from './due.ts';
 import { duration } from './time.ts';
 import { renderToolInput } from './tool-input.ts';
 
@@ -88,8 +89,11 @@ export class QueueView {
     return count;
   }
 
-  /** Running wait time and the bar that shows how much of the hold time is left. */
-  tick(now: number): void {
+  /**
+   * Running wait time and the bar that shows how much of the hold time is left; a card that has waited
+   * `remindAfterMs` pulses.
+   */
+  tick(now: number, remindAfterMs = 0): void {
     for (const card of this.cards.values()) {
       const { view } = card;
       if (view.outcome !== null) continue;
@@ -97,6 +101,7 @@ export class QueueView {
       const total = view.holdUntil - view.receivedAt;
       const left = total > 0 ? Math.min(1, Math.max(0, (view.holdUntil - now) / total)) : 0;
       card.bar.style.transform = `scaleX(${left})`;
+      card.root.classList.toggle('card--remind', reminds(view, remindAfterMs, now));
     }
   }
 
@@ -151,6 +156,7 @@ export class QueueView {
     card.appLabel.data = card.view.terminal ? t.inTerminal : t.inApp;
     const settled = card.view.outcome !== null;
     card.root.classList.toggle('card--settled', settled);
+    if (settled) card.root.classList.remove('card--remind');
     card.outcome.textContent = settled ? this.texts.outcome[card.view.outcome!] : '';
     for (const button of card.buttons) button.disabled = settled || card.busy || !this.connected;
     if (settled && card.view.resolvedAt !== null) card.wait.textContent = duration(card.view.resolvedAt - card.view.receivedAt);

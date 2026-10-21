@@ -235,6 +235,7 @@ async function serve(
       version: VERSION,
       sound: config.sound,
       quietAfterMs: config.quietAfterMinutes * 60_000,
+      remindAfterMs: config.remindAfterSeconds * 1000,
       auditFile: paths.auditFile,
       uiRoot: path.join(ROOT, 'ui'),
       webRoot: path.join(ROOT, 'dist', 'ui'),

@@ -108,6 +108,8 @@ const configSchema = z.strictObject({
   sound: z.boolean().default(false),
   /** The display dims after this many minutes without anything new and without an open request; 0: never. */
   quietAfterMinutes: z.number().int().min(0).max(1440).default(10),
+  /** An open request reminds after this many seconds: its card pulses, with sound the tones come again; 0: never. */
+  remindAfterSeconds: z.number().int().min(0).max(300).default(20),
   scale: z.number().min(0.5).max(3).default(1),
   debugRawLog: z.boolean().default(false),
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */

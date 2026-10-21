@@ -3,7 +3,7 @@
 ## 0.6.0 – 2026-10-22
 
 An update in one step, and the display says when there is one; the last decisions and a session's details
-on the display.
+on the display; a request that waits long reminds.
 
 - **`stellwerk update` in one step:** after setting up the release it now also moves Codex' hooks to the
   new forwarder (when they run Stellwerk's), starts the hub again from the new version and removes the
@@ -28,6 +28,10 @@ on the display.
   no pointer events, so a tap that meets an update still reaches the session (a check in a real Edge
   holds a press over an update). Every session is a tab stop now. The hub also sends the model of a
   session's last answer and the tool it used last.
+- **A request that waits long reminds:** after `remindAfterSeconds` (20 by default, 0: never) its card
+  pulses in the colour of attention, and with `sound` on the tones come once more. Without motion (the
+  system's setting) the card keeps a frame instead of pulsing. Codex hands a request back to its app
+  after 30 s, so the reminder comes before that.
 
 ## 0.5.4 – 2026-10-21
 
