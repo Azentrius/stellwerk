@@ -1,8 +1,9 @@
 // For the command line's tests: Windows as a test describes it, so the real command line runs without
 // touching the machine. Loaded with --import before the command line, it answers the screen list
-// (PowerShell) and task queries (schtasks /Query) from STELLWERK_FAKE_WINDOWS, writes every program the
-// command line starts to the file named there, lets spawnSync end at once with success, and refuses
-// everything else: nothing is run, no task is changed.
+// (PowerShell), task queries (schtasks /Query) and Task Scheduler's error code for a task (PowerShell) from
+// STELLWERK_FAKE_WINDOWS, writes every program the command line starts to the file named there, lets
+// spawnSync end at once with success, and refuses everything else: nothing is run, no task is changed.
+// A task that is not there fails schtasks with a German message, as on the machine this was made on.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,8 +16,21 @@ export interface FakeWindows {
   screens: Screen[];
   /** Task name → its XML as schtasks /Query /XML gives it out; a task not named here does not exist. */
   tasks: Record<string, string>;
+  /** What goes wrong with a task, by name: */
+  faults?: Record<string, TaskFault>;
   /** Where each call goes, one JSON line each. */
   calls: string;
+}
+
+export interface TaskFault {
+  /** schtasks /Query fails with this message. */
+  query?: string;
+  /** schtasks /Query /XML fails with this message. */
+  xml?: string;
+  /** Task Scheduler answers this error code (0: the task is there). */
+  code?: number;
+  /** The PowerShell that asks Task Scheduler fails with this message. */
+  powershell?: string;
 }
 
 export interface Call {
@@ -24,9 +38,14 @@ export interface Call {
   command: string;
   args: string[];
   cwd?: string;
-  /** For PowerShell: what the script asked. */
-  asked?: 'screens';
+  /** For PowerShell: what the script asked (for a task: its name). */
+  asked?: 'screens' | 'task';
+  task?: string;
 }
+
+/** HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), as in src/setup/windows.ts. */
+const NOT_FOUND = -2147024894;
+const failed = (stderr: string) => Object.assign(new Error(`Command failed: ${stderr}`), { status: 1, stderr });
 
 const fake = JSON.parse(process.env.STELLWERK_FAKE_WINDOWS ?? '') as FakeWindows;
 const note = (call: Call) => fs.appendFileSync(fake.calls, `${JSON.stringify(call)}\n`);
@@ -37,18 +56,31 @@ const refuse = (what: string) => {
 Object.defineProperty(process, 'platform', { value: 'win32' });
 const childProcess = cp as unknown as Record<string, unknown>;
 
-childProcess.execFileSync = (command: string, args: string[] = []) => {
+childProcess.execFileSync = (command: string, args: string[] = [], options: { input?: string } = {}) => {
   if (/powershell/i.test(command)) {
     const script = Buffer.from(args[args.indexOf('-EncodedCommand') + 1] ?? '', 'base64').toString('utf16le');
-    if (!script.includes('AllScreens')) refuse(`a PowerShell script other than the screen list`);
-    note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'screens' });
-    return JSON.stringify(fake.screens);
+    if (script.includes('AllScreens')) {
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'screens' });
+      return JSON.stringify(fake.screens);
+    }
+    if (script.includes('Schedule.Service')) {
+      const name = String(options.input ?? '').trim();
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'task', task: name });
+      const fault = fake.faults?.[name];
+      if (fault?.powershell !== undefined) throw failed(fault.powershell);
+      return String(fault?.code ?? (name in fake.tasks ? 0 : NOT_FOUND));
+    }
+    return refuse('a PowerShell script other than the screen list and the task query');
   }
   note({ via: 'execFileSync', command, args });
   if (command === 'schtasks' && args[0] === '/Query') {
-    const xml = fake.tasks[args[args.indexOf('/TN') + 1] ?? ''];
-    if (xml === undefined) throw Object.assign(new Error('schtasks failed'), { stderr: 'ERROR: The system cannot find the file specified.' });
-    return args.includes('/XML') ? xml : 'Folder: \\';
+    const name = args[args.indexOf('/TN') + 1] ?? '';
+    const fault = fake.faults?.[name];
+    const message = args.includes('/XML') ? fault?.xml : fault?.query;
+    if (message !== undefined) throw failed(message);
+    const xml = fake.tasks[name];
+    if (xml === undefined) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
+    return args.includes('/XML') ? xml : 'Ordner: \\';
   }
   return refuse(`${command} ${args.join(' ')}`);
 };

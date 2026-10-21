@@ -82,11 +82,53 @@ export function taskExists(name: string): boolean {
   }
 }
 
-/** A task as Task Scheduler gives it out (XML); null when there is no such task. */
+/** Task Scheduler's error code for a task that is not there: HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND). */
+export const TASK_NOT_FOUND = -2147024894;
+
+/**
+ * A task as Task Scheduler gives it out (XML); null only when Task Scheduler says there is no such task.
+ * A task that could not be read is not a missing one: then this throws.
+ */
 export function taskDefinition(name: string): string | null {
   requireWindows();
-  if (!taskExists(name)) return null;
-  return run('schtasks', ['/Query', '/TN', name, '/XML']);
+  try {
+    run('schtasks', ['/Query', '/TN', name]);
+  } catch (err) {
+    // schtasks fails alike when the task is missing and when it cannot be read (exit 1, a message in the
+    // system's language); Task Scheduler's own error code tells the two apart.
+    let code: number;
+    try {
+      code = taskQueryCode(name);
+    } catch (inner) {
+      const { stderr } = inner as { stderr?: string };
+      throw unreadableTask(name, `${(err as Error).message}; ${(String(stderr ?? '').trim() || (inner as Error).message).slice(0, 300)}`);
+    }
+    if (code === TASK_NOT_FOUND) return null;
+    throw unreadableTask(name, `${(err as Error).message} (code 0x${(code >>> 0).toString(16)})`);
+  }
+  try {
+    return run('schtasks', ['/Query', '/TN', name, '/XML']);
+  } catch (err) {
+    throw unreadableTask(name, (err as Error).message);
+  }
+}
+
+/** What Task Scheduler's own interface answers when asked for the task: 0 when it is there, else its error code. */
+function taskQueryCode(name: string): number {
+  // The name goes in on stdin. COM wraps the error code in PowerShell's exception: the innermost holds it.
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    '$name = [Console]::In.ReadLine()',
+    'try { $service = New-Object -ComObject Schedule.Service; $service.Connect(); [void]$service.GetFolder([string][char]92).GetTask($name); 0 } ' +
+      'catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; $e.HResult }',
+  ].join('; ');
+  const answer = powershell(script, `${name}\n`);
+  if (!/^-?\d+$/.test(answer)) throw new Error(`Task Scheduler gave no error code (${JSON.stringify(answer.slice(0, 200))})`);
+  return Number(answer);
+}
+
+function unreadableTask(name: string, detail: string): Error {
+  return new Error(`Task Scheduler could not read the task "${name}": ${detail}`);
 }
 
 export function deleteTask(name: string): void {

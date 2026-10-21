@@ -15,8 +15,12 @@ while the display updates, and `stellwerk update` keeps the display on its scree
   without a single 1920×720 screen the update failed only after unpacking and `npm ci`. Now `update`
   chooses before it changes anything and hands the choice on: the screen given with `--screen`, otherwise
   the one the display task uses now, otherwise (no display task yet) the only 1920×720 screen. When the
-  display task's screen is gone or cannot be told, it asks for `--screen` instead of guessing. Tests run
-  the real command line with made-up screens and tasks; no program runs and no task changes.
+  display task's screen is gone or cannot be told, it asks for `--screen` instead of guessing. Only a
+  display task that Task Scheduler itself reports as missing counts as a first setup, by its error code,
+  not by the words of `schtasks`, which fails alike for a missing task and one it may not read and speaks
+  the system's language; a task it cannot read, or a Task Scheduler that does not answer, stops the update
+  before anything changes. Tests run the real command line with made-up screens and tasks; no program runs
+  and no task changes.
 
 ## 0.5.3 – 2026-10-21
 
