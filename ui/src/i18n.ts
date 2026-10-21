@@ -81,6 +81,7 @@ export interface Texts {
   };
   /** The raw hook log is on. */
   rawLog: { title: string; fix: string };
+  newRelease: { title: (version: string) => string; fix: (version: string) => string };
   /** The display was opened without its start file. */
   notSignedIn: string;
   notSignedInFix: string;
@@ -232,6 +233,10 @@ const en: Texts = {
     title: 'Raw hook log is on',
     fix: 'It holds prompts and code. Set `debugRawLog` to false in `config.json` (or start without `--debug-raw`), restart the hub and run `stellwerk raw-log delete`.',
   },
+  newRelease: {
+    title: (version) => `Stellwerk ${version} is out`,
+    fix: (version) => `Download \`stellwerk-${version}.zip\` and \`SHA256SUMS\` from its release on GitHub, then run \`stellwerk update stellwerk-${version}.zip\`.`,
+  },
   notSignedIn: 'Display not signed in',
   notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
   lastEvent: (ago) => `last event ${ago}`,
@@ -375,6 +380,10 @@ const de: Texts = {
   rawLog: {
     title: 'Rohprotokoll ist an',
     fix: 'Es enthält Prompts und Code. Setze `debugRawLog` in `config.json` auf false (oder starte ohne `--debug-raw`), starte den Hub neu und führe `stellwerk raw-log delete` aus.',
+  },
+  newRelease: {
+    title: (version) => `Stellwerk ${version} ist da`,
+    fix: (version) => `Lade \`stellwerk-${version}.zip\` und \`SHA256SUMS\` aus dem Release auf GitHub und führe \`stellwerk update stellwerk-${version}.zip\` aus.`,
   },
   notSignedIn: 'Anzeige nicht angemeldet',
   notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',

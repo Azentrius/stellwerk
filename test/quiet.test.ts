@@ -16,7 +16,7 @@ function stateWith(parts: { sessions?: Partial<SessionView>[]; permissions?: Par
     sessions: (parts.sessions ?? []) as SessionView[],
     permissions: (parts.permissions ?? []) as PermissionView[],
     pullRequests: (parts.pulls ?? []) as PullRequestView[],
-    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, build: 'x', rejected: null, rawLog: false },
+    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, build: 'x', rejected: null, rawLog: false, newRelease: null },
     github: null,
     hardware: null,
     uptimeKuma: parts.failing ? { monitors: { failing: parts.failing, up: 3, maintenance: 0 }, updatedAt: 0, problem: null } : null,

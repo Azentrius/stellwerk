@@ -7,6 +7,7 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
@@ -23,8 +24,8 @@ import {
 } from './hub/hardware.ts';
 import { codexStateFile } from './hub/codex-projects.ts';
 import { codexSessionIndex, codexTranscriptsRoot, defaultTranscriptsRoot } from './hub/context.ts';
-import { codexHooksFile, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
-import { checkRelease, releaseDir, releaseFiles, releaseVersion } from './setup/update.ts';
+import { codexHooksFile, stellwerkCodexCommands, withStellwerkCodexHooks, withoutStellwerkCodexHooks } from './setup/codex-settings.ts';
+import { checkRelease, isInside, previousReleases, releaseDir, releaseFiles, releaseVersion } from './setup/update.ts';
 import { displayKey, displayStartPage, startHub } from './hub/hub.ts';
 import {
   DISPLAY_TASK,
@@ -145,9 +146,11 @@ Usage:
       Remove exactly these hooks.
   stellwerk raw-log delete
       Delete the raw hook log (debug-raw.jsonl), which holds prompts and code.
-  stellwerk update <stellwerk-X.Y.Z.zip> [--yes] [--screen <number>]
+  stellwerk update <stellwerk-X.Y.Z.zip> [--yes] [--screen <number>] [--keep-previous]
       Set up a downloaded release (SHA256SUMS next to it): check it against SHA256SUMS, unpack it to
-      %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it.
+      %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it;
+      move Codex' hooks to its forwarder, start the hub again from it and remove the previous releases
+      (unless --keep-previous). The display loads the new page by itself.
       The display stays on its screen, or goes to the one given; when its screen is gone (or on a
       first setup, the 1920x720 screen cannot be told), nothing changes until one is given. When
       Task Scheduler cannot read the display task, nothing changes at all.
@@ -168,6 +171,7 @@ async function main(): Promise<void> {
       owner: { type: 'string' },
       url: { type: 'string' },
       screen: { type: 'string' },
+      'keep-previous': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', default: false },
     },
@@ -191,7 +195,7 @@ async function main(): Promise<void> {
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
-  if (command === 'update') return update(action, values.yes, values.screen);
+  if (command === 'update') return update(action, values.yes, values.screen, values['keep-previous']);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -680,7 +684,7 @@ function rawLogDelete(): void {
  * Sets up a downloaded release in a folder of its own and points the logon tasks at it (setup/update.ts),
  * the display on the screen it has now unless another is given.
  */
-async function update(zipFile: string | undefined, yes: boolean, screenOption: string | undefined): Promise<void> {
+async function update(zipFile: string | undefined, yes: boolean, screenOption: string | undefined, keepPrevious: boolean): Promise<void> {
   if (!zipFile) throw new Error('Name the release: stellwerk update <stellwerk-X.Y.Z.zip>, with SHA256SUMS next to it.');
   const given = screenNumber(screenOption);
   const paths = defaultPaths();
@@ -710,7 +714,16 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
   const screen = updateScreen(screens, given, current);
   const why = { given: 'as given', kept: 'where it is now', only: 'the only one of 1920×720' }[screen.reason];
   console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screen.number} (${why}).\n`);
-  console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there; then the logon tasks start it.`);
+  const config = loadConfig(paths.configFile);
+  const codexHooks = codexHooksFile(paths.codexHome);
+  const moveCodex = codexCommands(codexHooks).length > 0;
+  const previous = keepPrevious ? [] : previousReleases(fs.existsSync(paths.releasesDir) ? fs.readdirSync(paths.releasesDir) : [], version);
+  console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there. Then:`);
+  console.log('  - the logon tasks start it;');
+  if (moveCodex) console.log("  - Codex' hooks run its forwarder (the Codex app then asks to allow them again);");
+  console.log(`  - the hub (task "${HUB_TASK}") is started again from it, and the display loads the new page by itself;`);
+  if (previous.length > 0) console.log(`  - the previous ${previous.length === 1 ? 'release goes' : 'releases go'}: ${previous.join(', ')} (keep with --keep-previous).`);
+  console.log('');
   if (!(await confirm(yes))) return void console.log('Nothing changed.');
   for (const file of files) {
     const to = path.join(target, file.path);
@@ -718,12 +731,81 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
     fs.writeFileSync(to, file.data);
   }
   // Fixed arguments, no shell: npm through the Node.js that runs this, then the new version's own setup.
+  const cli = path.join(target, 'dist', 'cli.js');
   runStep(process.execPath, [npmCli, 'ci', '--omit=dev'], target);
-  runStep(process.execPath, [path.join(target, 'dist', 'cli.js'), 'autostart', 'install', '--yes', '--screen', String(screen.number)], target);
-  console.log(`Stellwerk ${version} is set up. Restart the hub and the display: schtasks /End and then /Run for "Stellwerk hub" and "Stellwerk display".`);
-  const codexHooks = codexHooksFile(paths.codexHome);
-  if (fs.existsSync(codexHooks) && fs.readFileSync(codexHooks, 'utf8').includes('hook.js')) {
-    console.log(`Codex' hooks still run the forwarder of the version that set them up; "stellwerk codex install" from ${target} moves them (the Codex app then asks to allow them again).`);
+  runStep(process.execPath, [cli, 'autostart', 'install', '--yes', '--screen', String(screen.number)], target);
+  if (moveCodex) runStep(process.execPath, [cli, 'codex', 'install', '--yes'], target);
+  await restartHub(config.port, paths.hubLogFile);
+  console.log(`Stellwerk ${version} runs; the display loads the new page by itself when it is open.`);
+  if (moveCodex) console.log('Restart the Codex app and allow the changed hooks there (the hook symbol in the input field).');
+  for (const folder of previous) removeRelease(path.join(paths.releasesDir, folder), codexHooks);
+}
+
+/** Stellwerk's commands in Codex' hooks; none when the file is missing or cannot be read. */
+function codexCommands(file: string): string[] {
+  try {
+    return stellwerkCodexCommands((readJsonFile(file) ?? {}) as Record<string, unknown>);
+  } catch {
+    return [];
+  }
+}
+
+/** A previous release, unless something may still use it: Codex' hooks, or this very command's folder. */
+function removeRelease(dir: string, codexHooks: string): void {
+  const still = codexCommands(codexHooks).some((command) => command.toLowerCase().includes(dir.toLowerCase()));
+  if (still || isInside(process.cwd(), dir)) {
+    return void console.log(`${dir} stays: ${still ? "Codex' hooks still run its forwarder" : 'this command runs in it'}.`);
+  }
+  try {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    console.log(`Removed ${dir}.`);
+  } catch (err) {
+    console.log(`${dir} stays (${(err as Error).message}); remove it yourself.`);
+  }
+}
+
+/**
+ * The hub task ended and started again, from the version its task now names. Waits until the port is free
+ * (the hub follows its task within seconds, --exit-with-parent) and until the new hub answers on it.
+ */
+async function restartHub(port: number, logFile: string): Promise<void> {
+  endTask(HUB_TASK);
+  if (!(await within(HUB_STOP_MS, async () => !(await listening(port))))) {
+    throw new Error(
+      `A hub not started by its task still listens on ${HOST}:${port}. Stop it (Ctrl+C in its window), then: schtasks /Run /TN "${HUB_TASK}"`,
+    );
+  }
+  startTask(HUB_TASK);
+  if (!(await within(HUB_START_MS, () => listening(port)))) throw new Error(`The hub did not start again; its messages are in ${logFile}.`);
+}
+
+/** How long the hub may take to follow its ended task, and to start. */
+const HUB_STOP_MS = 10_000;
+const HUB_START_MS = 20_000;
+
+/** Whether something answers on the hub's port. */
+function listening(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: HOST, port });
+    socket.setTimeout(1000);
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('error', () => resolve(false));
+  });
+}
+
+async function within(ms: number, test: () => Promise<boolean>): Promise<boolean> {
+  const end = Date.now() + ms;
+  for (;;) {
+    if (await test()) return true;
+    if (Date.now() >= end) return false;
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
 

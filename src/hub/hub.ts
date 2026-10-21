@@ -32,7 +32,7 @@ import { Board, QUESTION_TOOLS, projectName, showsNotification, type Permission 
 import { parseCodexInput } from './codex-input.ts';
 import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
-import { GitHubWatcher } from './github.ts';
+import { GitHubWatcher, newerRelease } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
@@ -606,7 +606,16 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       now: now(),
       ...board.view(),
       pullRequests: github?.pullRequests ?? [],
-      hub: { startedAt, lastEventAt: board.lastEventAt, sound: options.sound, quietAfterMs: options.quietAfterMs ?? 0, build, rejected, rawLog: Boolean(options.rawLogFile) },
+      hub: {
+        startedAt,
+        lastEventAt: board.lastEventAt,
+        sound: options.sound,
+        quietAfterMs: options.quietAfterMs ?? 0,
+        build,
+        rejected,
+        rawLog: Boolean(options.rawLogFile),
+        newRelease: newerRelease(github?.latestRelease ?? null, options.version),
+      },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,
       uptimeKuma: uptimeKuma?.view() ?? null,

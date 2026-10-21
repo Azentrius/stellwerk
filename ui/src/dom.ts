@@ -59,11 +59,12 @@ export function stateIcon(state: State): HTMLSpanElement {
  * the attention tone and its triangle, and is not announced as an alert.
  */
 export function alert(problem: Problem): HTMLDivElement {
-  const warning = problem.tone === 'warning';
-  const node = el('div', `az-alert az-alert--${warning ? 'warning' : 'danger'}`);
-  node.setAttribute('role', warning ? 'status' : 'alert');
+  const tone = problem.tone ?? 'danger';
+  // The design system's alert without a modifier is the note (info).
+  const node = el('div', tone === 'info' ? 'az-alert' : `az-alert az-alert--${tone}`);
+  node.setAttribute('role', tone === 'danger' ? 'alert' : 'status');
   const mark = el('span', 'az-alert__icon');
-  mark.append(icon(warning ? 'exclamation-triangle' : 'exclamation-circle'));
+  mark.append(icon(({ info: 'info-circle', warning: 'exclamation-triangle', danger: 'exclamation-circle' } as const)[tone]));
   const body = el('p', 'az-alert__body');
   for (const part of splitCode(problem.fix)) body.append(part.code ? el('code', undefined, part.text) : part.text);
   node.append(mark, el('p', 'az-alert__title', problem.title), body);

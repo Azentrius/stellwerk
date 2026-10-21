@@ -51,3 +51,14 @@ export function releaseFiles(files: ZipFile[], version: string): Array<{ path: s
 export function releaseDir(releasesDir: string, version: string): string {
   return path.join(releasesDir, `stellwerk-${version}`);
 }
+
+/** The release folders among `names` (named as `releaseDir` names them), other than the one of `version`. */
+export function previousReleases(names: string[], version: string): string[] {
+  return names.filter((name) => /^stellwerk-\d+\.\d+\.\d+$/.test(name) && name !== `stellwerk-${version}`).sort();
+}
+
+/** Whether `dir` holds the file or folder `file` (paths compared as Windows does, without regard to case). */
+export function isInside(file: string, dir: string): boolean {
+  const relative = path.relative(dir.toLowerCase(), file.toLowerCase());
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}

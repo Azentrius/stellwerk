@@ -97,6 +97,8 @@ export interface HubView {
   rejected: { count: number; lastAt: number; until: number; reason: RejectionReason } | null;
   /** The raw hook log is on: it holds prompts and code. */
   rawLog: boolean;
+  /** A newer release of Stellwerk on GitHub, its version (X.Y.Z); null when there is none or it is not known. */
+  newRelease: string | null;
 }
 
 /** The Actions runs on a pull request's head commit, summed up. */

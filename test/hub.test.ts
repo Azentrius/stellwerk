@@ -579,6 +579,29 @@ describe('open pull requests', () => {
     assert.ok(calls.every((u) => u.startsWith('https://api.github.com/')));
     screen.close();
   });
+
+  test("with a token the display hears of a newer release of Stellwerk, not of the one it runs", async () => {
+    let latest = 'v0.6.0';
+    const fakeFetch = (async (input: string | URL | Request) => {
+      const { pathname } = new URL(String(input));
+      if (pathname === '/repos/Azentrius/stellwerk/releases/latest') return new Response(JSON.stringify({ tag_name: latest }), { status: 200 });
+      return new Response(JSON.stringify(pathname === '/orgs/acme/repos' ? [] : {}), { status: 200 });
+    }) as typeof fetch;
+    const github = { owner: 'acme', token: `github_pat_${'t'.repeat(30)}`, intervalMs: 60_000, fetch: fakeFetch };
+    const newer = await startTestHub({ version: '0.5.4', github });
+    const screen = await display(newer.port);
+    assert.equal((await screen.state((s) => s.hub.newRelease !== null)).hub.newRelease, '0.6.0');
+    screen.close();
+    latest = 'v0.5.4';
+    const same = await startTestHub({ version: '0.5.4', github });
+    const other = await display(same.port);
+    assert.equal((await other.state((s) => s.github?.syncedAt !== null)).hub.newRelease, null);
+    other.close();
+    const without = await startTestHub({ version: '0.5.4' });
+    const plain = await display(without.port);
+    assert.equal((await plain.state(() => true)).hub.newRelease, null, 'without a token nobody is asked');
+    plain.close();
+  });
 });
 
 describe('hardware values', () => {

@@ -98,6 +98,13 @@ rest.
 
 ---
 
+## 0.6.0 – Updates in one step ✅
+
+Done in 0.6.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk update` also moves Codex' hooks, starts the hub
+again and removes the previous releases; the display says when a newer release is out.
+
+---
+
 ## 0.5.4 – Review fixes ✅
 
 Done in 0.5.4 (see [CHANGELOG](CHANGELOG.md)), after a review of 0.5.3: the line of the sessions at rest

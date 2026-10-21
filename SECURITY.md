@@ -54,7 +54,8 @@ reachable only from the machine it runs on and only by the display it serves:
   shell; `serve` restricts the token file and the display's start file with
   `icacls` when it creates or changes them;
 - the hub connects to two other machines at most. One is `api.github.com`
-  (fixed in the code), for the list of open pull requests, and only once a GitHub
+  (fixed in the code), for the list of open pull requests and the newest release
+  of `Azentrius/stellwerk` (to say that there is one; nothing is downloaded), and only once a GitHub
   token is set up: fine-grained only, meant to read pull requests and Actions
   and nothing else, kept like the hook token, never logged, never sent to the
   display; GitHub's answers are checked before use, redirects are not
@@ -101,8 +102,11 @@ reachable only from the machine it runs on and only by the display it serves:
 - `stellwerk update` takes a release you downloaded only if it matches the
   `SHA256SUMS` next to it, unpacks it into its own folder (refusing any file
   name that would leave it), runs `npm ci --omit=dev` there and the new
-  version's `autostart install`, with fixed arguments and no shell; it
-  downloads nothing itself;
+  version's `autostart install` (and `codex install` when Codex' hooks run
+  Stellwerk's forwarder), with fixed arguments and no shell; it ends and runs
+  only the hub's own task, and removes only folders named
+  `stellwerk-X.Y.Z` in its own releases folder that neither Codex' hooks nor
+  the command itself still use; it downloads nothing itself;
 - `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
   archive, pinned in the code by URL, size and SHA-256, unpacks it only into
   its own folder in Program Files (refusing any file name that would leave

@@ -4,13 +4,19 @@
 // STELLWERK_FAKE_WINDOWS, writes every program the command line starts to the file named there, lets
 // spawnSync end at once with success, and refuses everything else: nothing is run, no task is changed.
 // A task that is not there fails schtasks with a German message, as on the machine this was made on.
+// The hub is played by a socket on a free port of 127.0.0.1, written to the configuration: ending its
+// task closes it, running the task opens it. A new version's `codex install` writes its forwarder into
+// Codex' hooks.json (in CODEX_HOME), as the real one would.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import cp from 'node:child_process';
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
-import type { Screen } from '../../src/setup/autostart.ts';
+import net from 'node:net';
+import path from 'node:path';
+import { HUB_TASK, type Screen } from '../../src/setup/autostart.ts';
+import { withStellwerkCodexHooks } from '../../src/setup/codex-settings.ts';
 
 export interface FakeWindows {
   screens: Screen[];
@@ -18,6 +24,10 @@ export interface FakeWindows {
   tasks: Record<string, string>;
   /** What goes wrong with a task, by name: */
   faults?: Record<string, TaskFault>;
+  /** The hub: running at the start (default), ended with its task (default), started by it (default). */
+  hub?: { running?: boolean; endsWithTask?: boolean; starts?: boolean };
+  /** spawnSync fails (status 1) for a program whose arguments hold this. */
+  failing?: string;
   /** Where each call goes, one JSON line each. */
   calls: string;
 }
@@ -56,6 +66,28 @@ const refuse = (what: string) => {
 Object.defineProperty(process, 'platform', { value: 'win32' });
 const childProcess = cp as unknown as Record<string, unknown>;
 
+// The hub: a socket on a free port, which the configuration names.
+const hub = { running: true, endsWithTask: true, starts: true, ...fake.hub };
+let socket: net.Server | null = null;
+const port = await new Promise<number>((resolve) => {
+  const probe = net.createServer().listen(0, '127.0.0.1', () => {
+    const { port } = probe.address() as net.AddressInfo;
+    probe.close(() => resolve(port));
+  });
+});
+const configDir = path.join(process.env.APPDATA ?? '', 'stellwerk');
+fs.mkdirSync(configDir, { recursive: true });
+fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({ port }));
+const startHub = () => {
+  socket ??= net.createServer((connection) => connection.destroy()).listen(port, '127.0.0.1');
+  socket.unref();
+};
+const endHub = () => {
+  socket?.close();
+  socket = null;
+};
+if (hub.running) startHub();
+
 childProcess.execFileSync = (command: string, args: string[] = [], options: { input?: string } = {}) => {
   if (/powershell/i.test(command)) {
     const script = Buffer.from(args[args.indexOf('-EncodedCommand') + 1] ?? '', 'base64').toString('utf16le');
@@ -82,11 +114,26 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     if (xml === undefined) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
     return args.includes('/XML') ? xml : 'Ordner: \\';
   }
+  // Only the hub's task may be ended and started.
+  if (command === 'schtasks' && (args[0] === '/End' || args[0] === '/Run') && args[args.indexOf('/TN') + 1] === HUB_TASK) {
+    if (args[0] === '/End' && hub.endsWithTask) endHub();
+    if (args[0] === '/Run' && hub.starts) startHub();
+    return 'ERFOLGREICH';
+  }
   return refuse(`${command} ${args.join(' ')}`);
 };
 
 childProcess.spawnSync = (command: string, args: string[] = [], options: { cwd?: string } = {}) => {
   note({ via: 'spawnSync', command, args, cwd: options.cwd });
+  if (fake.failing !== undefined && args.some((arg) => arg.includes(fake.failing!))) {
+    return { pid: 0, output: [], stdout: '', stderr: '', status: 1, signal: null };
+  }
+  // A new version's `codex install --yes`: its forwarder goes into Codex' hooks, next to its cli.js.
+  if (args[1] === 'codex' && args[2] === 'install') {
+    const file = path.join(process.env.CODEX_HOME ?? '', 'hooks.json');
+    const current = fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>) : {};
+    fs.writeFileSync(file, JSON.stringify(withStellwerkCodexHooks(current, path.join(path.dirname(args[0]!), 'codex', 'hook.js')), null, 2));
+  }
   return { pid: 0, output: [], stdout: '', stderr: '', status: 0, signal: null };
 };
 

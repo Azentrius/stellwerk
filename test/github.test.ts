@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { GitHubWatcher, MAX_PAGES, nextPage, summarizeRuns } from '../src/hub/github.ts';
+import { GitHubWatcher, MAX_PAGES, RELEASE_EVERY_MS, RELEASE_RETRY_MS, newerRelease, nextPage, summarizeRuns } from '../src/hub/github.ts';
 
 const TOKEN = `github_pat_${'x'.repeat(40)}`;
 const SHA = (n: number) => String(n).repeat(40).slice(0, 40);
@@ -244,7 +244,7 @@ describe('lists over several pages', () => {
     const w = watch(fake, log);
     await w.poll();
     assert.equal(w.problem, 'too-many');
-    assert.equal(fake.calls.length, MAX_PAGES);
+    assert.equal(fake.calls.filter((url) => url.includes('/orgs/acme/repos')).length, MAX_PAGES);
     assert.ok(log.some((l) => l.includes(`more than ${MAX_PAGES} pages`)));
   });
 
@@ -274,5 +274,61 @@ describe('checks of a pull request', () => {
     assert.equal(summarizeRuns([run('completed', 'success'), run('completed', 'failure')]), 'failing');
     assert.equal(summarizeRuns([run('completed', 'cancelled')]), 'failing');
     assert.equal(summarizeRuns([run('completed', 'timed_out')]), 'failing');
+  });
+});
+
+describe("Stellwerk's newest release", () => {
+  const LATEST = '/repos/Azentrius/stellwerk/releases/latest';
+
+  test('a newer version is one with a higher X.Y.Z; anything else is none', () => {
+    assert.equal(newerRelease('0.6.0', '0.5.4'), '0.6.0');
+    assert.equal(newerRelease('0.5.10', '0.5.9'), '0.5.10', 'by number, not by letters');
+    assert.equal(newerRelease('1.0.0', '0.99.99'), '1.0.0');
+    assert.equal(newerRelease('0.5.4', '0.5.4'), null);
+    assert.equal(newerRelease('0.5.3', '0.5.4'), null, 'an older release says nothing');
+    assert.equal(newerRelease(null, '0.5.4'), null);
+    assert.equal(newerRelease('0.6.0', 'check'), null, 'a hub without a version (the checks) says nothing');
+  });
+
+  test('is asked with the same token at the start, then every few hours; failures again after an hour', async () => {
+    let now = 1000;
+    const fake = fakeGitHub({ ...standardRoutes(), [LATEST]: { tag_name: 'v0.6.0', draft: false, prerelease: false } });
+    const log: string[] = [];
+    const w = new GitHubWatcher({ owner: 'acme', token: TOKEN, intervalMs: 60_000, fetch: fake.fetch, now: () => now, log: (l) => log.push(l) });
+    const asked = () => fake.calls.filter((c) => new URL(c.url).pathname === LATEST);
+    await w.poll();
+    assert.equal(w.latestRelease, '0.6.0');
+    assert.equal(asked().length, 1);
+    assert.equal((asked()[0]!.init?.headers as Record<string, string>).Authorization, `Bearer ${TOKEN}`);
+    assert.equal(asked()[0]!.init?.redirect, 'error');
+    assert.match(log.join('\n'), /newest release of Stellwerk is 0\.6\.0/);
+    now += RELEASE_EVERY_MS - 1;
+    await w.poll();
+    assert.equal(asked().length, 1, 'not again before the time');
+    now += 1;
+    fake.routes[LATEST] = 500;
+    await w.poll();
+    assert.equal(asked().length, 2);
+    assert.equal(w.latestRelease, '0.6.0', 'a failure keeps what was known');
+    assert.equal(w.problem, null, 'and does not touch the pull requests');
+    assert.equal(w.pullRequests.length, 2);
+    now += RELEASE_RETRY_MS;
+    await w.poll();
+    assert.equal(asked().length, 3, 'after a failure again after an hour');
+    assert.equal(log.filter((l) => /could not be asked/.test(l)).length, 1, 'logged once');
+  });
+
+  test('drafts and pre-releases are no release; an answer that is not a version is not taken', async () => {
+    for (const [answer, expected] of [
+      [{ tag_name: 'v0.6.0', prerelease: true }, null],
+      [{ tag_name: 'v0.6.0', draft: true }, null],
+      [{ tag_name: 'v0.6.0-beta' }, null],
+      [{ tag_name: '<script>' }, null],
+      [{ tag_name: 'v0.6.1' }, '0.6.1'],
+    ] as const) {
+      const w = watcher(fakeGitHub({ ...standardRoutes(), [LATEST]: answer }));
+      await w.poll();
+      assert.equal(w.latestRelease, expected, JSON.stringify(answer));
+    }
   });
 });

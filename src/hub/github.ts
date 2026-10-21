@@ -2,7 +2,9 @@
 // a read-only fine-grained token: the owner's repositories, their open pull requests, and for each the
 // Actions runs on its head commit. Lists come in pages; the hub follows GitHub's "next" links, but only to
 // api.github.com and only up to a limit, so a list is complete or the round fails. Every answer is
-// checked before it is used; a failed round keeps the last list and says why.
+// checked before it is used; a failed round keeps the last list and says why. Every few hours the same
+// way: the newest release of Stellwerk itself, so the display can say when there is a newer one (nothing is
+// downloaded).
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -38,6 +40,26 @@ const pulls = z.array(
 const runs = z.object({
   workflow_runs: z.array(z.object({ status: z.string().nullable(), conclusion: z.string().nullable() })),
 });
+const release = z.object({
+  tag_name: z.string().regex(/^v\d{1,4}\.\d{1,5}\.\d{1,6}$/),
+  draft: z.boolean().optional(),
+  prerelease: z.boolean().optional(),
+});
+
+/** Stellwerk's own repository, whose newest release the hub looks for. */
+export const STELLWERK_REPO = 'Azentrius/stellwerk';
+/** Releases are rare: asked at the start and then this often; after a failed question again after an hour. */
+export const RELEASE_EVERY_MS = 6 * 3_600_000;
+export const RELEASE_RETRY_MS = 3_600_000;
+
+/** `latest` when it is a newer version than `current` (both X.Y.Z); otherwise null. */
+export function newerRelease(latest: string | null, current: string): string | null {
+  const parse = (version: string | null) => (version && /^\d+\.\d+\.\d+$/.test(version) ? version.split('.').map(Number) : null);
+  const [a, b] = [parse(latest), parse(current)];
+  if (!a || !b) return null;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i]! > b[i]! ? latest : null;
+  return null;
+}
 
 type Run = z.infer<typeof runs>['workflow_runs'][number];
 
@@ -79,11 +101,16 @@ export class GitHubWatcher {
   pullRequests: PullRequestView[] = [];
   syncedAt: number | null = null;
   problem: GitHubProblem | null = null;
+  /** The version of Stellwerk's newest release (no draft, no pre-release); null while not known. */
+  latestRelease: string | null = null;
   private readonly options: GitHubWatcherOptions;
   private readonly fetch: typeof fetch;
   private readonly now: () => number;
   private timer: NodeJS.Timeout | null = null;
   private polling: Promise<void> | null = null;
+  /** When to ask for the newest release next. */
+  private releaseDue = 0;
+  private releaseProblem: GitHubProblem | null = null;
 
   constructor(options: GitHubWatcherOptions) {
     this.options = options;
@@ -115,6 +142,7 @@ export class GitHubWatcher {
 
   private async round(): Promise<void> {
     const before = this.problem;
+    await this.releaseRound();
     try {
       const found: Array<{ view: PullRequestView; sha: string }> = [];
       for (const repo of await this.repositories()) {
@@ -152,6 +180,25 @@ export class GitHubWatcher {
       if (this.problem !== before) this.options.log?.(`GitHub: ${describeProblem(this.problem)}`);
     } finally {
       this.options.onChange?.();
+    }
+  }
+
+  /** Stellwerk's newest release, when it is due; a failure keeps what was known and is logged once. */
+  private async releaseRound(): Promise<void> {
+    if (this.now() < this.releaseDue) return;
+    try {
+      const { data } = await this.get(`${GITHUB_API}/repos/${STELLWERK_REPO}/releases/latest`, release);
+      const version = data.draft || data.prerelease ? null : data.tag_name.slice(1);
+      if (version !== this.latestRelease && version !== null) this.options.log?.(`GitHub: the newest release of Stellwerk is ${version}.`);
+      this.latestRelease = version;
+      this.releaseProblem = null;
+      this.releaseDue = this.now() + RELEASE_EVERY_MS;
+    } catch (err) {
+      const problem = err instanceof GitHubFailure ? err.problem : 'unreachable';
+      const why = err instanceof GitHubFailure && err.status !== null ? `${problem}, ${err.status}` : problem;
+      if (problem !== this.releaseProblem) this.options.log?.(`GitHub: the newest release of Stellwerk could not be asked (${why}).`);
+      this.releaseProblem = problem;
+      this.releaseDue = this.now() + RELEASE_RETRY_MS;
     }
   }
 
