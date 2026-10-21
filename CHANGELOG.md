@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.6.0 – 2026-10-21
+## 0.6.0 – 2026-10-22
 
-An update in one step, and the display says when there is one.
+An update in one step, and the display says when there is one; the last decisions on the display.
 
 - **`stellwerk update` in one step:** after setting up the release it now also moves Codex' hooks to the
   new forwarder (when they run Stellwerk's), starts the hub again from the new version and removes the
@@ -15,6 +15,12 @@ An update in one step, and the display says when there is one.
   start and then every six hours for the newest release of `Azentrius/stellwerk` (no drafts, no
   pre-releases; nothing is downloaded). When it is newer than the running version, the status column says
   so, with the command that sets it up.
+- **The last decisions:** in the status column, below the hub and its hints, one line folds the last ten
+  decisions on permission requests: what each was about (a command's first line, a file, an address), when,
+  whose session and tool, and how it ended (allowed, denied, in the app, time up …). A click or Enter opens
+  it, the next closes it. The hub keeps them as it settles requests and reads them back from the end of its
+  audit log at a start, so a restart does not empty them; the display never gets the whole input. The
+  audit log now also names the session's title and whose agent asked.
 
 ## 0.5.4 – 2026-10-21
 

@@ -12,6 +12,7 @@ import type {
   GitHubView,
   HardwareView,
   HubView,
+  PermissionOutcome,
   SessionStatus,
   UptimeKumaView,
 } from '../../src/shared/protocol.js';
@@ -144,6 +145,23 @@ export function rejectedLine(hub: HubView | null, now: number, texts: Texts): Pr
     title: texts.rejected.title(rejected.count),
     fix: texts.rejected.detail(ago(now - rejected.lastAt, texts), texts.rejected.reasons[rejected.reason]),
   };
+}
+
+/**
+ * How a request ended, in the list of the last decisions: allowed is good, denied a stop; the rest went
+ * to the app, or nobody decided.
+ */
+const OUTCOME_TONE: Record<PermissionOutcome, Tone> = {
+  allowed: 'success',
+  denied: 'danger',
+  'decided-in-app': 'info',
+  'handed-to-app': 'neutral',
+  'timed-out': 'warning',
+  aborted: 'neutral',
+};
+
+export function decisionState(outcome: PermissionOutcome, texts: Texts): State {
+  return state(OUTCOME_TONE[outcome], texts.decided[outcome]);
 }
 
 /** A reminder that the raw hook log is on: it holds prompts and code. */

@@ -92,6 +92,9 @@ export interface Texts {
   subagents: (n: number) => string;
   /** The line behind which the sessions at rest wait, closed and open. */
   restingMore: (n: number) => string;
+  decisionsTitle: (n: number) => string;
+  /** How a request ended, shortly, for the list of the last decisions. */
+  decided: Record<PermissionOutcome, string>;
   restingHide: (n: number) => string;
   /** Whose agent a session is, shown for every session alike. */
   providers: Record<Provider, string>;
@@ -245,6 +248,15 @@ const en: Texts = {
   justNow: 'just now',
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
   restingMore: (n) => `${n} more at rest`,
+  decisionsTitle: (n) => (n === 1 ? 'The last decision' : `The last ${n} decisions`),
+  decided: {
+    allowed: 'Allowed',
+    denied: 'Denied',
+    'handed-to-app': 'To the app',
+    'decided-in-app': 'In the app',
+    aborted: 'Cancelled',
+    'timed-out': 'Time up',
+  },
   restingHide: (n) => (n === 1 ? 'Hide the one at rest' : `Hide the ${n} at rest`),
   providers: { claude: 'Claude', codex: 'Codex' },
   codexCli: 'Codex CLI',
@@ -393,6 +405,15 @@ const de: Texts = {
   justNow: 'gerade eben',
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
   restingMore: (n) => (n === 1 ? '1 weitere ruht' : `${n} weitere ruhen`),
+  decisionsTitle: (n) => (n === 1 ? 'Die letzte Entscheidung' : `Die letzten ${n} Entscheidungen`),
+  decided: {
+    allowed: 'Erlaubt',
+    denied: 'Abgelehnt',
+    'handed-to-app': 'An die App',
+    'decided-in-app': 'In der App',
+    aborted: 'Abgebrochen',
+    'timed-out': 'Zeit abgelaufen',
+  },
   restingHide: (n) => (n === 1 ? 'Ruhende ausblenden' : `${n} ruhende ausblenden`),
   providers: { claude: 'Claude', codex: 'Codex' },
   codexCli: 'Codex CLI',

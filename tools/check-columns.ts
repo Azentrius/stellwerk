@@ -5,9 +5,11 @@
 // the focus while the column is drawn anew, and Enter, Space and a press held over a render open and close
 // it once each; below two alerts in the status
 // column, the hardware values and the plans' usage scroll the same way, the clock and the alerts staying in
-// place; with only a few nothing scrolls and nothing moves. Isolated hubs with made-up tokens; sessions,
-// requests and the plans' usage come as hook events, the answers of GitHub and LibreHardwareMonitor are made
-// up here, nothing goes online. Needs the display built (npm run build) and Edge.
+// place; with only a few nothing scrolls and nothing moves; the last decisions wait folded in the status
+// column, and a click or Enter opens and closes them. Isolated hubs with made-up tokens;
+// sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
+// answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
+// (npm run build) and Edge.
 //
 // Usage: node tools/check-columns.ts [folder for screenshots]
 //
@@ -126,12 +128,32 @@ function restingSessions(dir: string): string {
   return file;
 }
 
+/** Decisions of an earlier run in the audit log, one a minute, the newest last: step 01 to step NN. */
+function earlierDecisions(file: string, count: number): void {
+  const outcomes = ['allowed', 'denied', 'decided-in-app', 'timed-out'];
+  const lines = Array.from({ length: count }, (_, i) =>
+    JSON.stringify({
+      ts: new Date(Date.now() - (count - i) * 60_000).toISOString(),
+      request: `earlier-${pad(i + 1)}`,
+      project: 'shop-api',
+      title: 'Deploy the shop',
+      provider: 'claude',
+      tool: 'Bash',
+      input: { command: `npm run step-${pad(i + 1)}` },
+      result: outcomes[i % outcomes.length],
+    }),
+  );
+  fs.writeFileSync(file, `${lines.join('\n')}\n`);
+}
+
 /**
  * A hub of its own with its start file, as `serve` writes it; with `alerts`, the raw log is on and a
- * request with a wrong token is turned away, so the status column shows two alerts above its gauges.
+ * request with a wrong token is turned away, so the status column shows two alerts above its gauges;
+ * with `decisions`, that many decisions of an earlier run are in its audit log.
  */
-async function testHub(dir: string, pulls: number, alerts = false): Promise<{ hub: Hub; token: string; startFile: string }> {
+async function testHub(dir: string, pulls: number, alerts = false, decisions = 0): Promise<{ hub: Hub; token: string; startFile: string }> {
   fs.mkdirSync(dir, { recursive: true });
+  if (decisions > 0) earlierDecisions(path.join(dir, 'audit.jsonl'), decisions);
   const token = randomBytes(32).toString('hex');
   const hub = await startHub({
     port: 0,
@@ -504,7 +526,7 @@ try {
   check(g.scrollTop >= g.max - 1 && lastReadable(g), 'a finger moves them to the last, which can be read');
 
   // ---------- only a few: they fit, nothing scrolls, nothing moves ----------
-  few = await testHub(path.join(dir, 'few'), 1);
+  few = await testHub(path.join(dir, 'few'), 1, false, 12);
   await fill(few.hub, few.token, { working: 2, answers: 1, cards: 1 });
   await openDisplay(browser, few.startFile);
   await until('the display shows the few', async () => {
@@ -530,6 +552,69 @@ try {
       `the ${name} column: over the renders nothing moves`,
     );
   }
+
+  // ---------- the last decisions: folded in the status column, a click opens and closes them ----------
+  const decisions = () =>
+    browser.call<{ hidden: boolean; expanded: string | null; text: string; names: string[]; labels: string[]; box: Box; inView: boolean; focused: boolean; first: boolean }>(
+      `() => {
+      const section = document.querySelector('#decisions');
+      const button = document.querySelector('#decisions-toggle');
+      const list = document.querySelector('#decisions-list');
+      const shown = [...list.querySelectorAll('.decision')].filter((n) => n.getClientRects().length > 0);
+      const r = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const details = document.querySelector('#status-details');
+      const column = details.getBoundingClientRect();
+      return {
+        hidden: section.hidden,
+        expanded: button.getAttribute('aria-expanded'),
+        text: button.textContent,
+        names: shown.map((n) => n.querySelector('.entry__name').textContent),
+        labels: shown.map((n) => n.querySelector('.az-label')?.textContent ?? ''),
+        box: { top: r.top, bottom: r.bottom, left: r.left, right: r.right },
+        inView: r.top >= column.top && r.bottom <= column.bottom && hit !== null && button.contains(hit),
+        focused: document.activeElement === button,
+        first: (() => { const b = shown[0]?.getBoundingClientRect(); return b !== undefined && b.top >= column.top && b.bottom <= column.top + details.clientHeight; })(),
+      };
+    }`,
+    );
+  const click = async (box: Box) => {
+    const x = (box.left + box.right) / 2;
+    const y = (box.top + box.bottom) / 2;
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await browser.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+  };
+  const TITLE = /^(The last 10 decisions|Die letzten 10 Entscheidungen)$/;
+  let folded = await decisions();
+  check(!folded.hidden && folded.inView && folded.expanded === 'false' && folded.names.length === 0 && TITLE.test(folded.text), `the last ten decisions wait folded in one line in the status column ("${folded.text}")`);
+  check(shown(await measure(browser, STATUS)), 'the clock, the hub and its last event stay shown');
+  await click(folded.box);
+  folded = await until('a click opens the decisions', async () => {
+    const now = await decisions();
+    return now.expanded === 'true' && now.names.length === 10 ? now : null;
+  });
+  check(folded.names[0] === 'npm run step-12' && folded.names[9] === 'npm run step-03', `a click opens them: the ten newest, the newest first (${folded.names[0]} … ${folded.names[9]})`);
+  check(folded.first && folded.labels.every((l) => l !== ''), 'each with how it ended, the newest in view');
+  check(shown(await measure(browser, STATUS)), 'the clock, the hub and its last event stay shown');
+  const redrawn = await countRenders(browser, '#decisions-list');
+  await pause(2500);
+  folded = await decisions();
+  check((await redrawn()) >= 2 && folded.expanded === 'true' && folded.names.length === 10 && folded.focused, 'open, they stay open over the renders, the line keeps the focus');
+  await press(browser, 'Enter', 13, '\r');
+  folded = await until('Enter closes the decisions', async () => {
+    const now = await decisions();
+    return now.expanded === 'false' && now.names.length === 0 ? now : null;
+  });
+  check(folded.focused && TITLE.test(folded.text), 'Enter folds them again; the line keeps the focus');
+  await click(folded.box);
+  await until('another click opens them', async () => (await decisions()).names.length === 10);
+  await click((await decisions()).box);
+  folded = await until('the next click closes them', async () => {
+    const now = await decisions();
+    return now.expanded === 'false' && now.names.length === 0 ? now : null;
+  });
+  check(true, 'the next click opens them again, and the one after that folds them');
 } finally {
   await edge?.close();
   await many.hub.close();
