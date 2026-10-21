@@ -9,7 +9,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import type { GitHubView, HardwareView, HubView, UptimeKumaView } from '../src/shared/protocol.js';
 import { pickTexts } from '../ui/src/i18n.ts';
-import { githubLine, hardwareLine, rawLogLine, rejectedLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
+import { githubLine, hardwareLine, newReleaseLine, rawLogLine, rejectedLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const cli = fs.readFileSync(path.join(ROOT, 'src', 'cli.ts'), 'utf8');
@@ -86,7 +86,7 @@ test('the status lines are plain text, or a problem with its fix', () => {
 });
 
 test('requests turned away and the raw log are hints to look at the log, as warnings', () => {
-  const hub = (rejected: HubView['rejected'], rawLog = false): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: 0, build: 'x', rejected, rawLog });
+  const hub = (rejected: HubView['rejected'], rawLog = false, newRelease: string | null = null): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: 0, build: 'x', rejected, rawLog, newRelease });
   const de = languages[1]!;
   assert.equal(rejectedLine(null, 0, en), null);
   assert.equal(rejectedLine(hub(null), 0, en), null);
@@ -105,4 +105,17 @@ test('requests turned away and the raw log are hints to look at the log, as warn
   assert.equal(rawLogLine(hub(null), en), null);
   assert.deepEqual(rawLogLine(hub(null, true), de)?.title, 'Rohprotokoll ist an');
   assert.equal(rawLogLine(hub(null, true), en)?.tone, 'warning');
+});
+
+test('a newer release is a note that says how to set it up, in both languages', () => {
+  const hub = (newRelease: string | null): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: 0, build: 'x', rejected: null, rawLog: false, newRelease });
+  const de = languages[1]!;
+  assert.equal(newReleaseLine(null, en), null, 'nothing while the hub is away');
+  assert.equal(newReleaseLine(hub(null), en), null);
+  assert.deepEqual(newReleaseLine(hub('0.6.0'), en), {
+    tone: 'info',
+    title: 'Stellwerk 0.6.0 is out',
+    fix: 'Download `stellwerk-0.6.0.zip` and `SHA256SUMS` from its release on GitHub, then run `stellwerk update stellwerk-0.6.0.zip`.',
+  });
+  assert.equal(newReleaseLine(hub('0.6.0'), de)?.title, 'Stellwerk 0.6.0 ist da');
 });

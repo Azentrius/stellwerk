@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 – 2026-10-21
+
+An update in one step, and the display says when there is one.
+
+- **`stellwerk update` in one step:** after setting up the release it now also moves Codex' hooks to the
+  new forwarder (when they run Stellwerk's), starts the hub again from the new version and removes the
+  previous releases in `%LOCALAPPDATA%\stellwerk\releases` (`--keep-previous` keeps them). It lists all
+  of it before it asks. The display loads the new page by itself. The hub's task is ended and run; when a
+  hub not started by its task holds the port, or the new one does not start, the update says so and keeps
+  the previous release. A previous release that Codex' hooks still run, or the command runs in, stays.
+  Tests run the real command line against a made-up Windows with a stand-in hub.
+- **A newer release on the display:** with a GitHub token set up, the hub asks `api.github.com` at its
+  start and then every six hours for the newest release of `Azentrius/stellwerk` (no drafts, no
+  pre-releases; nothing is downloaded). When it is newer than the running version, the status column says
+  so, with the command that sets it up.
+
 ## 0.5.4 – 2026-10-21
 
 Fixes from a review of 0.5.3: the line of the sessions at rest keeps the keyboard's focus and a press

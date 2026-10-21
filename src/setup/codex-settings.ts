@@ -91,3 +91,14 @@ export function withStellwerkCodexHooks(settings: Settings, script: string): Set
   next.hooks = hooks;
   return next;
 }
+
+/** The commands of Stellwerk's handlers in Codex' hooks; none when there are none. */
+export function stellwerkCodexCommands(settings: Settings): string[] {
+  const hooks = settings.hooks;
+  if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks)) return [];
+  return Object.values(hooks as Record<string, unknown>)
+    .flatMap((groups) => (Array.isArray(groups) ? (groups as HookGroup[]) : []))
+    .flatMap((group) => (Array.isArray(group?.hooks) ? group.hooks : []))
+    .filter(isStellwerkCodexHandler)
+    .map((handler) => (handler as { command: string }).command);
+}

@@ -31,12 +31,12 @@ export interface State {
 
 /**
  * An error the user can fix: what happened, and how to fix it (commands in backticks). Shown as an alert,
- * an error unless it only needs attention (`tone: 'warning'`).
+ * an error unless it only needs attention (`tone: 'warning'`) or is a note (`tone: 'info'`).
  */
 export interface Problem {
   title: string;
   fix: string;
-  tone?: 'warning';
+  tone?: 'warning' | 'info';
 }
 
 const TONE_ICON: Record<Exclude<Tone, 'neutral'>, IconName> = {
@@ -149,6 +149,12 @@ export function rejectedLine(hub: HubView | null, now: number, texts: Texts): Pr
 /** A reminder that the raw hook log is on: it holds prompts and code. */
 export function rawLogLine(hub: HubView | null, texts: Texts): Problem | null {
   return hub?.rawLog ? { tone: 'warning', title: texts.rawLog.title, fix: texts.rawLog.fix } : null;
+}
+
+/** A note that a newer release of Stellwerk is out, and how to set it up. */
+export function newReleaseLine(hub: HubView | null, texts: Texts): Problem | null {
+  const version = hub?.newRelease ?? null;
+  return version === null ? null : { tone: 'info', title: texts.newRelease.title(version), fix: texts.newRelease.fix(version) };
 }
 
 /** Splits a text at its backticks: what stands between them is a command, the rest plain text. */

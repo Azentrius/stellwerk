@@ -63,10 +63,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.5.4.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.5.4.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.5.4.zip -DestinationPath .
-cd stellwerk-0.5.4
+(Get-FileHash stellwerk-0.6.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.6.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.6.0.zip -DestinationPath .
+cd stellwerk-0.6.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -105,17 +105,22 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.5.4.zip
+stellwerk update stellwerk-0.6.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
 (`%LOCALAPPDATA%\stellwerk\releases\stellwerk-VERSION`), runs `npm ci --omit=dev` there and points the
-two logon tasks at it; then restart them. The display stays on the screen its task uses now; give
+two logon tasks at it. Then it moves Codex' hooks to the new forwarder, if they run Stellwerk's (allow
+them again in the Codex app), starts the hub again from the new version, and removes the previous
+releases; `--keep-previous` keeps them. It lists all of this before it asks. The display loads the new
+page by itself. The display stays on the screen its task uses now; give
 `--screen <number>` (as `autostart install` lists them) to move it, or when that screen is gone: then
 the update stops before it changes anything. It stops as well when Task Scheduler cannot read the display
 task; only a task it reports as missing makes the update a first setup. Stellwerk downloads nothing itself. Settings, token and keys stay
-where they are. Codex' hooks keep running the forwarder of the version that set them up, until you run
-`stellwerk codex install` from the new folder.
+where they are.
+
+With a GitHub token set up (see below), the status column says when a newer release is out: the hub asks
+`api.github.com` at its start and every six hours for the newest release of `Azentrius/stellwerk`.
 
 ## Start with Windows
 
@@ -180,6 +185,8 @@ the name a screen reader reads), so repository, number and author have room:
 
 At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
 last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it. The token is never logged and never sent to the display.
+With the same token the hub asks, at its start and every six hours, for the newest release of Stellwerk
+itself, so the status column can say when there is a newer one (see "Updating").
 `stellwerk github remove` deletes it; the hub then opens no connection to GitHub.
 
 ## Hardware values
@@ -442,7 +449,7 @@ Restart the hub after a change.
 - Nothing is allowed automatically: no rules, no "always allow". A question of an MCP server
   (`Elicitation`) the hub never answers; the app asks you itself.
 - The hub starts no programs. It connects to other machines only to `api.github.com`, for the list of
-  pull requests, and only with a fine-grained read-only token you set up; and to Uptime Kuma at the
+  pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set up; and to Uptime Kuma at the
   address you set up, only for `/metrics` and only with its API key. Besides that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
