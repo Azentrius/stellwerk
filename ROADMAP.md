@@ -101,7 +101,8 @@ rest.
 ## 0.6.0 – Updates in one step ✅
 
 Done in 0.6.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk update` also moves Codex' hooks, starts the hub
-again and removes the previous releases; the display says when a newer release is out.
+again and removes the previous releases; the display says when a newer release is out, and folds the
+last ten decisions in one line of the status column.
 
 ---
 

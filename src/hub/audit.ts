@@ -5,7 +5,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PermissionOutcome } from '../shared/protocol.js';
+import type { PermissionOutcome, Provider } from '../shared/protocol.js';
 import { projectName, type Permission } from './board.ts';
 
 export interface AuditRecord {
@@ -13,6 +13,9 @@ export interface AuditRecord {
   cwd: string;
   outcome: PermissionOutcome;
   at: number;
+  /** Whose agent asked, and the session's title, as the display showed them. */
+  provider?: Provider;
+  title?: string | null;
   /** Why the hub settled it on its own, e.g. too many open requests. */
   note?: string;
 }
@@ -33,6 +36,8 @@ export class AuditLog {
       request: p.id,
       session: p.sessionId,
       project: projectName(record.cwd),
+      ...(record.title ? { title: record.title } : {}),
+      ...(record.provider ? { provider: record.provider } : {}),
       cwd: record.cwd,
       agent: p.agentId,
       tool: p.tool,

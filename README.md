@@ -41,6 +41,9 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
+- **The last decisions.** In the status column one line folds the last ten decisions on permission
+  requests: what, when, whose session, and how each ended. A click opens it, the next closes it; a restart
+  of the hub keeps them (they come from the audit log).
 - **At rest when nothing is new.** After 10 minutes with nothing new and no open request the display
   dims, the clock still readable; anything new or a tap wakes it (`quietAfterMinutes`, see
   [Configuration](#configuration)).
@@ -411,7 +414,7 @@ Restart the hub after a change.
 | `%APPDATA%\stellwerk\config.json` | Configuration |
 | `%LOCALAPPDATA%\stellwerk\token` | The hook token; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\display.html` | The display's start file with the key that signs it in, written by the hub; only your Windows user can read it |
-| `%LOCALAPPDATA%\stellwerk\audit.jsonl` | Audit log: every permission request with time, session, project, tool, input and outcome |
+| `%LOCALAPPDATA%\stellwerk\audit.jsonl` | Audit log: every permission request with time, session (and its title), whose agent, project, tool, input and outcome; the hub reads its end at a start for the last decisions |
 | `%LOCALAPPDATA%\stellwerk\debug-raw.jsonl` | Raw hook data, only in debug mode |
 | `%LOCALAPPDATA%\stellwerk\hub.log` | Messages of the hub started at logon |
 | `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |

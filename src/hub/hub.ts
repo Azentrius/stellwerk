@@ -32,6 +32,7 @@ import { Board, QUESTION_TOOLS, projectName, showsNotification, type Permission 
 import { parseCodexInput } from './codex-input.ts';
 import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
+import { Decisions, decisionWhat } from './decisions.ts';
 import { GitHubWatcher, newerRelease } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
@@ -196,6 +197,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   const restored = board.restore(sessionFile.load(), now());
   if (restored > 0) log(`Sessions of the last run: ${restored}, shown as unknown until they report again.`);
   const audit = new AuditLog(options.auditFile);
+  // The last decisions, also those of before a restart, from the end of the audit log.
+  const decisions = new Decisions();
+  decisions.load(options.auditFile);
   const held = new Map<string, Held>();
   const startedAt = now();
   const expectedAuthorization = Buffer.from(`Bearer ${options.token}`);
@@ -503,8 +507,19 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   }
 
   function report(permission: Permission, outcome: PermissionOutcome, at: number, note?: string): void {
-    const cwd = board.sessions.get(permission.sessionId)?.cwd ?? '';
-    audit.write({ permission, cwd, outcome, at, ...(note ? { note } : {}) });
+    const session = board.sessions.get(permission.sessionId);
+    const cwd = session?.cwd ?? '';
+    audit.write({ permission, cwd, outcome, at, provider: session?.provider, title: session?.title ?? null, ...(note ? { note } : {}) });
+    decisions.add({
+      id: permission.id,
+      at,
+      outcome,
+      tool: permission.tool,
+      what: decisionWhat(permission.tool, permission.input, permission.mcpServer),
+      project: session?.project ?? projectName(cwd),
+      title: session?.title ?? null,
+      provider: session?.provider ?? null,
+    });
     log(`${clockTime(at)}  ${projectName(cwd) || permission.sessionId.slice(0, 8)} · ${permission.tool}  ${outcome}`);
   }
 
@@ -620,6 +635,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       hardware: hardware?.view() ?? null,
       uptimeKuma: uptimeKuma?.view() ?? null,
       plans: plans.view(),
+      decisions: decisions.view(),
     };
   }
 

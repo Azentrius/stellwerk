@@ -7,6 +7,7 @@
 
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { renderAgents } from './agents.ts';
+import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
 import { waitingForAnswer } from './due.ts';
 import { alert, byId, el, icon, label } from './dom.ts';
@@ -62,6 +63,9 @@ const agentsCount = byId('agents-count');
 const restingLine = new RestingLine();
 const restingItem = el('li', 'resting');
 const restingButton = el('button', 'resting__toggle');
+/** The last decisions at the foot of the waiting column, folded until a click opens them. */
+const decisionsParts = { section: byId('decisions'), button: byId<HTMLButtonElement>('decisions-toggle'), list: byId<HTMLUListElement>('decisions-list') };
+let decisionsOpen = false;
 restingButton.type = 'button';
 restingItem.append(restingButton);
 const answers = byId<HTMLUListElement>('answers');
@@ -207,6 +211,7 @@ function tick(): void {
   waitingEmpty.hidden = !nothing;
   waitingList.hidden = nothing;
   fadeWhileMore(waitingList, 'waiting--more');
+  renderDecisions(decisionsParts, state?.decisions ?? [], decisionsOpen, now, texts);
   clockNode.textContent = clock(now);
   show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
@@ -322,6 +327,10 @@ void document.fonts.ready.then(() => tick());
 window.addEventListener('resize', () => tick());
 waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
 monitorsFailing.addEventListener('scroll', () => markScrolling(monitorsFailing, 'monitors__failing--more'), { passive: true });
+decisionsParts.button.addEventListener('click', () => {
+  decisionsOpen = !decisionsOpen;
+  tick();
+});
 restingButton.addEventListener('click', () => {
   restingLine.toggle(Date.now() + clockOffset);
   tick();

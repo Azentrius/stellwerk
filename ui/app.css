@@ -215,7 +215,10 @@ button { font: inherit; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 /* The line behind which the sessions at rest wait: quiet, but as high as a button, so a finger finds it. */
 .resting { border-block-end: 1px solid var(--line); }
-.resting__toggle {
+/* The last decisions in the status column, below the hub and its hints: one such line, folded by default;
+   open, its list scrolls with the hints and gauges. */
+.decisions { border-block: 1px solid var(--line); }
+.resting__toggle, .decisions__toggle {
   display: flex;
   align-items: center;
   gap: var(--sp-sm);

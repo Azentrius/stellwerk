@@ -75,6 +75,20 @@ export interface PermissionView {
   resolvedAt: number | null;
 }
 
+/** One of the last decisions on permission requests, for the display; never the whole input. */
+export interface DecisionView {
+  id: string;
+  at: number;
+  outcome: PermissionOutcome;
+  tool: string;
+  /** A short line of what it was about: a command's first line, a file, an address; may be empty. */
+  what: string;
+  project: string;
+  title: string | null;
+  /** Null for decisions read from an audit log written before it named the provider. */
+  provider: Provider | null;
+}
+
 /**
  * Why the hub turned a request away, as the display names it: a missing or wrong token, hook data it could
  * not take, a request from elsewhere (foreign host or origin, an unknown path or target), a display that is
@@ -219,6 +233,8 @@ export interface StateMessage {
   uptimeKuma: UptimeKumaView | null;
   /** The usage of the plans' limits, one entry per provider that recorded any. */
   plans: PlanView[];
+  /** The last decisions on permission requests, newest first, also those of before a restart. */
+  decisions: DecisionView[];
 }
 
 export interface DecisionResultMessage {

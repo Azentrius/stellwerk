@@ -748,7 +748,8 @@ describe('Codex', () => {
     screen.decide(card.id, 'allow');
     const reply = await pending.reply;
     assert.deepEqual(JSON.parse(reply.body), { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } });
-    const ring = await screen.state((s) => s.sessions[0]?.context !== null);
+    // Not just "not null": a state without the session would pass that too.
+    const ring = await screen.state((s) => s.sessions[0]?.context != null);
     assert.deepEqual(ring.sessions[0]?.context, { used: 182_031, size: 258_400 }, 'the window comes from the transcript');
     screen.close();
   });
@@ -1070,6 +1071,47 @@ describe('permission requests', () => {
     assert.equal(auditLines(auditFile)[0]?.result, 'allowed');
     screen.close();
     second.close();
+  });
+
+  test('the display gets the last decisions with what they were about, also those of before a restart', async () => {
+    const { hub, port, auditFile } = await startTestHub();
+    const screen = await display(port);
+    const open = async (command: string) => {
+      const state = await screen.state((s) => s.permissions.some((p) => p.outcome === null && p.input.command === command));
+      return state.permissions.find((p) => p.outcome === null && p.input.command === command)!.id;
+    };
+    const first = permissionRequest(port, 'npm run deploy\necho done');
+    screen.decide(await open('npm run deploy\necho done'), 'deny');
+    await first.reply;
+    const second = permissionRequest(port, 'git push origin main');
+    screen.decide(await open('git push origin main'), 'allow');
+    await second.reply;
+    const state = await screen.state((s) => s.decisions.length === 2);
+    assert.deepEqual(
+      state.decisions.map((d) => [d.outcome, d.tool, d.what, d.provider]),
+      [
+        ['allowed', 'Bash', 'git push origin main', 'claude'],
+        ['denied', 'Bash', 'npm run deploy', 'claude'],
+      ],
+      'newest first, the first line of each command',
+    );
+    assert.equal('input' in state.decisions[0]!, false, 'never the whole input');
+    await eventually(() => auditLines(auditFile).length === 2);
+    assert.equal(auditLines(auditFile)[0]?.provider, 'claude');
+    screen.close();
+    await hub.close();
+
+    const again = await startTestHub({ auditFile });
+    const later = await display(again.port);
+    const restored = await later.state(() => true);
+    assert.deepEqual(
+      restored.decisions.map((d) => [d.outcome, d.what]),
+      [
+        ['allowed', 'git push origin main'],
+        ['denied', 'npm run deploy'],
+      ],
+    );
+    later.close();
   });
 
   test('"Deny" answers with deny and a message for Claude', async () => {
