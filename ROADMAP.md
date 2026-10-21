@@ -98,6 +98,14 @@ rest.
 
 ---
 
+## 0.5.4 – Review fixes ✅
+
+Done in 0.5.4 (see [CHANGELOG](CHANGELOG.md)), after a review of 0.5.3: the line of the sessions at rest
+keeps the keyboard's focus and a press while the display updates; `stellwerk update` keeps the display on
+its screen and asks before it would guess.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

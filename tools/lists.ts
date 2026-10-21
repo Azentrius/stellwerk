@@ -180,12 +180,17 @@ export async function press(edge: Edge, key: string, code: number, text?: string
   await edge.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event });
 }
 
-/** Counts the changes to a list from now on, so a check knows the display drew it again. */
+/**
+ * Counts the changes to a list from now on, so a check knows the display drew it again; one count per
+ * render (the changes of one task come together), one counter at a time.
+ */
 export async function countRenders(edge: Edge, selector: string): Promise<() => Promise<number>> {
   await edge.call(
     `(selector) => {
+      window.__renderObserver?.disconnect();
       window.__renders = 0;
-      new MutationObserver(() => window.__renders++).observe(document.querySelector(selector), { childList: true, subtree: true, characterData: true });
+      window.__renderObserver = new MutationObserver(() => window.__renders++);
+      window.__renderObserver.observe(document.querySelector(selector), { childList: true, subtree: true, characterData: true });
     }`,
     selector,
   );

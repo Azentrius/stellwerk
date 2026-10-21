@@ -1,7 +1,9 @@
 // The agents and the waiting column in a real Edge at the display's 1920×720: with more than fit, each
 // scrolls by mouse wheel, finger and keyboard to its last entry, which can then be read in full, and keeps
 // its place while the display updates; the column titles and GitHub's line stay in place; the Allow of a
-// card far down can be reached and pressed by finger and by keyboard; below two alerts in the status
+// card far down can be reached and pressed by finger and by keyboard; the line of the sessions at rest keeps
+// the focus while the column is drawn anew, and Enter, Space and a press held over a render open and close
+// it once each; below two alerts in the status
 // column, the hardware values and the plans' usage scroll the same way, the clock and the alerts staying in
 // place; with only a few nothing scrolls and nothing moves. Isolated hubs with made-up tokens; sessions,
 // requests and the plans' usage come as hook events, the answers of GitHub and LibreHardwareMonitor are made
@@ -297,6 +299,106 @@ try {
   await tap(browser, (rest!.box.left + rest!.box.right) / 2, (rest!.box.top + rest!.box.bottom) / 2);
   await until('the next tap closes it', async () => (await measure(browser, AGENTS)).entries.length === sessions);
   check(true, 'the next tap closes it');
+
+  // The keyboard and the mouse, while the display draws the column anew every second: the line keeps the
+  // focus and its place, and a key or a press held over a render opens or closes it, once.
+  const resting = () =>
+    browser.call<{ focused: boolean; expanded: string | null; text: string; shown: number; scrollTop: number; clicks: number }>(
+      `() => {
+      const node = document.querySelector('.resting__toggle');
+      const names = [...document.querySelectorAll('#agents .agent .entry__name')].filter((n) => n.getClientRects().length > 0);
+      return {
+        focused: document.activeElement === node,
+        expanded: node.getAttribute('aria-expanded'),
+        text: node.textContent,
+        shown: names.filter((n) => n.textContent.startsWith('Ruht ')).length,
+        scrollTop: document.querySelector('#agents').scrollTop,
+        clicks: window.__restingClicks,
+      };
+    }`,
+    );
+  const isOpen = (s: Awaited<ReturnType<typeof resting>>) => s.expanded === 'true' && s.shown === RESTING && /^(Hide the 10 at rest|10 ruhende ausblenden)$/.test(s.text);
+  const isClosed = (s: Awaited<ReturnType<typeof resting>>) => s.expanded === 'false' && s.shown === 0 && /^10 (more at rest|weitere ruhen)$/.test(s.text);
+  /** Waits until the line is open or closed, then a little longer, so a second activation would show. */
+  const becomes = async (want: (s: Awaited<ReturnType<typeof resting>>) => boolean, what: string) => {
+    await until(what, async () => want(await resting()));
+    await pause(400);
+    return resting();
+  };
+  /** Renders counted over `ms`, and how the line stands afterwards. */
+  const overRenders = async (ms: number) => {
+    const count = await countRenders(browser, AGENTS.list);
+    await pause(ms);
+    return { renders: await count(), s: await resting() };
+  };
+  const SPACE = { key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 };
+  await browser.evaluate("window.__restingClicks = 0; document.querySelector('.resting__toggle').addEventListener('click', () => window.__restingClicks++)");
+
+  await browser.evaluate("document.activeElement?.blur(); document.querySelector('#agents').focus()");
+  let s = await resting();
+  for (let i = 0; i < 5 && !s.focused; i++) {
+    await press(browser, 'Tab', 9);
+    s = await resting();
+  }
+  check(s.focused && isClosed(s), 'Tab reaches the line of the sessions at rest, closed (aria-expanded false)');
+  let held = await overRenders(3200);
+  check(held.renders >= 3, `the column was drawn again ${held.renders} times`);
+  check(held.s.focused && held.s.scrollTop === s.scrollTop && isClosed(held.s), 'over these renders the line keeps the focus, the column its place');
+
+  await press(browser, 'Enter', 13, '\r');
+  s = await becomes(isOpen, 'Enter opens the line');
+  check(s.clicks === 1 && s.focused, 'after the renders Enter opens it, once: aria-expanded true, the ten show, its word says how to close it');
+  held = await overRenders(2500);
+  check(held.renders >= 2 && held.s.focused && isOpen(held.s), `open, it keeps the focus over ${held.renders} renders`);
+  await press(browser, 'Enter', 13, '\r');
+  s = await becomes(isClosed, 'Enter closes the line');
+  check(s.clicks === 2 && s.focused, 'after the renders Enter closes it again, once');
+
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', ...SPACE, text: ' ', unmodifiedText: ' ' });
+  let during = await countRenders(browser, AGENTS.list);
+  await until('a render while Space is held', async () => (await during()) >= 1);
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...SPACE });
+  s = await becomes(isOpen, 'Space opens the line');
+  check(s.clicks === 3 && s.focused, 'Space held over a render opens it, once');
+  held = await overRenders(2500);
+  check(held.renders >= 2 && held.s.focused && isOpen(held.s), `it stays open and focused over ${held.renders} renders`);
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', ...SPACE, text: ' ', unmodifiedText: ' ' });
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...SPACE });
+  s = await becomes(isClosed, 'Space closes the line');
+  check(s.clicks === 4 && s.focused, 'after the renders Space closes it again, once');
+
+  for (const [want, word] of [
+    [isOpen, 'opens'],
+    [isClosed, 'closes'],
+  ] as const) {
+    const at = (await line())!;
+    check(at.inView, `the line is in view for the mouse (${word})`);
+    const x = (at.box.left + at.box.right) / 2;
+    const y = (at.box.top + at.box.bottom) / 2;
+    const clicks = (await resting()).clicks;
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await browser.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+    during = await countRenders(browser, AGENTS.list);
+    await until('a render while the mouse button is down', async () => (await during()) >= 1);
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+    s = await becomes(want, `the press ${word} the line`);
+    check(s.clicks === clicks + 1, `a press held over a render ${word} it: one click (${s.clicks - clicks})`);
+  }
+
+  // A session at rest that reports again: the count follows, it stands on its own, the focus stays.
+  await browser.evaluate("document.querySelector('.resting__toggle').focus()");
+  await hook(many.hub.port, many.token, 'rest-05', { hook_event_name: 'UserPromptSubmit', prompt: 'x' });
+  s = await until('the session that reported leaves the line', async () => {
+    const now = await resting();
+    return /^9 (more at rest|weitere ruhen)$/.test(now.text) ? now : null;
+  });
+  const order = await browser.call<{ woken: number; line: number }>(
+    `() => {
+      const items = [...document.querySelector('#agents').children];
+      return { woken: items.findIndex((n) => n.querySelector('.entry__name')?.textContent === 'Ruht 05'), line: items.indexOf(document.querySelector('.resting')) };
+    }`,
+  );
+  check(s.focused && s.expanded === 'false' && order.woken >= 0 && order.woken < order.line, 'a session at rest that reports again leaves the line, which counts 9 and keeps the focus');
 
   // ---------- the waiting column: cards, answers in the app, pull requests ----------
   g = await settled(browser, WAITING);

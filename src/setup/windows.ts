@@ -82,6 +82,13 @@ export function taskExists(name: string): boolean {
   }
 }
 
+/** A task as Task Scheduler gives it out (XML); null when there is no such task. */
+export function taskDefinition(name: string): string | null {
+  requireWindows();
+  if (!taskExists(name)) return null;
+  return run('schtasks', ['/Query', '/TN', name, '/XML']);
+}
+
 export function deleteTask(name: string): void {
   requireWindows();
   run('schtasks', ['/Delete', '/TN', name, '/F']);
@@ -125,9 +132,9 @@ export function stopProgram(exe: string): void {
   powershell(script, `${exe}\n`);
 }
 
-function run(command: string, args: string[]): void {
+function run(command: string, args: string[]): string {
   try {
-    execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   } catch (err) {
     const { stdout, stderr } = err as { stdout?: string; stderr?: string };
     throw new Error(`${String(stderr ?? '').trim() || String(stdout ?? '').trim() || (err as Error).message}`);

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.4 – 2026-10-21
+
+Fixes from a review of 0.5.3: the line of the sessions at rest keeps the keyboard's focus and a press
+while the display updates, and `stellwerk update` keeps the display on its screen.
+
+- **The line of the sessions at rest:** each second the display took the line out of the agents list and
+  put it back, so it lost the keyboard's focus (Enter then opened nothing), and a mouse button held over
+  that moment clicked nothing. Now only the entries around it are drawn anew; the line stays, with its
+  focus, a press or key held on it, `aria-expanded` and the list's place. The column check in a real Edge
+  covers Tab, Enter and Space over several updates and a press held over one.
+- **`stellwerk update` and the screen:** the new version's setup chose the screen anew, so a display put
+  on another screen with `autostart install --screen` could move, `update --screen` was ignored, and
+  without a single 1920×720 screen the update failed only after unpacking and `npm ci`. Now `update`
+  chooses before it changes anything and hands the choice on: the screen given with `--screen`, otherwise
+  the one the display task uses now, otherwise (no display task yet) the only 1920×720 screen. When the
+  display task's screen is gone or cannot be told, it asks for `--screen` instead of guessing. Tests run
+  the real command line with made-up screens and tasks; no program runs and no task changes.
+
 ## 0.5.3 – 2026-10-21
 
 The display rests when nothing is new; sessions at rest make way; Codex' command line is marked as such;

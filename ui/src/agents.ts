@@ -15,8 +15,9 @@ import { sessionState } from './states.ts';
 import { elapsed } from './time.ts';
 
 /**
- * The sessions, those at rest behind `line` (the same element each time, so a tap on it is never lost to a
- * new one): its word says how many, and they show below it while it is open.
+ * The sessions, those at rest behind `line`: its word says how many, and they show below it while it is
+ * open. The line is the same element each time and stays in the list while the entries around it are drawn
+ * anew, so a focus on it and a press or key still held on it outlast every render.
  */
 export function renderAgents(
   list: HTMLElement,
@@ -34,7 +35,11 @@ export function renderAgents(
     line.button.setAttribute('aria-expanded', String(line.open));
     line.button.replaceChildren(icon(line.open ? 'angle-down' : 'angle-right'), line.open ? texts.restingHide(count) : texts.restingMore(count));
   }
-  list.replaceChildren(...sessions.active.map((s) => agentEntry(s, now, texts)), line.item, ...(line.open ? sessions.resting.map((s) => agentEntry(s, now, texts)) : []));
+  // Taken out and put back, the line would lose the focus and end a press on it without a click.
+  for (const child of [...list.children]) if (child !== line.item) child.remove();
+  if (line.item.parentElement !== list) list.append(line.item);
+  line.item.before(...sessions.active.map((s) => agentEntry(s, now, texts)));
+  line.item.after(...(line.open ? sessions.resting.map((s) => agentEntry(s, now, texts)) : []));
 }
 
 function agentEntry(session: SessionView, now: number, texts: Texts): HTMLLIElement {
