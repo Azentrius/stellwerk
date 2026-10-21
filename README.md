@@ -112,7 +112,8 @@ It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
 (`%LOCALAPPDATA%\stellwerk\releases\stellwerk-VERSION`), runs `npm ci --omit=dev` there and points the
 two logon tasks at it; then restart them. The display stays on the screen its task uses now; give
 `--screen <number>` (as `autostart install` lists them) to move it, or when that screen is gone: then
-the update stops before it changes anything. Stellwerk downloads nothing itself. Settings, token and keys stay
+the update stops before it changes anything. It stops as well when Task Scheduler cannot read the display
+task; only a task it reports as missing makes the update a first setup. Stellwerk downloads nothing itself. Settings, token and keys stay
 where they are. Codex' hooks keep running the forwarder of the version that set them up, until you run
 `stellwerk codex install` from the new folder.
 

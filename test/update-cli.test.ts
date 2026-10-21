@@ -1,7 +1,8 @@
 // `stellwerk update` as a user runs it: the real command line in a process of its own, with a made-up
 // release, temporary folders and Windows made up by test/support/fake-windows.ts (screens and tasks; every
 // program it would start is written down, none runs, no task changes). Which screen the new version's
-// setup gets, and that a screen that cannot be told stops the update before anything changes.
+// setup gets, and that a screen that cannot be told, or a display task Task Scheduler cannot read, stops
+// the update before anything changes; only a task Task Scheduler reports as missing is a first setup.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,7 +16,7 @@ import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { DISPLAY_TASK, HUB_TASK, displayTask, taskXml, type Screen } from '../src/setup/autostart.ts';
 import { zip } from '../tools/package.ts';
-import type { Call, FakeWindows } from './support/fake-windows.ts';
+import type { Call, FakeWindows, TaskFault } from './support/fake-windows.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const CLI = path.join(ROOT, 'src', 'cli.ts');
@@ -58,7 +59,7 @@ interface Outcome {
 }
 
 /** Runs `stellwerk update <release> --yes …` against the made-up Windows. */
-function update(windows: { screens: Screen[]; tasks?: Record<string, string> }, ...extra: string[]): Outcome {
+function update(windows: { screens: Screen[]; tasks?: Record<string, string>; faults?: Record<string, TaskFault> }, ...extra: string[]): Outcome {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-update-cli-'));
   try {
     const name = `stellwerk-${VERSION}.zip`;
@@ -73,7 +74,7 @@ function update(windows: { screens: Screen[]; tasks?: Record<string, string> }, 
     fs.mkdirSync(downloads);
     fs.writeFileSync(path.join(downloads, name), release);
     fs.writeFileSync(path.join(downloads, 'SHA256SUMS'), `${createHash('sha256').update(release).digest('hex')}  ${name}\n`);
-    const fake: FakeWindows = { screens: windows.screens, tasks: windows.tasks ?? {}, calls: path.join(dir, 'calls.jsonl') };
+    const fake: FakeWindows = { screens: windows.screens, tasks: windows.tasks ?? {}, faults: windows.faults, calls: path.join(dir, 'calls.jsonl') };
     fs.writeFileSync(fake.calls, '');
     const local = path.join(dir, 'local');
     const result = spawnSync(process.execPath, ['--import', FAKE, CLI, 'update', path.join(downloads, name), '--yes', ...extra], {
@@ -105,6 +106,9 @@ function update(windows: { screens: Screen[]; tasks?: Record<string, string> }, 
   }
 }
 
+/** Only asked: the screen list, a task (schtasks /Query, Task Scheduler's error code); changes nothing. */
+const asked = (c: Call) => c.asked === 'screens' || c.asked === 'task' || (c.command === 'schtasks' && c.args[0] === '/Query');
+
 /** Set up, with the display on that screen; only the screen list, task queries, npm and the setup ran. */
 function setUpOn(outcome: Outcome, number: number): void {
   assert.equal(outcome.status, 0, outcome.output);
@@ -114,7 +118,7 @@ function setUpOn(outcome: Outcome, number: number): void {
   assert.equal(started.length, 2, 'npm ci and the new setup, nothing else');
   assert.deepEqual(started[0]!.args.slice(1), ['ci', '--omit=dev']);
   assert.ok(
-    outcome.calls.every((c) => c.via === 'spawnSync' || c.asked === 'screens' || (c.command === 'schtasks' && c.args[0] === '/Query')),
+    outcome.calls.every((c) => c.via === 'spawnSync' || asked(c)),
     'the update itself changes no task',
   );
   assert.match(outcome.output, new RegExp(`full screen on screen ${number} `));
@@ -130,7 +134,7 @@ function stoppedBefore(outcome: Outcome, message: RegExp): void {
     [],
     'neither npm nor a setup was started',
   );
-  assert.ok(outcome.calls.every((c) => c.asked === 'screens' || (c.command === 'schtasks' && c.args[0] === '/Query')), 'no task was changed');
+  assert.ok(outcome.calls.every(asked), 'no task was changed');
 }
 
 test('--screen 2 reaches the setup of the new version', () => {
@@ -174,6 +178,53 @@ test('a display task that names no screen is not overwritten by a guess', () => 
   const plain = displayTaskOn(DESK).replace(/ --window-position=[\d,-]+ --window-size=[\d,]+/, '');
   assert.doesNotMatch(plain, /--window-/);
   stoppedBefore(update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: plain } }), /names no screen\. Choose one with --screen/);
+});
+
+// Task Scheduler's error codes (HRESULTs): not there, access denied, its service not reachable.
+const NOT_FOUND = -2147024894;
+const ACCESS_DENIED = -2147024891;
+const UNREACHABLE = -2147023174;
+const unreadable = (detail: RegExp) =>
+  new RegExp(`could not read the task "Stellwerk display": ${detail.source}[\\s\\S]*Nothing was changed`);
+
+test('a display task Task Scheduler cannot read stops the update, instead of counting as a first setup', () => {
+  const tasks = { [DISPLAY_TASK]: displayTaskOn(SIDE) };
+  const faults = { [DISPLAY_TASK]: { query: 'FEHLER: Zugriff verweigert', code: ACCESS_DENIED } };
+  const denied = update({ screens: [MAIN, SIDE, DESK], tasks, faults });
+  stoppedBefore(denied, unreadable(/FEHLER: Zugriff verweigert \(code 0x80070005\)/));
+  assert.ok(denied.calls.some((c) => c.asked === 'task' && c.task === DISPLAY_TASK), 'Task Scheduler was asked');
+  // A screen given does not get round it: the new version could not replace the task either.
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], tasks, faults }, '--screen', '3'), unreadable(/FEHLER: Zugriff verweigert/));
+  // schtasks' words do not count: "cannot find" with the code for access denied is no missing task.
+  const words = { [DISPLAY_TASK]: { query: 'ERROR: The system cannot find the file specified.', code: ACCESS_DENIED } };
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], faults: words }), unreadable(/ERROR: The system cannot find the file specified\. \(code 0x80070005\)/));
+});
+
+test('when Task Scheduler cannot be reached, or asking it fails, the update stops the same way', () => {
+  const unreachable = { [DISPLAY_TASK]: { query: 'FEHLER: Der RPC-Server ist nicht verfügbar.', code: UNREACHABLE } };
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], faults: unreachable }), unreadable(/FEHLER: Der RPC-Server ist nicht verfügbar\. \(code 0x800706ba\)/));
+  const broken = { [DISPLAY_TASK]: { query: 'FEHLER: Unbekannter Fehler', powershell: 'Die Aufgabenplanung antwortet nicht.' } };
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], faults: broken }), unreadable(/FEHLER: Unbekannter Fehler; Die Aufgabenplanung antwortet nicht\./));
+  // Task Scheduler says the task is there although schtasks could not find it: no first setup either.
+  const there = { [DISPLAY_TASK]: { query: 'FEHLER: Das System kann die angegebene Datei nicht finden.', code: 0 } };
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], faults: there }), unreadable(/.*\(code 0x0\)/));
+});
+
+test('a display task that is there but whose definition cannot be read stops the update the same way', () => {
+  const tasks = { [DISPLAY_TASK]: displayTaskOn(SIDE) };
+  stoppedBefore(update({ screens: [MAIN, SIDE, DESK], tasks, faults: { [DISPLAY_TASK]: { xml: 'FEHLER: Zugriff verweigert' } } }), unreadable(/FEHLER: Zugriff verweigert/));
+});
+
+test('a display task Task Scheduler says is not there is a first setup, in whatever language schtasks answers', () => {
+  // German, by default.
+  const german = update({ screens: [MAIN, SIDE, DESK] });
+  setUpOn(german, 3);
+  assert.ok(german.calls.some((c) => c.asked === 'task' && c.task === DISPLAY_TASK), 'Task Scheduler was asked');
+  for (const query of ['ERROR: The system cannot find the file specified.', 'ERREUR : le fichier spécifié est introuvable.', '']) {
+    setUpOn(update({ screens: [MAIN, SIDE, DESK], faults: { [DISPLAY_TASK]: { query, code: NOT_FOUND } } }), 3);
+  }
+  // The hub task alone does not make it an update of the display task.
+  setUpOn(update({ screens: [MAIN, SIDE, DESK], tasks: { [HUB_TASK]: '<Task/>' } }), 3);
 });
 
 test('a --screen that is no number, or names no screen, stops the update before anything changes', () => {

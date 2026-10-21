@@ -149,7 +149,8 @@ Usage:
       Set up a downloaded release (SHA256SUMS next to it): check it against SHA256SUMS, unpack it to
       %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it.
       The display stays on its screen, or goes to the one given; when its screen is gone (or on a
-      first setup, the 1920x720 screen cannot be told), nothing changes until one is given.
+      first setup, the 1920x720 screen cannot be told), nothing changes until one is given. When
+      Task Scheduler cannot read the display task, nothing changes at all.
 
 Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
 `;
@@ -695,8 +696,18 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
   const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
   if (!fs.existsSync(npmCli)) throw new Error(`npm is not next to Node.js (${npmCli}).`);
   // The screen before anything changes, so the new version's setup neither fails late nor moves the display.
+  // Only a display task Task Scheduler says is not there counts as a first setup; one it cannot read stops.
   const screens = listScreens();
-  const screen = updateScreen(screens, given, taskDefinition(DISPLAY_TASK));
+  let current: string | null;
+  try {
+    current = taskDefinition(DISPLAY_TASK);
+  } catch (err) {
+    throw new Error(
+      `${(err as Error).message}\nNothing was changed: without the display task the update cannot tell the display's screen, ` +
+        'nor would the new version be able to replace the task. Run it again once Task Scheduler can read it.',
+    );
+  }
+  const screen = updateScreen(screens, given, current);
   const why = { given: 'as given', kept: 'where it is now', only: 'the only one of 1920×720' }[screen.reason];
   console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screen.number} (${why}).\n`);
   console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there; then the logon tasks start it.`);
