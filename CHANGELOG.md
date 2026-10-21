@@ -3,7 +3,7 @@
 ## 0.6.0 – 2026-10-22
 
 An update in one step, and the display says when there is one; the last decisions and a session's details
-on the display; a request that waits long reminds.
+on the display; a request that waits long reminds; a night by the clock.
 
 - **`stellwerk update` in one step:** after setting up the release it now also moves Codex' hooks to the
   new forwarder (when they run Stellwerk's), starts the hub again from the new version and removes the
@@ -32,6 +32,10 @@ on the display; a request that waits long reminds.
   pulses in the colour of attention, and with `sound` on the tones come once more. Without motion (the
   system's setting) the card keeps a frame instead of pulsing. Codex hands a request back to its app
   after 30 s, so the reminder comes before that.
+- **A night by the clock:** with `nightFrom` and `nightTo` in `config.json` (e.g. "23:00" and "07:00",
+  also over midnight) the display rests at night after a minute without anything new, also when it never
+  rests by day, and goes almost black, the clock's column too. What wakes it by day wakes it at night: a
+  tap, an open request, an answer due, a monitor going down, a new pull request or failed checks.
 
 ## 0.5.4 – 2026-10-21
 

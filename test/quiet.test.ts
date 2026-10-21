@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { FailingMonitor, PermissionView, PullRequestView, SessionView, StateMessage } from '../src/shared/protocol.js';
-import { Rest, watched } from '../ui/src/quiet.ts';
+import { NIGHT_REST_MS, Rest, inNight, restAfter, watched } from '../ui/src/quiet.ts';
 
 const AFTER = 10 * 60_000;
 
@@ -16,7 +16,7 @@ function stateWith(parts: { sessions?: Partial<SessionView>[]; permissions?: Par
     sessions: (parts.sessions ?? []) as SessionView[],
     permissions: (parts.permissions ?? []) as PermissionView[],
     pullRequests: (parts.pulls ?? []) as PullRequestView[],
-    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, remindAfterMs: 0, build: 'x', rejected: null, rawLog: false, newRelease: null },
+    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, remindAfterMs: 0, night: null, build: 'x', rejected: null, rawLog: false, newRelease: null },
     github: null,
     hardware: null,
     uptimeKuma: parts.failing ? { monitors: { failing: parts.failing, up: 3, maintenance: 0 }, updatedAt: 0, problem: null } : null,
@@ -90,5 +90,31 @@ describe('at rest', () => {
     assert.equal(rest.update({ open: 0, keys: [] }, AFTER, AFTER + 6), false);
     assert.equal(rest.update({ open: 0, keys: [] }, AFTER, 2 * AFTER + 5), true);
     assert.equal(rest.update({ open: 0, keys: [] }, 0, 100 * AFTER), false);
+  });
+});
+
+describe('at night', () => {
+  const at = (h: number, m = 0) => h * 60 + m;
+
+  test('the night lies between its two times, also over midnight; without one, never', () => {
+    const late = { from: at(23), to: at(7) };
+    assert.equal(inNight(late, at(23)), true);
+    assert.equal(inNight(late, at(2, 30)), true);
+    assert.equal(inNight(late, at(6, 59)), true);
+    assert.equal(inNight(late, at(7)), false);
+    assert.equal(inNight(late, at(22, 59)), false);
+    const nap = { from: at(13), to: at(14) };
+    assert.equal(inNight(nap, at(13, 30)), true);
+    assert.equal(inNight(nap, at(14)), false);
+    assert.equal(inNight(null, at(3)), false);
+    assert.equal(inNight({ from: at(5), to: at(5) }, at(5)), false, 'no length, no night');
+  });
+
+  test('at night the display rests after a minute, sooner if the day is quicker, also when it never rests by day', () => {
+    assert.equal(restAfter(10 * 60_000, false), 10 * 60_000);
+    assert.equal(restAfter(0, false), 0);
+    assert.equal(restAfter(10 * 60_000, true), NIGHT_REST_MS);
+    assert.equal(restAfter(1500, true), 1500);
+    assert.equal(restAfter(0, true), NIGHT_REST_MS);
   });
 });

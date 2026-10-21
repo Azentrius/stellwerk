@@ -330,6 +330,8 @@ button { font: inherit; }
 .col { transition: filter 0.2s; }
 .quiet .col { filter: brightness(0.25); transition: filter 2s; }
 .quiet .col--status { filter: brightness(0.4); }
+/* At night (the hours set up), at rest it goes almost black, the clock's column too. */
+.night .col, .night .col--status { filter: brightness(0.06); }
 
 /* ---------- toast: a note, with its icon ---------- */
 .toast {

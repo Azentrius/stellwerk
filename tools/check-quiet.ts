@@ -1,8 +1,9 @@
 // The display at rest in a real Edge: after the time with nothing new it dims, the clock still readable,
 // and stays so while nothing changes; a tap wakes it without pressing what lies below; an open request
 // wakes it and keeps it awake; a new answer due in the app, a monitor going down, a new pull request and
-// failed checks wake it, and so does the hub going away. An isolated hub with a made-up token and a rest
-// time of 1.5 s; GitHub's and Uptime Kuma's answers are made up here, nothing goes online. Needs the display
+// failed checks wake it, and so does the hub going away. At night (a second hub whose night is now) it
+// rests almost black; a tap and an open request wake it. Isolated hubs with made-up tokens and a rest time
+// of 1.5 s; GitHub's and Uptime Kuma's answers are made up here, nothing goes online. Needs the display
 // built (npm run build) and Edge.
 //
 // Usage: node tools/check-quiet.ts [folder for screenshots]
@@ -65,6 +66,7 @@ if (hub.missingBuild) throw new Error('The display is not built. Run "npm run bu
 const startFile = path.join(dir, 'display.html');
 fs.writeFileSync(startFile, displayStartPage(hub.port, displayKey(token)));
 let hubClosed = false;
+let nightHub: Awaited<ReturnType<typeof startHub>> | null = null;
 
 let edge: Edge | null = null;
 try {
@@ -101,6 +103,7 @@ try {
   await screenshot(browser, shots, 'quiet');
   check(dim.agents === 'brightness(0.25)' && dim.waiting === 'brightness(0.25)', `at rest the columns are dimmed to a quarter (${dim.agents})`);
   check(dim.status === 'brightness(0.4)' && dim.clock, `the clock's column a little less, the clock in view (${dim.status})`);
+  check(!(await browser.evaluate<boolean>("document.body.classList.contains('night')")), 'without a night set up it is never black');
   check(await resting(), 'while nothing changes it stays at rest (GitHub and Uptime Kuma asked again in between)');
 
   // A tap wakes it and presses nothing; the next tap is an ordinary one.
@@ -150,8 +153,60 @@ try {
   await hub.close();
   hubClosed = true;
   await untilAwake('the hub going away');
+
+  // ---------- at night: a hub whose night is now ----------
+  const local = new Date();
+  const minute = local.getHours() * 60 + local.getMinutes();
+  const nightToken = randomBytes(32).toString('hex');
+  nightHub = await startHub({
+    port: 0,
+    token: nightToken,
+    holdMs: 60_000,
+    scale: 1,
+    version: 'check',
+    sound: false,
+    quietAfterMs: QUIET_MS,
+    night: { from: (minute + 1440 - 60) % 1440, to: (minute + 60) % 1440 },
+    auditFile: path.join(dir, 'night-audit.jsonl'),
+    uiRoot: path.join(ROOT, 'ui'),
+    webRoot: path.join(ROOT, 'dist', 'ui'),
+    log: () => {},
+  });
+  const nightStart = path.join(dir, 'night.html');
+  fs.writeFileSync(nightStart, displayStartPage(nightHub.port, displayKey(nightToken)));
+  await openDisplay(browser, nightStart);
+  const night = () => browser.evaluate<boolean>("document.body.classList.contains('night')");
+  await until('the display rests at night', night, 4 * QUIET_MS + 3000);
+  await pause(2500);
+  const black = await browser.evaluate<{ agents: string; status: string }>(`(() => {
+    const filter = (selector) => getComputedStyle(document.querySelector(selector)).filter;
+    return { agents: filter('.col--agents'), status: filter('.col--status') };
+  })()`);
+  await screenshot(browser, shots, 'night');
+  check(black.agents === 'brightness(0.06)' && black.status === 'brightness(0.06)', `at night at rest it is almost black, the clock's column too (${black.agents}, ${black.status})`);
+  const tapped = await rect('.col--agents');
+  await tap(browser, center(tapped!).x, center(tapped!).y);
+  await until('a tap wakes the display at night', async () => !(await night()) && !(await resting()), 5000);
+  check(true, 'a tap wakes it at night');
+  await until('it goes dark again', night, 4 * QUIET_MS + 3000);
+  check(true, 'with nothing new it goes dark again');
+  const asked = hook(nightHub.port, nightToken, 'night-1', {
+    hook_event_name: 'PermissionRequest',
+    session_title: 'At night',
+    tool_name: 'Bash',
+    tool_input: { command: 'npm run backup' },
+  });
+  await until('an open request wakes the display at night', async () => !(await night()), 5000);
+  await pause(4 * QUIET_MS);
+  check(!(await night()) && !(await resting()), 'an open request wakes it at night and keeps it awake');
+  const allowNight = await rect('.card [data-decision="allow"]');
+  await tap(browser, center(allowNight!).x, center(allowNight!).y);
+  check(behaviorOf(await answerOf(asked, 'the tap on Allow at night')) === 'allow', 'awake at night, a tap on Allow allows');
+  await until('decided, it goes dark again', night, 4 * QUIET_MS + 3000);
+  check(true, 'decided, it goes dark again');
 } finally {
   await edge?.close();
+  await nightHub?.close();
   if (!hubClosed) await hub.close();
   await pause(500);
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

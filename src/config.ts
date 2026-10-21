@@ -97,6 +97,16 @@ export function uptimeKumaAddress(value: string): string | null {
   return url.origin;
 }
 
+/** A time of day, hours and minutes: "07:00", "23:30". */
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** The night of the configuration in minutes of the day; null without one. */
+export function nightOf(config: Pick<Config, 'nightFrom' | 'nightTo'>): { from: number; to: number } | null {
+  if (config.nightFrom === undefined || config.nightTo === undefined) return null;
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+  return { from: minutes(config.nightFrom), to: minutes(config.nightTo) };
+}
+
 const configSchema = z.strictObject({
   port: z.number().int().min(1024).max(65535).default(4780),
   holdSeconds: z
@@ -135,6 +145,14 @@ const configSchema = z.strictObject({
     .default(30),
   /** Context windows by model id, for models Stellwerk does not know (e.g. "claude-sonnet-5-5": 1000000). */
   contextWindows: z.record(z.string().min(1).max(200), z.number().int().min(1000).max(100_000_000)).default({}),
+  /**
+   * The night, as hours and minutes of the display's clock ("23:00" to "07:00", also over midnight): the
+   * display then rests after a minute and goes almost black. Both or neither.
+   */
+  nightFrom: z.string().regex(CLOCK_TIME).optional(),
+  nightTo: z.string().regex(CLOCK_TIME).optional(),
+}).refine((config) => (config.nightFrom === undefined) === (config.nightTo === undefined), {
+  message: 'nightFrom and nightTo go together: set both or neither.',
 });
 
 export type Config = z.infer<typeof configSchema>;

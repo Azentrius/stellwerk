@@ -107,6 +107,8 @@ export interface HubOptions {
   quietAfterMs?: number;
   /** An open request reminds after this long (config remindAfterSeconds); 0 or none: never. */
   remindAfterMs?: number;
+  /** The night in minutes of the day (config nightFrom, nightTo); null or none: no night. */
+  night?: { from: number; to: number } | null;
   auditFile: string;
   /** ui/: index.html, styles, fonts. */
   uiRoot: string;
@@ -629,6 +631,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         sound: options.sound,
         quietAfterMs: options.quietAfterMs ?? 0,
         remindAfterMs: options.remindAfterMs ?? 0,
+        night: options.night ?? null,
         build,
         rejected,
         rawLog: Boolean(options.rawLogFile),
