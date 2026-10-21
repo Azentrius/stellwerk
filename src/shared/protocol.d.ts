@@ -106,6 +106,8 @@ export interface HubView {
   sound: boolean;
   /** The display dims after this long without anything new and without an open request; 0: never. */
   quietAfterMs: number;
+  /** An open request reminds after this long: its card pulses, with sound the tones come again; 0: never. */
+  remindAfterMs: number;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
   build: string;
   /**

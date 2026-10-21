@@ -32,6 +32,7 @@ test('without a file every setting has its default', () => {
     holdSeconds: 60,
     sound: false,
     quietAfterMinutes: 10,
+    remindAfterSeconds: 20,
     scale: 1,
     debugRawLog: false,
     githubIntervalSeconds: 120,
@@ -40,6 +41,16 @@ test('without a file every setting has its default', () => {
     codexHoldSeconds: 30,
     contextWindows: {},
   });
+});
+
+test('an open request reminds after 0 (never) to 300 seconds', () => {
+  const file = path.join(tempDir(), 'config.json');
+  fs.writeFileSync(file, '{ "remindAfterSeconds": 0 }');
+  assert.equal(loadConfig(file).remindAfterSeconds, 0);
+  for (const bad of ['{ "remindAfterSeconds": -1 }', '{ "remindAfterSeconds": 301 }', '{ "remindAfterSeconds": 1.5 }']) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => loadConfig(file), bad);
+  }
 });
 
 test('the display rests after 0 (never) to 1440 minutes', () => {

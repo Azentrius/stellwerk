@@ -102,7 +102,8 @@ rest.
 
 Done in 0.6.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk update` also moves Codex' hooks, starts the hub
 again and removes the previous releases; the display says when a newer release is out, folds the last
-ten decisions in one line of the status column, and opens a session's details on a tap.
+ten decisions in one line of the status column, opens a session's details on a tap, and reminds of a
+request that waits long.
 
 ---
 
