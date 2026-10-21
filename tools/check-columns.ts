@@ -356,9 +356,10 @@ try {
   const SPACE = { key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 };
   await browser.evaluate("window.__restingClicks = 0; document.querySelector('.resting__toggle').addEventListener('click', () => window.__restingClicks++)");
 
+  // Every session is a tab stop of its own (a tap or a key opens its details), so the way is long.
   await browser.evaluate("document.activeElement?.blur(); document.querySelector('#agents').focus()");
   let s = await resting();
-  for (let i = 0; i < 5 && !s.focused; i++) {
+  for (let i = 0; i < 60 && !s.focused; i++) {
     await press(browser, 'Tab', 9);
     s = await resting();
   }
@@ -422,6 +423,77 @@ try {
   );
   check(s.focused && s.expanded === 'false' && order.woken >= 0 && order.woken < order.line, 'a session at rest that reports again leaves the line, which counts 9 and keeps the focus');
 
+  // A session's details: a tap opens them below it and the next closes them; so do Enter and Space.
+  // The topmost session, once the list is back at its start.
+  let NAME = '';
+  const session = () =>
+    browser.call<{ box: Box; inView: boolean; expanded: string | null; terms: string[]; folder: string; focused: boolean } | null>(
+      `(name) => {
+      const item = [...document.querySelectorAll('#agents .agent')].find((n) => n.querySelector('.entry__name')?.textContent === name);
+      if (!item) return null;
+      const r = item.getBoundingClientRect();
+      const list = document.querySelector('#agents').getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 20));
+      const details = item.querySelector('.agent__details');
+      return {
+        box: { top: r.top, bottom: r.top + Math.min(r.height, 40), left: r.left, right: r.right },
+        inView: r.top >= list.top && r.top + 40 <= list.bottom && hit !== null && item.contains(hit),
+        expanded: item.getAttribute('aria-expanded'),
+        terms: details && details.getClientRects().length > 0 ? [...details.querySelectorAll('dt')].map((n) => n.textContent) : [],
+        folder: details?.querySelector('dd')?.textContent ?? '',
+        focused: document.activeElement === item,
+      };
+    }`,
+      NAME,
+    );
+  g = (await scrollWith(browser, AGENTS, swipe(browser, -300), 'start')).g;
+  NAME = await browser.evaluate<string>("document.querySelector('#agents .agent .entry__name').textContent");
+  let one = await session();
+  check(one?.inView === true && one.expanded === 'false' && one.terms.length === 0, `"${NAME}" is in view, its details closed`);
+  await tap(browser, (one!.box.left + one!.box.right) / 2, (one!.box.top + one!.box.bottom) / 2);
+  one = await until('a tap opens the details', async () => {
+    const now = await session();
+    return now?.expanded === 'true' && now.terms.length > 0 ? now : null;
+  });
+  check(
+    one.terms.length === 6 && /^(Folder|Ordner)$/.test(one.terms[0]!) && one.folder.startsWith('C:\\Projects\\'),
+    `a tap opens its details below it: ${one.terms.join(', ')}; folder ${one.folder}`,
+  );
+  await tap(browser, (one.box.left + one.box.right) / 2, (one.box.top + one.box.bottom) / 2);
+  await until('the next tap closes them', async () => (await session())?.terms.length === 0);
+  check(true, 'the next tap closes them');
+
+  one = (await session())!;
+  const sx = (one.box.left + one.box.right) / 2;
+  const sy = (one.box.top + one.box.bottom) / 2;
+  await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: sx, y: sy });
+  await browser.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: sx, y: sy, button: 'left', buttons: 1, clickCount: 1 });
+  const drawn = await countRenders(browser, AGENTS.list);
+  await until('a render while the mouse button is down on the session', async () => (await drawn()) >= 1);
+  await browser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: sx, y: sy, button: 'left', buttons: 0, clickCount: 1 });
+  one = await until('the press opens the details', async () => {
+    const now = await session();
+    return now?.expanded === 'true' && now.terms.length > 0 ? now : null;
+  });
+  await pause(400);
+  one = (await session())!;
+  check(one.expanded === 'true' && one.terms.length === 6, 'a press held over a render opens them, once');
+  const kept = await overRenders(2500);
+  one = (await session())!;
+  check(kept.renders >= 2 && one.expanded === 'true' && one.focused, `open, they stay open over ${kept.renders} renders, the session keeps the focus`);
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', ...SPACE, text: ' ', unmodifiedText: ' ' });
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...SPACE });
+  one = await until('Space closes the details', async () => {
+    const now = await session();
+    return now?.expanded === 'false' && now.terms.length === 0 ? now : null;
+  });
+  check(one.focused, 'Space closes them, the focus stays');
+  await press(browser, 'Enter', 13, '\r');
+  await until('Enter opens them again', async () => (await session())?.terms.length === 6);
+  await press(browser, 'Enter', 13, '\r');
+  await until('and Enter closes them', async () => (await session())?.terms.length === 0);
+  check(true, 'Enter opens and closes them as well');
+
   // ---------- the waiting column: cards, answers in the app, pull requests ----------
   g = await settled(browser, WAITING);
   check(g.max > 200 && g.more, `${g.entries.length} cards and entries are more than fit (${Math.round(g.max)} px more), the bottom fades out`);
@@ -466,7 +538,7 @@ try {
   // keys.
   await browser.evaluate("document.querySelector('#agents').focus()");
   focused = false;
-  for (let i = 0; i < 40 && !focused; i++) {
+  for (let i = 0; i < 120 && !focused; i++) {
     await press(browser, 'Tab', 9);
     focused = await browser.call<boolean>(`(card) => document.activeElement === document.querySelectorAll('.card')[card]?.querySelector('[data-decision="allow"]')`, before);
   }

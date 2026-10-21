@@ -41,6 +41,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
+- **A session's details.** A tap on a session opens its folder, model, context in tokens, subagents and
+  the tool it used last below it; the next tap closes them.
 - **The last decisions.** In the status column one line folds the last ten decisions on permission
   requests: what, when, whose session, and how each ended. A click opens it, the next closes it; a restart
   of the hub keeps them (they come from the audit log).

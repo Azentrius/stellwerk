@@ -2,7 +2,8 @@
 
 ## 0.6.0 – 2026-10-22
 
-An update in one step, and the display says when there is one; the last decisions on the display.
+An update in one step, and the display says when there is one; the last decisions and a session's details
+on the display.
 
 - **`stellwerk update` in one step:** after setting up the release it now also moves Codex' hooks to the
   new forwarder (when they run Stellwerk's), starts the hub again from the new version and removes the
@@ -21,6 +22,12 @@ An update in one step, and the display says when there is one; the last decision
   it, the next closes it. The hub keeps them as it settles requests and reads them back from the end of its
   audit log at a start, so a restart does not empty them; the display never gets the whole input. The
   audit log now also names the session's title and whose agent asked.
+- **A session's details:** a tap on a session (or Enter or Space on it) opens its details below it: its
+  folder, model, how much of its context is in use, its subagents, the tool it used last and its id; the
+  next closes them. Each session keeps its element while its content is drawn anew, and the content takes
+  no pointer events, so a tap that meets an update still reaches the session (a check in a real Edge
+  holds a press over an update). Every session is a tab stop now. The hub also sends the model of a
+  session's last answer and the tool it used last.
 
 ## 0.5.4 – 2026-10-21
 

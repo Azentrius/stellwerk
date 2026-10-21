@@ -93,6 +93,18 @@ export interface Texts {
   /** The line behind which the sessions at rest wait, closed and open. */
   restingMore: (n: number) => string;
   decisionsTitle: (n: number) => string;
+  /** A session's details, opened by a tap on it. */
+  details: {
+    folder: string;
+    model: string;
+    context: string;
+    contextOf: (usedK: string, sizeK: string, percent: string) => string;
+    subagents: string;
+    lastTool: string;
+    session: string;
+    unknown: string;
+    none: string;
+  };
   /** How a request ended, shortly, for the list of the last decisions. */
   decided: Record<PermissionOutcome, string>;
   restingHide: (n: number) => string;
@@ -249,6 +261,17 @@ const en: Texts = {
   subagents: (n) => (n === 1 ? '1 subagent' : `${n} subagents`),
   restingMore: (n) => `${n} more at rest`,
   decisionsTitle: (n) => (n === 1 ? 'The last decision' : `The last ${n} decisions`),
+  details: {
+    folder: 'Folder',
+    model: 'Model',
+    context: 'Context',
+    contextOf: (used, size, percent) => `${used}k of ${size}k (${percent} %)`,
+    subagents: 'Subagents',
+    lastTool: 'Last tool',
+    session: 'Session',
+    unknown: 'not known',
+    none: 'none yet',
+  },
   decided: {
     allowed: 'Allowed',
     denied: 'Denied',
@@ -406,6 +429,17 @@ const de: Texts = {
   subagents: (n) => (n === 1 ? '1 Subagent' : `${n} Subagenten`),
   restingMore: (n) => (n === 1 ? '1 weitere ruht' : `${n} weitere ruhen`),
   decisionsTitle: (n) => (n === 1 ? 'Die letzte Entscheidung' : `Die letzten ${n} Entscheidungen`),
+  details: {
+    folder: 'Ordner',
+    model: 'Modell',
+    context: 'Kontext',
+    contextOf: (used, size, percent) => `${used}k von ${size}k (${percent} %)`,
+    subagents: 'Subagenten',
+    lastTool: 'Zuletzt',
+    session: 'Sitzung',
+    unknown: 'unbekannt',
+    none: 'noch keins',
+  },
   decided: {
     allowed: 'Erlaubt',
     denied: 'Abgelehnt',

@@ -1,7 +1,10 @@
 // The agents column: every session with how full its context is in front (the percentage over a thin
 // line), its name (bold), whose agent it is and how long ago it was active on top ("Claude · 12 s"), its
 // project (and subagents) and its state below; the most urgent first (the hub sorts them). All agents look
-// alike. Sessions at rest (resting.ts) make way in one line at the foot, which opens on a tap.
+// alike. Sessions at rest (resting.ts) make way in one line at the foot, which opens on a tap. A tap on a
+// session (or Enter or Space on it) opens its details below it: folder, model, context, subagents, the tool
+// it used last; the next closes them. Each session keeps its element while only its content is drawn anew,
+// and that content takes no pointer events, so a tap that meets a render still reaches the session.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,7 +15,41 @@ import type { Texts } from './i18n.ts';
 import { meterTone } from './levels.ts';
 import { naming, providerName } from './naming.ts';
 import { sessionState } from './states.ts';
-import { elapsed } from './time.ts';
+import { ago, elapsed } from './time.ts';
+
+/** The sessions' elements by id, and whose details are open. */
+export class AgentItems {
+  readonly open = new Set<string>();
+  private readonly items = new Map<string, HTMLLIElement>();
+
+  /** The element of a session: the same one each time; a tap or Enter or Space on it calls `toggle`. */
+  item(id: string, toggle: (id: string) => void): HTMLLIElement {
+    let item = this.items.get(id);
+    if (!item) {
+      item = el('li');
+      item.dataset.session = id;
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.addEventListener('click', () => toggle(id));
+      item.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        if (!event.repeat) toggle(id);
+      });
+      this.items.set(id, item);
+    }
+    return item;
+  }
+
+  /** Forgets the elements (and open details) of sessions no longer shown. */
+  keep(ids: Set<string>): void {
+    for (const id of this.items.keys()) {
+      if (ids.has(id)) continue;
+      this.items.delete(id);
+      this.open.delete(id);
+    }
+  }
+}
 
 /**
  * The sessions, those at rest behind `line`: its word says how many, and they show below it while it is
@@ -23,6 +60,7 @@ export function renderAgents(
   list: HTMLElement,
   sessions: { active: SessionView[]; resting: SessionView[] },
   line: { item: HTMLLIElement; button: HTMLButtonElement; open: boolean },
+  agents: { items: AgentItems; toggle: (id: string) => void },
   now: number,
   texts: Texts,
 ): void {
@@ -35,11 +73,51 @@ export function renderAgents(
     line.button.setAttribute('aria-expanded', String(line.open));
     line.button.replaceChildren(icon(line.open ? 'angle-down' : 'angle-right'), line.open ? texts.restingHide(count) : texts.restingMore(count));
   }
-  // Taken out and put back, the line would lose the focus and end a press on it without a click.
-  for (const child of [...list.children]) if (child !== line.item) child.remove();
+  agents.items.keep(new Set([...sessions.active, ...sessions.resting].map((s) => s.id)));
+  const fill = (session: SessionView) => {
+    const item = agents.items.item(session.id, agents.toggle);
+    const open = agents.items.open.has(session.id);
+    const fresh = agentEntry(session, now, texts);
+    item.className = `${fresh.className} agent--tappable`;
+    item.title = fresh.title;
+    item.setAttribute('aria-expanded', String(open));
+    item.replaceChildren(...fresh.childNodes, ...(open ? [agentDetails(session, now, texts)] : []));
+    return item;
+  };
+  const before = sessions.active.map(fill);
+  const after = line.open ? sessions.resting.map(fill) : [];
+  // Taken out and put back, an element would lose the focus and end a press on it without a click: only
+  // what goes away is removed, and only what is out of place is moved, around the line, which never is.
+  const keep = new Set<Element>([...before, line.item, ...after]);
+  for (const child of [...list.children]) if (!keep.has(child)) child.remove();
   if (line.item.parentElement !== list) list.append(line.item);
-  line.item.before(...sessions.active.map((s) => agentEntry(s, now, texts)));
-  line.item.after(...(line.open ? sessions.resting.map((s) => agentEntry(s, now, texts)) : []));
+  let place = list.firstElementChild;
+  for (const item of before) {
+    if (item === place) place = place.nextElementSibling;
+    else list.insertBefore(item, place);
+  }
+  place = line.item.nextElementSibling;
+  for (const item of after) {
+    if (item === place) place = place.nextElementSibling;
+    else list.insertBefore(item, place);
+  }
+}
+
+/** A session's details, below its two lines: folder, model, context, subagents and the tool it used last. */
+function agentDetails(session: SessionView, now: number, texts: Texts): HTMLDListElement {
+  const list = el('dl', 'agent__details');
+  const row = (term: string, value: string, mono = false) => list.append(el('dt', undefined, term), el('dd', mono ? 'az-mono' : undefined, value));
+  const usage = session.context;
+  row(texts.details.folder, session.cwd, true);
+  row(texts.details.model, usage?.model ?? texts.details.unknown);
+  row(
+    texts.details.context,
+    usage ? texts.details.contextOf(texts.number(usage.used / 1000, 0), texts.number(usage.size / 1000, 0), texts.number(contextPercent(usage) ?? 0, 0)) : texts.details.unknown,
+  );
+  row(texts.details.subagents, texts.number(session.subagents, 0));
+  row(texts.details.lastTool, session.lastTool ? `${session.lastTool.name} · ${ago(now - session.lastTool.at, texts)}` : texts.details.none);
+  row(texts.details.session, session.id.slice(0, 8), true);
+  return list;
 }
 
 function agentEntry(session: SessionView, now: number, texts: Texts): HTMLLIElement {

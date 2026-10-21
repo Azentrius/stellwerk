@@ -22,6 +22,15 @@ const session = (id: string, lastActivity = 1000): SavedSession => ({
 });
 
 describe('sessions over a restart', () => {
+  test("the model of a session's context is kept as well", async () => {
+    const file = fileIn();
+    const saved = new SessionFile(file);
+    const withModel = { ...session('m'), context: { used: 42, size: 100, model: 'claude-opus-5-5' } };
+    saved.save([withModel]);
+    await saved.flush();
+    assert.deepEqual(new SessionFile(file).load(), [withModel]);
+  });
+
   test('what is saved is read again', async () => {
     const file = fileIn();
     const first = new SessionFile(file);

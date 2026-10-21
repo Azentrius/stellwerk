@@ -21,7 +21,7 @@ const savedSession = z.object({
   cwd: z.string().max(4096),
   title: z.string().max(1000).nullable(),
   project: z.string().max(1000).nullable(),
-  context: z.object({ used: z.number().nonnegative(), size: z.number().positive() }).nullable(),
+  context: z.object({ used: z.number().nonnegative(), size: z.number().positive(), model: z.string().max(200).optional() }).nullable(),
   lastActivity: z.number().nonnegative(),
 });
 const savedList = z.array(z.unknown()).max(MAX_SESSIONS);

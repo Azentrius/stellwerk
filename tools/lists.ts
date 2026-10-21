@@ -76,10 +76,11 @@ const MEASURE = `(spec) => {
   const fade = mask !== 'none' ? 3 * parseFloat(getComputedStyle(document.documentElement).fontSize) : 0;
   const readableBottom = Math.min(innerHeight, view.bottom - fade);
   const inside = (b) => b.top >= view.top - 0.5 && b.bottom <= readableBottom + 0.5 && b.left >= view.left - 0.5 && b.right <= view.right + 0.5;
+  // A part that takes no pointer events (a session's lines) is hit through its own element.
   const uncovered = (node) => {
     const b = node.getBoundingClientRect();
     const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-    return hit !== null && (node === hit || node.contains(hit));
+    return hit !== null && (node === hit || node.contains(hit) || hit.contains(node));
   };
   const entries = [...list.querySelectorAll(spec.entries)].map((item) => {
     const name = spec.name ? item.querySelector(spec.name) : null;

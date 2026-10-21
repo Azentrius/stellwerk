@@ -94,14 +94,14 @@ test('the window comes from the configuration, the model, or what is in use', ()
 test('the reader reports usage for a session at most once per interval, and ignores foreign paths', async () => {
   const t = transcripts();
   const file = t.file('s.jsonl', [answer({ input_tokens: 1, cache_read_input_tokens: 590_000, output_tokens: 1_500 })]);
-  const reports: Array<[string, { used: number; size: number }]> = [];
+  const reports: Array<[string, { used: number; size: number; model?: string }]> = [];
   const log: string[] = [];
   const reader = new ContextReader({ root: t.root, intervalMs: 20, onUsage: (id, usage) => reports.push([id, usage]), log: (l) => log.push(l) });
   for (let i = 0; i < 5; i++) reader.note('s1', file);
   const until = Date.now() + 3000;
   while (reports.length === 0 && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
   await new Promise((resolve) => setTimeout(resolve, 100));
-  assert.deepEqual(reports, [['s1', { used: 591_501, size: LARGE_WINDOW }]], 'a burst of events, one read');
+  assert.deepEqual(reports, [['s1', { used: 591_501, size: LARGE_WINDOW, model: 'claude-opus-5-5' }]], 'a burst of events, one read');
 
   assert.equal(await reader.read('s2', path.join(os.tmpdir(), 'other.jsonl')), null);
   assert.equal(await reader.read('s2', path.join(os.tmpdir(), 'other.jsonl')), null);

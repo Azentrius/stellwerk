@@ -213,6 +213,14 @@ button { font: inherit; }
 .meter--danger .meter__fill { background: var(--status-danger); }
 .agent--ended .meter, .agent--unknown .meter { opacity: 0.5; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
+/* A tap anywhere on a session opens its details. Its parts take no pointer events, so a tap meets the
+   session's own element, which stays while its content is drawn anew. */
+.agent--tappable { cursor: pointer; touch-action: manipulation; }
+.agent--tappable > * { pointer-events: none; }
+.agent--tappable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.agent__details { grid-column: 2; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-xs) var(--sp-md); margin: var(--sp-xs) 0 0; color: var(--text-subtle); }
+.agent__details dt { color: var(--text-subtle); }
+.agent__details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
 /* The line behind which the sessions at rest wait: quiet, but as high as a button, so a finger finds it. */
 .resting { border-block-end: 1px solid var(--line); }
 /* The last decisions in the status column, below the hub and its hints: one such line, folded by default;

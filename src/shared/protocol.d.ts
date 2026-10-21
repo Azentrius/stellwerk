@@ -21,6 +21,8 @@ export type Provider = 'claude' | 'codex';
 export interface ContextUsage {
   used: number;
   size: number;
+  /** The model of the last answer, as the transcript names it; absent when not known (Codex). */
+  model?: string;
 }
 
 export interface SessionView {
@@ -40,6 +42,8 @@ export interface SessionView {
   context: ContextUsage | null;
   /** Subagents started and not yet stopped. */
   subagents: number;
+  /** The tool that ran last in the session (any agent of it), and when; null until one ran. */
+  lastTool: { name: string; at: number } | null;
   /** Runs in Codex' command line, not in an app: its own card for a request shows in the terminal. */
   terminal: boolean;
   lastActivity: number;
