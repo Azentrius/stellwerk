@@ -16,7 +16,7 @@ import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
-import { Rest, watched } from './quiet.ts';
+import { Rest, inNight, restAfter, watched } from './quiet.ts';
 import { RestingLine, splitResting } from './resting.ts';
 import { shouldReload } from './reload.ts';
 import {
@@ -258,8 +258,12 @@ function tick(): void {
   const kumaNote = uptimeKumaLine(kuma, now, texts);
   if (kumaNote) show(monitorsState, kumaNote);
 
-  // At rest after a while with nothing new and no open request: dimmed (quiet.ts).
-  document.body.classList.toggle('quiet', rest.update(watched(state, connected), state?.hub.quietAfterMs ?? 0, now));
+  // At rest after a while with nothing new and no open request: dimmed; at night sooner and almost black (quiet.ts).
+  const local = new Date(now);
+  const atNight = inNight(state?.hub.night ?? null, local.getHours() * 60 + local.getMinutes());
+  const resting = rest.update(watched(state, connected), restAfter(state?.hub.quietAfterMs ?? 0, atNight), now);
+  document.body.classList.toggle('quiet', resting);
+  document.body.classList.toggle('night', resting && atNight);
 }
 
 /**
@@ -354,7 +358,7 @@ document.addEventListener(
   (event) => {
     if (!document.body.classList.contains('quiet')) return;
     rest.wake(Date.now() + clockOffset);
-    document.body.classList.remove('quiet');
+    document.body.classList.remove('quiet', 'night');
     swallowClick = true;
     window.setTimeout(() => (swallowClick = false), 1000);
     event.preventDefault();

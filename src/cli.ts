@@ -12,7 +12,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { format, parseArgs } from 'node:util';
-import { GITHUB_OWNER, HOST, defaultPaths, deleteRawLog, loadConfig, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
+import { GITHUB_OWNER, HOST, defaultPaths, deleteRawLog, loadConfig, nightOf, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
 import { UptimeKumaWatcher, describeUptimeKumaProblem } from './hub/kuma.ts';
 import {
@@ -236,6 +236,7 @@ async function serve(
       sound: config.sound,
       quietAfterMs: config.quietAfterMinutes * 60_000,
       remindAfterMs: config.remindAfterSeconds * 1000,
+      night: nightOf(config),
       auditFile: paths.auditFile,
       uiRoot: path.join(ROOT, 'ui'),
       webRoot: path.join(ROOT, 'dist', 'ui'),

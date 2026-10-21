@@ -108,6 +108,11 @@ export interface HubView {
   quietAfterMs: number;
   /** An open request reminds after this long: its card pulses, with sound the tones come again; 0: never. */
   remindAfterMs: number;
+  /**
+   * The night, in minutes of the day by the display's clock (from may be after to: over midnight); then the
+   * display rests after a minute and goes almost black. Null: no night.
+   */
+  night: { from: number; to: number } | null;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
   build: string;
   /**

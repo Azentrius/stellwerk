@@ -2,7 +2,8 @@
 // day and night. An open request keeps it awake, since it goes back to the app when its hold time is up.
 // Anything new wakes it: a request, an answer due in the app, a monitor that goes down, a pull request or
 // checks that failed, the hub gone away. So does a tap. The hub cannot dim the screen itself (it starts no
-// programs); the display dims its own page.
+// programs); the display dims its own page. At night (the hours set up) it rests after a minute already
+// and goes almost black; what wakes it by day wakes it at night too.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -30,6 +31,21 @@ export function watched(state: StateMessage | null, connected: boolean): Watched
     if (pull.checks === 'failing') keys.push(`failing ${pull.repo}#${pull.number}`);
   }
   return { open: state.permissions.filter((p) => p.outcome === null).length, keys };
+}
+
+/** At night the display rests after this long, also when the rest by day is longer or off. */
+export const NIGHT_REST_MS = 60_000;
+
+/** Whether a minute of the day lies in the night; a night from 23:00 to 07:00 goes over midnight. */
+export function inNight(night: { from: number; to: number } | null, minute: number): boolean {
+  if (night === null || night.from === night.to) return false;
+  return night.from < night.to ? minute >= night.from && minute < night.to : minute >= night.from || minute < night.to;
+}
+
+/** How long without anything new before the display rests: by day as set up (0: never), at night a minute. */
+export function restAfter(quietAfterMs: number, atNight: boolean): number {
+  if (!atNight) return quietAfterMs;
+  return quietAfterMs > 0 ? Math.min(quietAfterMs, NIGHT_REST_MS) : NIGHT_REST_MS;
 }
 
 export class Rest {

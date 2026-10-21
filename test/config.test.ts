@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { defaultPaths, deleteRawLog, loadConfig, setConfigValue } from '../src/config.ts';
+import { defaultPaths, deleteRawLog, loadConfig, nightOf, setConfigValue } from '../src/config.ts';
 import {
   ensureToken,
   isGitHubToken,
@@ -41,6 +41,17 @@ test('without a file every setting has its default', () => {
     codexHoldSeconds: 30,
     contextWindows: {},
   });
+});
+
+test('the night is two times of the day, both or neither', () => {
+  const file = path.join(tempDir(), 'config.json');
+  assert.equal(nightOf(loadConfig(file)), null, 'none by default');
+  fs.writeFileSync(file, '{ "nightFrom": "23:00", "nightTo": "07:30" }');
+  assert.deepEqual(nightOf(loadConfig(file)), { from: 23 * 60, to: 7 * 60 + 30 });
+  for (const bad of ['{ "nightFrom": "23:00" }', '{ "nightTo": "07:00" }', '{ "nightFrom": "24:00", "nightTo": "07:00" }', '{ "nightFrom": "7:00", "nightTo": "08:00" }', '{ "nightFrom": 23, "nightTo": 7 }']) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => loadConfig(file), bad);
+  }
 });
 
 test('an open request reminds after 0 (never) to 300 seconds', () => {

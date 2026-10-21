@@ -1017,6 +1017,17 @@ describe('the display at rest', () => {
     other.close();
   });
 
+  test('the display gets the night; without one, none', async () => {
+    const dark = await startTestHub({ night: { from: 23 * 60, to: 7 * 60 } });
+    const screen = await display(dark.port);
+    assert.deepEqual((await screen.state(() => true)).hub.night, { from: 23 * 60, to: 7 * 60 });
+    screen.close();
+    const day = await startTestHub();
+    const other = await display(day.port);
+    assert.equal((await other.state(() => true)).hub.night, null);
+    other.close();
+  });
+
   test('the display gets the time after which an open request reminds; without one, never', async () => {
     const reminding = await startTestHub({ remindAfterMs: 20_000 });
     const screen = await display(reminding.port);
