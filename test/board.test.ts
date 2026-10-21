@@ -36,6 +36,19 @@ function statusOf(board: Board, id = SESSION) {
 }
 
 describe('sessions', () => {
+  test("the tool that ran last is the session's, of any of its agents, failed or not; none at first", () => {
+    const board = new Board();
+    board.apply(event('UserPromptSubmit', { prompt: 'x' }), 1000);
+    const lastTool = () => board.view().sessions[0]?.lastTool;
+    assert.equal(lastTool(), null);
+    board.apply(event('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' } }), 2000);
+    assert.deepEqual(lastTool(), { name: 'Bash', at: 2000 });
+    board.apply(event('PostToolUse', { tool_name: 'Read', tool_input: {}, agent_id: 'sub-1', agent_type: 'Explore' }), 3000);
+    assert.deepEqual(lastTool(), { name: 'Read', at: 3000 }, 'a subagent of the session too');
+    board.apply(event('PostToolUseFailure', { tool_name: 'Edit', tool_input: {}, error: 'no' }), 4000);
+    assert.deepEqual(lastTool(), { name: 'Edit', at: 4000 });
+  });
+
   test('a session appears with its first event, named after the last part of its directory', () => {
     const board = new Board();
     board.apply(event('UserPromptSubmit', { session_title: 'Fix the login' }), 1000);

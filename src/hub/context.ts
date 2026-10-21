@@ -314,7 +314,9 @@ export class ContextReader {
         if (plan && !this.stopped) this.options.onPlan?.(plan);
       } else {
         const found = await readContextUsage(checked);
-        if (found) usage = { used: found.used, size: contextWindow(found.model, found.used, this.options.windows) };
+        if (found) {
+          usage = { used: found.used, size: contextWindow(found.model, found.used, this.options.windows), ...(found.model ? { model: found.model } : {}) };
+        }
         const title = this.options.onName ? await readLastFromEnd(checked, claudeTitleOfLine, MAX_TITLE_READ) : null;
         if (title && !this.stopped) this.options.onName?.(sessionId, title);
       }

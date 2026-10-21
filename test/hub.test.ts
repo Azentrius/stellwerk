@@ -900,7 +900,7 @@ describe('context usage', () => {
     const screen = await display(port);
     await hook(port, { hook_event_name: 'Stop', transcript_path: transcript }).reply;
     const state = await screen.state((s) => s.sessions[0]?.context !== null && s.sessions[0]?.context !== undefined);
-    assert.deepEqual(state.sessions[0]?.context, { used: 591_500, size: 1_000_000 });
+    assert.deepEqual(state.sessions[0]?.context, { used: 591_500, size: 1_000_000, model: 'claude-opus-5-5' });
     assert.doesNotMatch(JSON.stringify(state), /secret|session-1\.jsonl/);
     screen.close();
   });

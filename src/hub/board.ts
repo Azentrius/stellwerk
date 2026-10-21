@@ -106,6 +106,8 @@ interface Session {
   context: ContextUsage | null;
   /** Subagents seen starting (by agent_id) and not yet stopped. */
   subagents: Set<string>;
+  /** The tool that ran last (PostToolUse or its failure, of any agent of the session). */
+  lastTool: { name: string; at: number } | null;
   /** Runs in Codex' command line (from its transcript); its own cards show in the terminal. */
   terminal: boolean;
   lastActivity: number;
@@ -221,6 +223,7 @@ export class Board {
         // the main agent's tools say what the session does: a subagent working on leaves a question of the
         // main agent open.
         if (agentId === null) setStatus(session, 'working');
+        session.lastTool = { name: event.tool_name, at: now };
         if (event.hook_event_name === 'PostToolUse' && event.tool_name === WRAP_UP_TOOL && agentId === null) {
           session.wrapUp = wrapUpOf(event.tool_input);
         }
@@ -326,7 +329,7 @@ export class Board {
   setContext(sessionId: string, usage: ContextUsage): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
-    session.context = { used: usage.used, size: usage.size };
+    session.context = { used: usage.used, size: usage.size, ...(usage.model ? { model: usage.model } : {}) };
     return true;
   }
 
@@ -460,6 +463,7 @@ export class Board {
           question: waiting?.question ?? null,
           context: s.context,
           subagents: s.subagents.size,
+          lastTool: s.lastTool,
           terminal: s.terminal,
           lastActivity: s.lastActivity,
           endedAt: s.endedAt,
@@ -571,6 +575,7 @@ function newSession(id: string, provider: Provider, cwd: string, now: number): S
     subagentAppRequests: new Map(),
     context: null,
     subagents: new Set(),
+    lastTool: null,
     terminal: false,
     lastActivity: now,
     endedAt: null,

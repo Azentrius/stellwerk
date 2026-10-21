@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
-import { renderAgents } from './agents.ts';
+import { AgentItems, renderAgents } from './agents.ts';
 import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
 import { waitingForAnswer } from './due.ts';
@@ -63,6 +63,12 @@ const agentsCount = byId('agents-count');
 const restingLine = new RestingLine();
 const restingItem = el('li', 'resting');
 const restingButton = el('button', 'resting__toggle');
+/** The sessions' elements, and whose details a tap opened. */
+const agentItems = new AgentItems();
+const toggleDetails = (id: string) => {
+  if (!agentItems.open.delete(id)) agentItems.open.add(id);
+  tick();
+};
 /** The last decisions at the foot of the waiting column, folded until a click opens them. */
 const decisionsParts = { section: byId('decisions'), button: byId<HTMLButtonElement>('decisions-toggle'), list: byId<HTMLUListElement>('decisions-list') };
 let decisionsOpen = false;
@@ -193,7 +199,7 @@ function tick(): void {
   const now = Date.now() + clockOffset;
   queue.tick(now);
   const sessions = state?.sessions ?? [];
-  renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, now, texts);
+  renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, { items: agentItems, toggle: toggleDetails }, now, texts);
   // With the line's button in it, the browser no longer makes the list a tab stop by itself.
   markScrolling(agents);
   agentsEmpty.hidden = sessions.length > 0;
