@@ -1,6 +1,6 @@
 # Roadmap
 
-As of 2026-10-18. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
+As of 2026-10-22. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
 until they are decided.
 
 **Guardrails for every stage** (they keep applying):
@@ -67,7 +67,8 @@ Done in 0.4.2 (see [CHANGELOG](CHANGELOG.md)), after an external review of 0.4.1
 with a start file only the user can read (another account on the computer no longer gets the
 decisions); a broken display connection no longer ends the hub; open Codex questions and the main
 agent's questions survive turn ends and subagents; GitHub lists are complete, private repositories of a
-person included. The sign-in was checked in a real Edge, also with a second local service that must get nothing.
+person included. The sign-in was checked in a real Edge, also with a second local service that must get
+nothing.
 
 ---
 
@@ -98,10 +99,11 @@ rest.
 
 ---
 
-## 0.6.1 – Task Scheduler read safely everywhere ✅
+## 0.5.4 – Review fixes ✅
 
-Done in 0.6.1 (see [CHANGELOG](CHANGELOG.md)): `autostart uninstall` and `hardware` tell a missing task from one
-Task Scheduler cannot read, as `update` does.
+Done in 0.5.4 (see [CHANGELOG](CHANGELOG.md)), after a review of 0.5.3: the line of the sessions at rest
+keeps the keyboard's focus and a press while the display updates; `stellwerk update` keeps the display on
+its screen and asks before it would guess.
 
 ---
 
@@ -114,11 +116,19 @@ request that waits long, and goes almost black at night.
 
 ---
 
-## 0.5.4 – Review fixes ✅
+## 0.6.1 – Task Scheduler read safely everywhere ✅
 
-Done in 0.5.4 (see [CHANGELOG](CHANGELOG.md)), after a review of 0.5.3: the line of the sessions at rest
-keeps the keyboard's focus and a press while the display updates; `stellwerk update` keeps the display on
-its screen and asks before it would guess.
+Done in 0.6.1 (see [CHANGELOG](CHANGELOG.md)): `autostart uninstall` and `hardware` tell a missing task
+from one Task Scheduler cannot read, as `update` does.
+
+---
+
+## 0.6.2 – Up to date with the other Azentrius repositories ✅
+
+Done in 0.6.2 (see [CHANGELOG](CHANGELOG.md)): the shared design file in its current state; the README
+with known limits, `npm link` after an update and Codex' command line; the security policy with the
+supported versions and how fixes are announced; templates for issues and pull requests and a guide for
+contributors; the test job requires a dated changelog section.
 
 ---
 
@@ -131,13 +141,13 @@ works is a number.
 
 ---
 
-## Stage 3 – Usage of Claude and ChatGPT
+## Stage 3 – Usage of Claude and ChatGPT ✅
 
-How much of the plans' limits is used: in 0.4.0, below the hardware, from local sources only. Claude's
-limits from the desktop app's tool `get_usage`, whose answer the `PostToolUse` hook carries when a session
-calls it; Codex' limits (those of the ChatGPT plan for Codex) from its transcripts. Not possible without
-a connection to another machine: the limits of chats in ChatGPT, and Claude's limits for Claude Code in a
-terminal without the desktop app.
+How much of the plans' limits is used: done in 0.4.0 (see [CHANGELOG](CHANGELOG.md)), below the
+hardware, from local sources only. Claude's limits from the desktop app's tool `get_usage`, whose answer
+the `PostToolUse` hook carries when a session calls it; Codex' limits (those of the ChatGPT plan for
+Codex) from its transcripts. Not possible without a connection to another machine: the limits of chats in
+ChatGPT, and Claude's limits for Claude Code in a terminal without the desktop app.
 
 ---
 

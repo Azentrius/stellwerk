@@ -1,7 +1,20 @@
 {
   "name": "stellwerk",
-  "version": "0.6.1",
-  "description": "A signal box for your AI agents: a local dashboard for Claude Code sessions and their permission requests.",
+  "version": "0.6.2",
+  "description": "A signal box for your AI agents: a local desk display for Claude Code and Codex sessions and their permission requests.",
+  "keywords": [
+    "ai-agents",
+    "claude-code",
+    "dashboard",
+    "desk-display",
+    "permissions",
+    "windows",
+    "codex"
+  ],
+  "homepage": "https://azentrius.com/stellwerk/",
+  "bugs": {
+    "url": "https://github.com/Azentrius/stellwerk/issues"
+  },
   "license": "Apache-2.0",
   "private": true,
   "type": "module",

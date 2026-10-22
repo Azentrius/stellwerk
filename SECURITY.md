@@ -10,8 +10,9 @@ Report them privately through GitHub instead:
 
 Please include:
 
-- what is affected (hub, display, hook setup, firewall rule, hardware monitor
-  setup; version or commit),
+- what is affected (hub, display, hook setup, Codex forwarder, firewall rule,
+  `stellwerk update`, `autostart`, hardware monitor setup; version or
+  commit),
 - steps to reproduce,
 - the impact you expect.
 
@@ -21,8 +22,36 @@ unless you prefer to stay anonymous.
 
 ## Supported versions
 
-Only the latest release and the latest state of the `main` branch receive
-security fixes.
+| Version | Security fixes |
+|---|---|
+| Newest release | yes |
+| Older releases | no |
+| `main` | development state, not a supported installation |
+
+Stellwerk is in its 0.x line: only the newest release is supported. Security
+fixes go into a new patch or minor release; older releases get no backports.
+
+To stay on a supported version, update to the newest release (see "Updating"
+in the [README](README.md)): download its `stellwerk-X.Y.Z.zip` and
+`SHA256SUMS` into one folder, then
+
+```powershell
+gh attestation verify stellwerk-X.Y.Z.zip --repo Azentrius/stellwerk    # optional, needs gh
+stellwerk update stellwerk-X.Y.Z.zip    # checks the zip against SHA256SUMS first
+```
+
+## How fixes are announced
+
+A fixed vulnerability is announced with:
+
+- a GitHub security advisory in this repository (tab **Security**), with a
+  CVE ID where one is assigned,
+- an entry in `CHANGELOG.md` marked as a security fix,
+- the release notes of the fixed release, which come from `CHANGELOG.md`.
+
+To be notified, watch this repository's releases on GitHub (**Watch › Custom
+› Releases**). With a GitHub token set up, the display also says when a newer
+release is out.
 
 ## What Stellwerk does
 
@@ -45,8 +74,9 @@ reachable only from the machine it runs on and only by the display it serves:
   token; the key is in no address and no log; `tools/check-browser.ts`
   checks this in a real Edge with a second local service;
 - decisions travel only over the display's WebSocket, which needs the right
-  `Host`, the right `Origin` and the page token from the sign-in; a broken or oversized message (over 4 KB) or an unreadable
-  request target closes only its own connection;
+  `Host`, the right `Origin` and the page token from the sign-in; a broken
+  or oversized message (over 4 KB) or an unreadable request target closes
+  only its own connection;
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;
 - the hub starts no programs; only the setup commands run `icacls`,
@@ -139,6 +169,10 @@ Reports are particularly welcome for:
 - the forwarder printing anything but the hub's answer, sending the token
   elsewhere, or making Codex wait beyond its hook timeout; `stellwerk codex
   install` or `uninstall` changing more of Codex' hooks than Stellwerk's own,
+- `stellwerk update` setting up a zip that does not match the `SHA256SUMS`
+  next to it, unpacking anything outside its own folder in
+  `%LOCALAPPDATA%\stellwerk\releases`, removing folders other than its own
+  previous releases, or ending tasks other than the hub's own,
 - `stellwerk hardware install` accepting another file than the pinned one,
   writing outside its folder, or leaving LibreHardwareMonitor's web server
   reachable without the password or from other machines,

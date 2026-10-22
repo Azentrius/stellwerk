@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Bug report
+description: Something in Stellwerk does not work as described, or the display shows a session or a request wrong.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problems do not belong here.** Report them privately as described in
+        [SECURITY.md](https://github.com/Azentrius/stellwerk/blob/main/SECURITY.md).
+
+        This issue is public. Remove tokens, keys, passwords, prompts, code and other private data from
+        everything you paste. Never paste the hook token, the GitHub token, the API key of Uptime Kuma or
+        lines of `audit.jsonl` or `debug-raw.jsonl`.
+  - type: input
+    id: version
+    attributes:
+      label: Stellwerk version
+      description: The output of `stellwerk --version` (or `node dist/cli.js --version`).
+      placeholder: "0.6.2"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: The output of `node --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      description: Whose sessions or requests are affected?
+      multiple: true
+      options:
+        - Claude desktop app
+        - Claude Code in a terminal
+        - Codex app
+        - Codex' command line
+        - None (setup, display, pull requests, hardware, Uptime Kuma)
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: For a wrong session or request on the display, say which column and what you expected there.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the hub with `stellwerk serve`
+        2. Ask Claude Code to run a command that needs permission
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: >-
+        For example the hub's console or `%LOCALAPPDATA%\stellwerk\hub.log`, or the output of the command
+        that failed.
+        **Before pasting, remove tokens, keys, passwords, prompts, code and any other private data.**
+      render: shell
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Private data
+      options:
+        - label: >-
+            I have removed tokens, keys, passwords, prompts, code and any other secrets or private data from
+            everything above.
+          required: true

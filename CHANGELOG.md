@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.6.2 – 2026-10-22
+
+Up to date with the other Azentrius repositories: the shared design file, the documentation, and
+templates for issues and pull requests.
+
+- **The shared design file:** `ui/azentrius.css` is the design system's current one again, as in the
+  other Azentrius add-ons (only its path to Red Hat Mono is Stellwerk's own). It adds spacing tokens for
+  sections, columns and cards, the dot of the word mark after a page title, a large button and a small
+  line above a section title for project pages, and keeps helpers placed in a table that scrolls
+  sideways inside it. The display looks the same.
+- **README, roadmap and security policy:** a section on known limits; after an update, `npm link` in the
+  new release's folder, so the command runs the new version; Codex' command line and the note of a newer
+  release under "What it does"; the releases folder in the list of files; what `autostart uninstall`
+  leaves running; the four browser checks under "Development". The security policy names the supported
+  versions, how fixes are announced and what matters most in `stellwerk update`.
+- **Issue and pull request templates and a contributing guide:** a bug report and a feature request
+  form, security problems only as a private report, and `CONTRIBUTING.md` with the commands, the tests
+  and the rules the hub keeps.
+- **Package metadata:** `package.json` has the repository's description, homepage, issue tracker and
+  topics.
+- **The command's help** says where every setting is described (the README's "Configuration") instead
+  of listing some of them.
+- **The test job** requires a dated changelog section for the version, as the release does.
+
 ## 0.6.1 – 2026-10-22
 
 A task that Task Scheduler cannot read no longer counts as missing anywhere.

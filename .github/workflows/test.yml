@@ -37,11 +37,12 @@ jobs:
         run: node tools/check-quiet.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
-      - name: Changelog has a section for the current version
+      # Every pull request that raises the version dates its section, so a release can follow the merge.
+      - name: Changelog has a dated section for the current version
         shell: bash
         run: |
           version=$(node -p "require('./package.json').version")
-          node tools/release-notes.ts "$version" > /dev/null || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          node tools/release-notes.ts "$version" --require-date > /dev/null || { echo "::error::CHANGELOG.md has no dated section \"## $version – YYYY-MM-DD\"."; exit 1; }
       # The release package, unpacked and installed as the README tells users, must start and serve the display.
       - name: Package, install it as a user would, start the hub
         shell: pwsh
