@@ -134,9 +134,10 @@ reachable only from the machine it runs on and only by the display it serves:
   name that would leave it), runs `npm ci --omit=dev` there and the new
   version's `autostart install` (and `codex install` when Codex' hooks run
   Stellwerk's forwarder), with fixed arguments and no shell; it ends and runs
-  only the hub's own task, and removes only folders named
-  `stellwerk-X.Y.Z` in its own releases folder that neither Codex' hooks nor
-  the command itself still use; it downloads nothing itself;
+  only the hub's own task, and the display's when the display moves to
+  another screen, and removes only folders named `stellwerk-X.Y.Z` in its
+  own releases folder that neither Codex' hooks nor the command itself still
+  use (none while Codex' hooks cannot be read); it downloads nothing itself;
 - `stellwerk hardware install` downloads exactly one LibreHardwareMonitor
   archive, pinned in the code by URL, size and SHA-256, unpacks it only into
   its own folder in Program Files (refusing any file name that would leave
@@ -172,7 +173,9 @@ Reports are particularly welcome for:
 - `stellwerk update` setting up a zip that does not match the `SHA256SUMS`
   next to it, unpacking anything outside its own folder in
   `%LOCALAPPDATA%\stellwerk\releases`, removing folders other than its own
-  previous releases, or ending tasks other than the hub's own,
+  previous releases or one that Codex' hooks may still run, ending tasks
+  other than Stellwerk's own two, or closing Edge windows other than the
+  display's,
 - `stellwerk hardware install` accepting another file than the pinned one,
   writing outside its folder, or leaving LibreHardwareMonitor's web server
   reachable without the password or from other machines,
