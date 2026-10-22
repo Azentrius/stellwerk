@@ -32,6 +32,7 @@ import {
   HUB_TASK,
   commandLine,
   describeScreens,
+  displayPlacement,
   displayTask,
   hubTask,
   pickScreen,
@@ -67,6 +68,7 @@ import {
   conhostPath,
   currentUser,
   deleteTask,
+  edgeWithProfile,
   endTask,
   findEdge,
   firewallRuleName,
@@ -150,10 +152,11 @@ Usage:
       Set up a downloaded release (SHA256SUMS next to it): check it against SHA256SUMS, unpack it to
       %LOCALAPPDATA%\\stellwerk\\releases, install its dependencies there and point the logon tasks at it;
       move Codex' hooks to its forwarder, start the hub again from it and remove the previous releases
-      (unless --keep-previous). The display loads the new page by itself.
-      The display stays on its screen, or goes to the one given; when its screen is gone (or on a
-      first setup, the 1920x720 screen cannot be told), nothing changes until one is given. When
-      Task Scheduler cannot read the display task, nothing changes at all.
+      (unless --keep-previous). On its screen the display loads the new page by itself.
+      The display stays on its screen, or goes to the one given (it is then started again there);
+      when its screen is gone (or on a first setup, the 1920x720 screen cannot be told), nothing
+      changes until one is given. When Task Scheduler cannot read the display task, or Codex'
+      hooks.json cannot be read, nothing changes at all.
 
 Configuration: %APPDATA%\\stellwerk\\config.json. Every setting is described in the README,
 section "Configuration".
@@ -719,12 +722,27 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
   console.log(`Screens:\n${describeScreens(screens)}\nThe display goes full screen on screen ${screen.number} (${why}).\n`);
   const config = loadConfig(paths.configFile);
   const codexHooks = codexHooksFile(paths.codexHome);
-  const moveCodex = codexCommands(codexHooks).length > 0;
+  // Codex' hooks must be readable: otherwise the update could not move them, nor tell whether an older
+  // release's forwarder is still in use.
+  let moveCodex: boolean;
+  try {
+    moveCodex = codexCommands(codexHooks).length > 0;
+  } catch (err) {
+    throw new Error(`${(err as Error).message}\nNothing was changed. Repair or remove that file, then run the update again.`);
+  }
+  // A display moved to another screen has to start again there; on the same screen it reloads by itself.
+  const place = current === null ? null : displayPlacement(current);
+  const chosen = screens[screen.number - 1]!;
+  const moveDisplay = place !== null && (place.x !== chosen.x || place.y !== chosen.y || place.width !== chosen.width || place.height !== chosen.height);
   const previous = keepPrevious ? [] : previousReleases(fs.existsSync(paths.releasesDir) ? fs.readdirSync(paths.releasesDir) : [], version);
   console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there. Then:`);
   console.log('  - the logon tasks start it;');
   if (moveCodex) console.log("  - Codex' hooks run its forwarder (the Codex app then asks to allow them again);");
-  console.log(`  - the hub (task "${HUB_TASK}") is started again from it, and the display loads the new page by itself;`);
+  console.log(
+    moveDisplay
+      ? `  - the hub (task "${HUB_TASK}") is started again from it, and the display (task "${DISPLAY_TASK}") on screen ${screen.number};`
+      : `  - the hub (task "${HUB_TASK}") is started again from it, and the display loads the new page by itself;`,
+  );
   if (previous.length > 0) console.log(`  - the previous ${previous.length === 1 ? 'release goes' : 'releases go'}: ${previous.join(', ')} (keep with --keep-previous).`);
   console.log('');
   if (!(await confirm(yes))) return void console.log('Nothing changed.');
@@ -739,23 +757,51 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
   runStep(process.execPath, [cli, 'autostart', 'install', '--yes', '--screen', String(screen.number)], target);
   if (moveCodex) runStep(process.execPath, [cli, 'codex', 'install', '--yes'], target);
   await restartHub(config.port, paths.hubLogFile);
-  console.log(`Stellwerk ${version} runs; the display loads the new page by itself when it is open.`);
+  if (moveDisplay) {
+    try {
+      await restartDisplay(paths.displayProfileDir);
+    } catch (err) {
+      throw new Error(`Stellwerk ${version} runs, but the display is not on screen ${screen.number} yet. ${(err as Error).message}`);
+    }
+  }
+  console.log(
+    moveDisplay
+      ? `Stellwerk ${version} runs; the display started again on screen ${screen.number}.`
+      : `Stellwerk ${version} runs; the display loads the new page by itself when it is open.`,
+  );
   if (moveCodex) console.log('Restart the Codex app and allow the changed hooks there (the hook symbol in the input field).');
   for (const folder of previous) removeRelease(path.join(paths.releasesDir, folder), codexHooks);
 }
 
-/** Stellwerk's commands in Codex' hooks; none when the file is missing or cannot be read. */
+/**
+ * Stellwerk's commands in Codex' hooks; none when the file is not there. A file that cannot be read or is no
+ * JSON object throws: it may still name a forwarder.
+ */
 function codexCommands(file: string): string[] {
+  let settings: unknown;
   try {
-    return stellwerkCodexCommands((readJsonFile(file) ?? {}) as Record<string, unknown>);
-  } catch {
-    return [];
+    settings = readJsonFile(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    const message = (err as Error).message;
+    throw new Error(`Codex' hooks could not be read: ${message.includes(file) ? message : `${file}: ${message}`}`);
   }
+  if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    throw new Error(`Codex' hooks could not be read: ${file} is not a JSON object.`);
+  }
+  return stellwerkCodexCommands(settings as Record<string, unknown>);
 }
 
 /** A previous release, unless something may still use it: Codex' hooks, or this very command's folder. */
 function removeRelease(dir: string, codexHooks: string): void {
-  const still = codexCommands(codexHooks).some((command) => command.toLowerCase().includes(dir.toLowerCase()));
+  let commands: string[];
+  try {
+    commands = codexCommands(codexHooks);
+  } catch (err) {
+    // Not to be told: it may still run this release's forwarder.
+    return void console.log(`${dir} stays: ${(err as Error).message}`);
+  }
+  const still = commands.some((command) => command.toLowerCase().includes(dir.toLowerCase()));
   if (still || isInside(process.cwd(), dir)) {
     return void console.log(`${dir} stays: ${still ? "Codex' hooks still run its forwarder" : 'this command runs in it'}.`);
   }
@@ -781,6 +827,31 @@ async function restartHub(port: number, logFile: string): Promise<void> {
   startTask(HUB_TASK);
   if (!(await within(HUB_START_MS, () => listening(port)))) throw new Error(`The hub did not start again; its messages are in ${logFile}.`);
 }
+
+/**
+ * The display task ended and run again, so its Edge opens on the screen its task now names. Waits until the
+ * Edge of the display's own profile is gone (other Edge windows are not touched): an Edge still running with
+ * that profile would only open a window in itself, where it was.
+ */
+async function restartDisplay(profileDir: string): Promise<void> {
+  const run = `schtasks /Run /TN "${DISPLAY_TASK}"`;
+  endTask(DISPLAY_TASK);
+  let closed: boolean;
+  try {
+    closed = await within(DISPLAY_STOP_MS, async () => edgeWithProfile(profileDir) === 0);
+  } catch (err) {
+    throw new Error(`Whether it closed could not be told: ${(err as Error).message} Close it if it is open (Alt+F4 on the display), then: ${run}`);
+  }
+  if (!closed) throw new Error(`Its Edge (profile ${profileDir}) did not close. Close it (Alt+F4 on the display), then: ${run}`);
+  try {
+    startTask(DISPLAY_TASK);
+  } catch (err) {
+    throw new Error(`Its task did not run: ${(err as Error).message.trim()} Start it: ${run}`);
+  }
+}
+
+/** How long the display's Edge may take to close after its task ended. */
+const DISPLAY_STOP_MS = 15_000;
 
 /** How long the hub may take to follow its ended task, and to start. */
 const HUB_STOP_MS = 10_000;

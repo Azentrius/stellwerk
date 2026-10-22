@@ -3,6 +3,8 @@
 // program it would start is written down, none runs, no task changes). Which screen the new version's
 // setup gets, and that a screen that cannot be told, or a display task Task Scheduler cannot read, stops
 // the update before anything changes; only a task Task Scheduler reports as missing is a first setup.
+// What it does after the setup, in order: Codex' hooks, the hub, the display when it moves, previous
+// releases; Codex' hooks that cannot be read stop it before, or keep the previous releases after.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -62,9 +64,9 @@ interface Outcome {
   codexHooks: string | null;
 }
 
-/** What else the machine has: Codex' hooks.json, release folders set up before. */
+/** What else the machine has: Codex' hooks.json (a string as it is), release folders set up before. */
 interface Before {
-  codexHooks?: Record<string, unknown>;
+  codexHooks?: Record<string, unknown> | string;
   releases?: string[];
 }
 
@@ -86,7 +88,7 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs:
   });
 }
 
-async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 'failing'> & { tasks?: Record<string, string> } & Before, ...extra: string[]): Promise<Outcome> {
+async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 'display' | 'codexUnreadable' | 'failing'> & { tasks?: Record<string, string> } & Before, ...extra: string[]): Promise<Outcome> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-update-cli-'));
   try {
     const name = `stellwerk-${VERSION}.zip`;
@@ -101,7 +103,16 @@ async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 
     fs.mkdirSync(downloads);
     fs.writeFileSync(path.join(downloads, name), release);
     fs.writeFileSync(path.join(downloads, 'SHA256SUMS'), `${createHash('sha256').update(release).digest('hex')}  ${name}\n`);
-    const fake: FakeWindows = { screens: windows.screens, tasks: windows.tasks ?? {}, faults: windows.faults, hub: windows.hub, failing: windows.failing, calls: path.join(dir, 'calls.jsonl') };
+    const fake: FakeWindows = {
+      screens: windows.screens,
+      tasks: windows.tasks ?? {},
+      faults: windows.faults,
+      hub: windows.hub,
+      display: windows.display,
+      codexUnreadable: windows.codexUnreadable,
+      failing: windows.failing,
+      calls: path.join(dir, 'calls.jsonl'),
+    };
     fs.writeFileSync(fake.calls, '');
     const local = path.join(dir, 'local');
     const releases = path.join(local, 'stellwerk', 'releases');
@@ -110,9 +121,10 @@ async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 
       fs.writeFileSync(path.join(releases, folder, 'dist', 'codex', 'hook.js'), '// a release set up before');
     }
     const codexHome = path.join(dir, 'codex');
-    if (windows.codexHooks) {
+    if (windows.codexHooks !== undefined) {
       fs.mkdirSync(codexHome, { recursive: true });
-      fs.writeFileSync(path.join(codexHome, 'hooks.json'), JSON.stringify(windows.codexHooks));
+      const hooks = windows.codexHooks;
+      fs.writeFileSync(path.join(codexHome, 'hooks.json'), typeof hooks === 'string' ? hooks : JSON.stringify(hooks));
     }
     const result = await run(process.execPath, ['--import', FAKE, CLI, 'update', path.join(downloads, name), '--yes', ...extra], {
       ...process.env,
@@ -145,9 +157,15 @@ async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 
 const asked = (c: Call) => c.asked === 'screens' || c.asked === 'task' || (c.command === 'schtasks' && c.args[0] === '/Query');
 /** The hub's task ended or run. */
 const hubTask = (c: Call, action: '/End' | '/Run') => c.command === 'schtasks' && c.args[0] === action && c.args.includes(HUB_TASK);
+/** The display's task ended or run. */
+const displayAction = (c: Call, action: '/End' | '/Run') => c.command === 'schtasks' && c.args[0] === action && c.args.includes(DISPLAY_TASK);
 
-/** Set up, with the display on that screen; only the screen list, task queries, npm and the setup ran. */
-function setUpOn(outcome: Outcome, number: number): void {
+/**
+ * Set up, with the display on that screen; only the screen list, task queries, npm, the setup and the hub's
+ * task ran, and the display's task when it moved to another screen: then after the hub, ended, its Edge
+ * waited for, run once. Else it reloads by itself.
+ */
+function setUpOn(outcome: Outcome, number: number, moved = false): void {
   assert.equal(outcome.status, 0, outcome.output);
   assert.ok(outcome.unpacked, 'the release was unpacked');
   assert.deepEqual(outcome.setup, ['autostart', 'install', '--yes', '--screen', String(number)]);
@@ -157,12 +175,25 @@ function setUpOn(outcome: Outcome, number: number): void {
   const ended = outcome.calls.findIndex((c) => hubTask(c, '/End'));
   const run = outcome.calls.findIndex((c) => hubTask(c, '/Run'));
   assert.ok(ended > outcome.calls.lastIndexOf(started.at(-1)!) && run > ended, 'then the hub was ended and started again');
+  const display = (c: Call) => moved && (displayAction(c, '/End') || displayAction(c, '/Run') || c.asked === 'edge');
   assert.ok(
-    outcome.calls.every((c) => c.via === 'spawnSync' || asked(c) || hubTask(c, '/End') || hubTask(c, '/Run')),
+    outcome.calls.every((c) => c.via === 'spawnSync' || asked(c) || hubTask(c, '/End') || hubTask(c, '/Run') || display(c)),
     'besides that the update changes no task',
   );
   assert.match(outcome.output, new RegExp(`full screen on screen ${number} `));
-  assert.match(outcome.output, /Stellwerk 9\.9\.9 runs/);
+  if (moved) {
+    const closed = outcome.calls.findIndex((c) => displayAction(c, '/End'));
+    const waited = outcome.calls.findIndex((c, i) => i > closed && c.asked === 'edge');
+    const opened = outcome.calls.findIndex((c) => displayAction(c, '/Run'));
+    assert.ok(run < closed && closed < waited && waited < opened, `then the display: ended (${closed}), its Edge gone (${waited}), run (${opened})`);
+    assert.equal(outcome.calls.filter((c) => displayAction(c, '/Run')).length, 1, 'run once');
+    assert.match(outcome.calls[waited]!.task ?? '', /[\\/]stellwerk[\\/]edge-display$/, "only the display's own Edge is waited for");
+    assert.match(outcome.output, new RegExp(`the display \\(task "Stellwerk display"\\) on screen ${number};`));
+    assert.match(outcome.output, new RegExp(`Stellwerk 9\\.9\\.9 runs; the display started again on screen ${number}\\.`));
+  } else {
+    assert.ok(!outcome.calls.some((c) => displayAction(c, '/End') || displayAction(c, '/Run') || c.asked === 'edge'), 'the display reloads by itself');
+    assert.match(outcome.output, /Stellwerk 9\.9\.9 runs; the display loads the new page by itself/);
+  }
 }
 
 /** Stopped with that message before anything changed: nothing unpacked, nothing started. */
@@ -195,7 +226,7 @@ describe('stellwerk update', { concurrency: true }, () => {
   });
 
   test('a screen given with --screen comes before the one the task uses', async () => {
-    setUpOn(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) } }, '--screen', '3'), 3);
+    setUpOn(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) } }, '--screen', '3'), 3, true);
   });
 
   test('a first setup takes the only 1920×720 screen', async () => {
@@ -213,7 +244,7 @@ describe('stellwerk update', { concurrency: true }, () => {
     stoppedBefore(await update({ screens: [MAIN, SIDE], tasks }), /shows the display at 0,1440 in 1920×720, where no screen is now\. Choose one with --screen/);
     // Not even to the only 1920×720 screen there is now.
     stoppedBefore(await update({ screens: [MAIN, DESK_TOO], tasks }), /where no screen is now/);
-    setUpOn(await update({ screens: [MAIN, SIDE], tasks }, '--screen', '2'), 2);
+    setUpOn(await update({ screens: [MAIN, SIDE], tasks }, '--screen', '2'), 2, true);
   });
 
   test('a display task that names no screen is not overwritten by a guess', async () => {
@@ -351,5 +382,97 @@ describe('stellwerk update', { concurrency: true }, () => {
     assert.ok(!outcome.calls.some((c) => hubTask(c, '/End')), 'the hub was left as it was');
     assert.deepEqual(outcome.releases, [OLD, 'stellwerk-9.9.9']);
     assert.match(outcome.codexHooks ?? '', new RegExp(OLD));
+  });
+
+  // ---------- Codex' hooks that cannot be read ----------
+
+  test("Codex' hooks that cannot be read, or are no JSON object, stop the update before anything changes", async () => {
+    const stopped = (detail: RegExp) => new RegExp(`Codex' hooks could not be read: ${detail.source}[\\s\\S]*Nothing was changed\\. Repair or remove that file`);
+    const releases = [OLD];
+    const denied = await update({ screens: [MAIN, SIDE, DESK], releases, codexHooks: codexHooksOf(OLD), codexUnreadable: 'always' });
+    stoppedBefore(denied, stopped(/EACCES: permission denied, open '.*hooks\.json'/));
+    assert.deepEqual(denied.releases, [OLD], 'the release its forwarder may run stays');
+    assert.ok(!denied.calls.some((c) => hubTask(c, '/End')), 'the hub was not touched');
+    for (const broken of ['{"hooks": {', '[]', 'null']) {
+      const outcome = await update({ screens: [MAIN, SIDE, DESK], releases, codexHooks: broken });
+      stoppedBefore(outcome, stopped(broken === '{"hooks": {' ? /.*hooks\.json is not valid JSON: / : /.*hooks\.json is not a JSON object\./));
+      assert.equal(outcome.codexHooks, broken, 'the file is left as it was');
+      assert.deepEqual(outcome.releases, [OLD]);
+    }
+  });
+
+  test("Codex' hooks that cannot be read at the cleanup keep the previous releases; the update itself is done", async () => {
+    const outcome = await update({ screens: [MAIN, SIDE, DESK], releases: [OLD, 'stellwerk-0.5.4'], codexHooks: codexHooksOf(OLD), codexUnreadable: 'at-cleanup' });
+    setUpOn(outcome, 3);
+    assert.ok(outcome.calls.some((c) => c.via === 'spawnSync' && c.args.includes('codex')), "Codex' hooks were moved before");
+    assert.deepEqual(outcome.releases, [OLD, 'stellwerk-0.5.4', 'stellwerk-9.9.9'], 'whether a forwarder still runs them cannot be told');
+    assert.match(outcome.output, /stellwerk-0\.5\.3 stays: Codex' hooks could not be read: EACCES: permission denied, open '.*hooks\.json'/);
+    assert.match(outcome.output, /stellwerk-0\.5\.4 stays: Codex' hooks could not be read/);
+    assert.doesNotMatch(outcome.output, /Removed/);
+  });
+
+  test("Codex' hooks that are missing or run no Stellwerk leave Codex alone, and the previous releases go", async () => {
+    const releases = [OLD, 'stellwerk-0.5.4'];
+    const missing = await update({ screens: [MAIN, SIDE, DESK], releases });
+    setUpOn(missing, 3);
+    assert.ok(!missing.calls.some((c) => c.args.includes('codex')));
+    assert.equal(missing.codexHooks, null, 'no hooks.json was made');
+    assert.deepEqual(missing.releases, ['stellwerk-9.9.9']);
+    const foreign = { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'notify-me.exe' }] }] } };
+    const others = await update({ screens: [MAIN, SIDE, DESK], releases, codexHooks: foreign });
+    setUpOn(others, 3);
+    assert.ok(!others.calls.some((c) => c.args.includes('codex')));
+    assert.deepEqual(JSON.parse(others.codexHooks ?? ''), foreign, 'left as it was');
+    assert.deepEqual(others.releases, ['stellwerk-9.9.9']);
+  });
+
+  test("with --keep-previous Codex' hooks still move, and the release they ran before stays", async () => {
+    const outcome = await update({ screens: [MAIN, SIDE, DESK], releases: [OLD], codexHooks: codexHooksOf(OLD) }, '--keep-previous');
+    setUpOn(outcome, 3);
+    assert.match(outcome.codexHooks ?? '', /stellwerk-9\.9\.9\\\\dist\\\\codex\\\\hook\.js/);
+    assert.doesNotMatch(outcome.codexHooks ?? '', new RegExp(OLD));
+    assert.deepEqual(outcome.releases, [OLD, 'stellwerk-9.9.9']);
+    assert.doesNotMatch(outcome.output, /previous release|stays|Removed/);
+  });
+
+  // ---------- the display moved to another screen ----------
+
+  test('a display moved from screen 2 to 3 starts again there, after the setup and the hub', async () => {
+    const outcome = await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) }, releases: [OLD], codexHooks: codexHooksOf(OLD) }, '--screen', '3');
+    setUpOn(outcome, 3, true);
+    // The whole order: npm, the setup naming screen 3, Codex, the hub, the display, then the cleanup.
+    const changes = outcome.calls
+      .filter((c) => c.via === 'spawnSync' || hubTask(c, '/End') || hubTask(c, '/Run') || displayAction(c, '/End') || displayAction(c, '/Run'))
+      .map((c) => (c.via === 'spawnSync' ? c.args.slice(1, 3).join(' ') : `${c.args[0]} ${c.args[c.args.indexOf('/TN') + 1]}`));
+    assert.deepEqual(changes, ['ci --omit=dev', 'autostart install', 'codex install', '/End Stellwerk hub', '/Run Stellwerk hub', '/End Stellwerk display', '/Run Stellwerk display']);
+    assert.deepEqual(outcome.releases, ['stellwerk-9.9.9'], 'removed after the display runs');
+    assert.ok(outcome.output.indexOf('display started again') < outcome.output.indexOf('Removed'));
+  });
+
+  test('a display that stays where it is is not started again, also when --screen names its screen', async () => {
+    setUpOn(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(DESK) } }, '--screen', '3'), 3);
+    setUpOn(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) } }), 2);
+  });
+
+  test('a display that cannot be started again is reported; the hub runs, the previous release stays', async () => {
+    const moving = { screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) }, releases: [OLD] };
+    const failed = (outcome: Outcome, detail: RegExp) => {
+      assert.equal(outcome.status, 1, outcome.output);
+      assert.match(outcome.output, new RegExp(`Stellwerk 9\\.9\\.9 runs, but the display is not on screen 3 yet\\. ${detail.source}`));
+      assert.ok(outcome.calls.some((c) => hubTask(c, '/Run')), 'the hub was started again');
+      assert.deepEqual(outcome.releases, [OLD, 'stellwerk-9.9.9']);
+      assert.doesNotMatch(outcome.output, /display started again/);
+    };
+    // Its Edge does not close: not run, which would only open a window where it was.
+    const open = await update({ ...moving, display: { endsWithTask: false } }, '--screen', '3');
+    failed(open, /Its Edge \(profile .*edge-display\) did not close\. Close it \(Alt\+F4 on the display\), then: schtasks \/Run \/TN "Stellwerk display"/);
+    assert.ok(!open.calls.some((c) => displayAction(c, '/Run')));
+    // Whether it closed cannot be told.
+    const blind = await update({ ...moving, display: { count: 'Get-CimInstance : Zugriff verweigert' } }, '--screen', '3');
+    failed(blind, /Whether it closed could not be told: Could not count the display's Edge processes \(Get-CimInstance : Zugriff verweigert\)\. Close it if it is open/);
+    assert.ok(!blind.calls.some((c) => displayAction(c, '/Run')));
+    // Its task does not run.
+    const stuck = await update({ ...moving, display: { starts: false } }, '--screen', '3');
+    failed(stuck, /Its task did not run: FEHLER: Die Aufgabe konnte nicht gestartet werden\. Start it: schtasks \/Run \/TN "Stellwerk display"/);
   });
 });

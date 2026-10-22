@@ -6,7 +6,8 @@
 // A task that is not there fails schtasks with a German message, as on the machine this was made on.
 // The hub is played by a socket on a free port of 127.0.0.1, written to the configuration: ending its
 // task closes it, running the task opens it. A new version's `codex install` writes its forwarder into
-// Codex' hooks.json (in CODEX_HOME), as the real one would.
+// Codex' hooks.json (in CODEX_HOME), as the real one would. The display's Edge is counted by its profile:
+// ending the display task closes it, running the task opens it. Codex' hooks.json can be made unreadable.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -26,6 +27,13 @@ export interface FakeWindows {
   faults?: Record<string, TaskFault>;
   /** The hub: running at the start (default), ended with its task (default), started by it (default). */
   hub?: { running?: boolean; endsWithTask?: boolean; starts?: boolean };
+  /**
+   * The display's Edge: running at the start (default), closed when its task ends (default), opened by it
+   * (default: else /Run fails); counting it fails with `count`.
+   */
+  display?: { running?: boolean; endsWithTask?: boolean; starts?: boolean; count?: string };
+  /** Codex' hooks.json cannot be read (EACCES): always, or only once the hub was started again (at the cleanup). */
+  codexUnreadable?: 'always' | 'at-cleanup';
   /** spawnSync fails (status 1) for a program whose arguments hold this. */
   failing?: string;
   /** Where each call goes, one JSON line each. */
@@ -49,7 +57,7 @@ export interface Call {
   args: string[];
   cwd?: string;
   /** For PowerShell: what the script asked (for a task: its name). */
-  asked?: 'screens' | 'task';
+  asked?: 'screens' | 'task' | 'edge';
   task?: string;
 }
 
@@ -68,6 +76,18 @@ const childProcess = cp as unknown as Record<string, unknown>;
 
 // The hub: a socket on a free port, which the configuration names.
 const hub = { running: true, endsWithTask: true, starts: true, ...fake.hub };
+// The display's Edge, played by a number of processes with its profile.
+const display = { running: true, endsWithTask: true, starts: true, ...fake.display };
+// Codex' hooks.json made unreadable, from the start or once the hub's task ran (the cleanup).
+let hubRestarted = false;
+const readFile = fs.readFileSync;
+(fs as unknown as Record<string, unknown>).readFileSync = (file: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+  const unreadable = fake.codexUnreadable === 'always' || (fake.codexUnreadable === 'at-cleanup' && hubRestarted);
+  if (unreadable && typeof file === 'string' && path.resolve(file) === path.resolve(process.env.CODEX_HOME ?? '', 'hooks.json')) {
+    throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+  }
+  return (readFile as (...args: unknown[]) => unknown)(file, ...rest);
+};
 let socket: net.Server | null = null;
 const port = await new Promise<number>((resolve) => {
   const probe = net.createServer().listen(0, '127.0.0.1', () => {
@@ -95,6 +115,11 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
       note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'screens' });
       return JSON.stringify(fake.screens);
     }
+    if (script.includes('msedge.exe')) {
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'edge', task: String(options.input ?? '').trim() });
+      if (display.count !== undefined) throw failed(display.count);
+      return String(display.running ? 3 : 0);
+    }
     if (script.includes('Schedule.Service')) {
       const name = String(options.input ?? '').trim();
       note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'task', task: name });
@@ -102,7 +127,7 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
       if (fault?.powershell !== undefined) throw failed(fault.powershell);
       return String(fault?.code ?? (name in fake.tasks ? 0 : NOT_FOUND));
     }
-    return refuse('a PowerShell script other than the screen list and the task query');
+    return refuse("a PowerShell script other than the screen list, the task query and the display's Edge");
   }
   note({ via: 'execFileSync', command, args });
   if (command === 'schtasks' && args[0] === '/Query') {
@@ -119,10 +144,18 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     if (!((args[args.indexOf('/TN') + 1] ?? '') in fake.tasks)) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
     return 'ERFOLGREICH';
   }
-  // Only the hub's task may be ended and started.
+  // The display's task may be ended and run: its Edge closes and opens.
+  if (command === 'schtasks' && (args[0] === '/End' || args[0] === '/Run') && args[args.indexOf('/TN') + 1] === DISPLAY_TASK) {
+    if (args[0] === '/End' && display.endsWithTask) display.running = false;
+    if (args[0] === '/Run' && !display.starts) throw failed('FEHLER: Die Aufgabe konnte nicht gestartet werden.');
+    if (args[0] === '/Run') display.running = true;
+    return 'ERFOLGREICH';
+  }
+  // The hub's task may be ended and started.
   if (command === 'schtasks' && (args[0] === '/End' || args[0] === '/Run') && args[args.indexOf('/TN') + 1] === HUB_TASK) {
     if (args[0] === '/End' && hub.endsWithTask) endHub();
     if (args[0] === '/Run' && hub.starts) startHub();
+    if (args[0] === '/Run') hubRestarted = true;
     return 'ERFOLGREICH';
   }
   return refuse(`${command} ${args.join(' ')}`);

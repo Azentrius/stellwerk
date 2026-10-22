@@ -75,10 +75,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.6.2.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.6.2.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.6.2.zip -DestinationPath .
-cd stellwerk-0.6.2
+(Get-FileHash stellwerk-0.6.3.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.6.3.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.6.3.zip -DestinationPath .
+cd stellwerk-0.6.3
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -117,26 +117,30 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.6.2.zip
+stellwerk update stellwerk-0.6.3.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
 (`%LOCALAPPDATA%\stellwerk\releases\stellwerk-VERSION`), runs `npm ci --omit=dev` there and points the
 two logon tasks at it. Then it moves Codex' hooks to the new forwarder, if they run Stellwerk's (allow
 them again in the Codex app), starts the hub again from the new version, and removes the previous
-releases; `--keep-previous` keeps them. It lists all of this before it asks. The display loads the new
-page by itself. Stellwerk downloads nothing itself. Settings, token and keys stay where they are.
+releases; `--keep-previous` keeps them. It lists all of this before it asks. On its screen the display
+loads the new page by itself. Stellwerk downloads nothing itself. Settings, token and keys stay where
+they are.
 
 The display stays on the screen its task uses now; give `--screen <number>` (as `autostart install`
 lists them) to move it, or when that screen is gone: then the update stops before it changes anything.
-It stops as well when Task Scheduler cannot read the display task; only a task it reports as missing
-makes the update a first setup.
+A display moved to another screen is closed and started again there once the hub runs: only the Edge
+with the display's own profile, other Edge windows stay open. It stops as well when Task Scheduler
+cannot read the display task; only a task it reports as missing makes the update a first setup. And it
+stops when Codex' `hooks.json` is there but cannot be read or is no JSON object, as it might still run
+a previous release's forwarder; if the file cannot be read only at the end, the previous releases stay.
 
 If you made the command `stellwerk` available with `npm link`, it still runs the version it was linked
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.2"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.3"
 npm link
 ```
 

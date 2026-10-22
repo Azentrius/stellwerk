@@ -132,6 +132,14 @@ contributors; the test job requires a dated changelog section.
 
 ---
 
+## 0.6.3 – Updates that move the display and keep what Codex runs ✅
+
+Done in 0.6.3 (see [CHANGELOG](CHANGELOG.md)): `stellwerk update` starts a display moved to another
+screen again there, closing only its own Edge; a Codex `hooks.json` that cannot be read stops the
+update before it changes anything, and keeps the previous releases when it fails only at the end.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

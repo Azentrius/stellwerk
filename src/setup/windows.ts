@@ -158,6 +158,28 @@ export function isElevated(): boolean {
   return powershell(script) === 'True';
 }
 
+/**
+ * How many Edge processes run with this profile folder (--user-data-dir); the folder goes in on stdin. Edge
+ * passes it on to its child processes in quotes, and Windows paths ignore case.
+ */
+export function edgeWithProfile(profileDir: string): number {
+  requireWindows();
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "$flag = ('--user-data-dir=' + [Console]::In.ReadLine() + ' ').ToLowerInvariant()",
+    "@(Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | Where-Object { $_.CommandLine -and ($_.CommandLine.Replace('\"', '') + ' ').ToLowerInvariant().Contains($flag) }).Count",
+  ].join('; ');
+  let answer: string;
+  try {
+    answer = powershell(script, `${profileDir}\n`);
+  } catch (err) {
+    const { stderr } = err as { stderr?: string };
+    answer = (String(stderr ?? '').trim() || (err as Error).message).slice(0, 300);
+  }
+  if (!/^\d+$/.test(answer)) throw new Error(`Could not count the display's Edge processes (${answer}).`);
+  return Number(answer);
+}
+
 /** Ends every process started from exactly this program file and waits for it (the path goes in on stdin). */
 export function stopProgram(exe: string): void {
   requireWindows();

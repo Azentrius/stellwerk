@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.3 – 2026-10-23
+
+`stellwerk update` starts a display moved to another screen again there, and no longer removes a
+release that Codex' hooks may still run.
+
+- **Codex' hooks that cannot be read:** a `hooks.json` that is there but cannot be read, or is no JSON
+  object, stops the update before it changes anything. Before, it counted as holding no Stellwerk
+  hooks: the update left them on the previous release's forwarder and then removed that release. If
+  the file cannot be read only at the end, the previous releases stay. A missing file, or hooks of
+  other programs only, work as before.
+- **A display moved to another screen** (`--screen` naming another one) is started again there: once
+  the hub runs, the update ends the display's task, waits until the Edge with the display's own profile
+  has closed (other Edge windows stay open) and runs the task again. Before, only the task changed, and
+  the display stayed where it was until the next logon. On its screen the display still loads the new
+  page by itself. When it does not close, cannot be counted or its task does not run, the update says
+  what to do and keeps the previous releases.
+- **Tests** for both, and for the order of the update's steps: the setup, Codex' hooks, the hub, the
+  display, then the previous releases.
+
 ## 0.6.2 – 2026-10-22
 
 Up to date with the other Azentrius repositories: the shared design file, the documentation, and
