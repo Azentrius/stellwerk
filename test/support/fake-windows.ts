@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
-import { HUB_TASK, type Screen } from '../../src/setup/autostart.ts';
+import { DISPLAY_TASK, HUB_TASK, type Screen } from '../../src/setup/autostart.ts';
 import { withStellwerkCodexHooks } from '../../src/setup/codex-settings.ts';
 
 export interface FakeWindows {
@@ -113,6 +113,11 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     const xml = fake.tasks[name];
     if (xml === undefined) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
     return args.includes('/XML') ? xml : 'Ordner: \\';
+  }
+  // Stellwerk's two tasks may be deleted (autostart uninstall); a missing one fails as schtasks would.
+  if (command === 'schtasks' && args[0] === '/Delete' && [HUB_TASK, DISPLAY_TASK].includes(args[args.indexOf('/TN') + 1] ?? '')) {
+    if (!((args[args.indexOf('/TN') + 1] ?? '') in fake.tasks)) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
+    return 'ERFOLGREICH';
   }
   // Only the hub's task may be ended and started.
   if (command === 'schtasks' && (args[0] === '/End' || args[0] === '/Run') && args[args.indexOf('/TN') + 1] === HUB_TASK) {

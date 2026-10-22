@@ -72,13 +72,27 @@ export function registerTask(name: string, xml: string): void {
   }
 }
 
+/**
+ * Whether the task is there. It is missing only when Task Scheduler itself says so: a task that could not
+ * be read, or a Task Scheduler that does not answer, throws instead of counting as missing.
+ */
 export function taskExists(name: string): boolean {
   requireWindows();
   try {
     run('schtasks', ['/Query', '/TN', name]);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // schtasks fails alike when the task is missing and when it cannot be read (exit 1, a message in the
+    // system's language); Task Scheduler's own error code tells the two apart.
+    let code: number;
+    try {
+      code = taskQueryCode(name);
+    } catch (inner) {
+      const { stderr } = inner as { stderr?: string };
+      throw unreadableTask(name, `${(err as Error).message}; ${(String(stderr ?? '').trim() || (inner as Error).message).slice(0, 300)}`);
+    }
+    if (code === TASK_NOT_FOUND) return false;
+    throw unreadableTask(name, `${(err as Error).message} (code 0x${(code >>> 0).toString(16)})`);
   }
 }
 
@@ -90,22 +104,7 @@ export const TASK_NOT_FOUND = -2147024894;
  * A task that could not be read is not a missing one: then this throws.
  */
 export function taskDefinition(name: string): string | null {
-  requireWindows();
-  try {
-    run('schtasks', ['/Query', '/TN', name]);
-  } catch (err) {
-    // schtasks fails alike when the task is missing and when it cannot be read (exit 1, a message in the
-    // system's language); Task Scheduler's own error code tells the two apart.
-    let code: number;
-    try {
-      code = taskQueryCode(name);
-    } catch (inner) {
-      const { stderr } = inner as { stderr?: string };
-      throw unreadableTask(name, `${(err as Error).message}; ${(String(stderr ?? '').trim() || (inner as Error).message).slice(0, 300)}`);
-    }
-    if (code === TASK_NOT_FOUND) return null;
-    throw unreadableTask(name, `${(err as Error).message} (code 0x${(code >>> 0).toString(16)})`);
-  }
+  if (!taskExists(name)) return null;
   try {
     return run('schtasks', ['/Query', '/TN', name, '/XML']);
   } catch (err) {
