@@ -72,10 +72,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.6.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.6.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.6.0.zip -DestinationPath .
-cd stellwerk-0.6.0
+(Get-FileHash stellwerk-0.6.1.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.6.1.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.6.1.zip -DestinationPath .
+cd stellwerk-0.6.1
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -114,7 +114,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.6.0.zip
+stellwerk update stellwerk-0.6.1.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own

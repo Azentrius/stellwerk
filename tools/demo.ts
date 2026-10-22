@@ -22,6 +22,8 @@ const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const fakeGitHub: Record<string, unknown> = {
   '/orgs/example/repos': [{ name: 'shop-api' }, { name: 'customer-portal-frontend' }],
+  // Stellwerk's newest release is the one running: no note on the display.
+  '/repos/Azentrius/stellwerk/releases/latest': { tag_name: `v${version}` },
   '/repos/example/shop-api/pulls': [
     { number: 41, title: 'Release 2.3', updated_at: hoursAgo(0.2), user: { login: 'dev' }, head: { sha: 'a'.repeat(40) } },
     { number: 39, title: 'Bump zod from 4.1 to 4.2', updated_at: hoursAgo(5), user: { login: 'dependabot[bot]' }, head: { sha: 'b'.repeat(40) } },
@@ -157,6 +159,20 @@ fs.writeFileSync(
     lastRun('onboarding', 'Onboarding docs', 'docs', 180),
     lastRun('cleanup', 'Remove old flags', 'shop-api', 240),
   ]),
+);
+// Decisions of the last run in the audit log: the status column folds them into one line.
+const decided = (minutesAgo: number, tool: string, input: Record<string, unknown>, result: string, title: string, project: string) =>
+  JSON.stringify({ ts: new Date(Date.now() - minutesAgo * 60_000).toISOString(), request: `earlier-${minutesAgo}`, project, title, provider: 'claude', tool, input, result });
+fs.writeFileSync(
+  path.join(demoDir, 'audit.jsonl'),
+  [
+    decided(95, 'Bash', { command: 'npm run migrate -- --env staging' }, 'allowed', 'Invoice export', 'billing'),
+    decided(70, 'Edit', { file_path: 'C:\\Projects\\shop-api\\src\\flags.ts' }, 'allowed', 'Remove old flags', 'shop-api'),
+    decided(52, 'Bash', { command: 'git push --force origin main' }, 'denied', 'Remove old flags', 'shop-api'),
+    decided(31, 'WebFetch', { url: 'https://example.com/api/changelog' }, 'decided-in-app', 'Search spike', 'search'),
+    decided(18, 'Bash', { command: 'npm test' }, 'allowed', 'Invoice export', 'billing'),
+    decided(9, 'PowerShell', { command: 'Remove-Item build -Recurse' }, 'timed-out', 'Onboarding docs', 'docs'),
+  ].join('\n') + '\n',
 );
 const codexStateFile = path.join(demoDir, 'codex', '.codex-global-state.json');
 fs.writeFileSync(

@@ -98,6 +98,13 @@ rest.
 
 ---
 
+## 0.6.1 – Task Scheduler read safely everywhere ✅
+
+Done in 0.6.1 (see [CHANGELOG](CHANGELOG.md)): `autostart uninstall` and `hardware` tell a missing task from one
+Task Scheduler cannot read, as `update` does.
+
+---
+
 ## 0.6.0 – Updates in one step ✅
 
 Done in 0.6.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk update` also moves Codex' hooks, starts the hub

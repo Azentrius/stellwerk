@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.1 – 2026-10-22
+
+A task that Task Scheduler cannot read no longer counts as missing anywhere.
+
+- **`autostart uninstall` and `hardware install`/`uninstall`:** they asked whether a task is there with
+  `schtasks /Query`, which fails alike for a missing task and one it may not read, and took any failure for
+  a missing task: `autostart uninstall` then said there were no Stellwerk tasks, or removed only one of them,
+  and `hardware` skipped ending its task. Now they ask Task Scheduler for its error code, as `update` does
+  since 0.5.4: only "not there" counts as missing, and anything else stops the command before it changes
+  anything. Tested with the real command line against a made-up Windows, and read only against the real
+  Task Scheduler.
+
 ## 0.6.0 – 2026-10-22
 
 An update in one step, and the display says when there is one; the last decisions and a session's details
