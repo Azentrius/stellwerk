@@ -31,12 +31,14 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   at the end of a turn), needs some input, or has a permission open in the app, the session is listed
   below the cards under "Answer in the app", with the question and how long it has been waiting. You
   answer in the app; allow or deny would not answer a question.
-- **Codex, if you like.** The Codex app's sessions and approvals appear among the others, marked
-  "Codex" (see [Codex](#codex)).
+- **Codex, if you like.** The sessions and approvals of the Codex app and of Codex' command line appear
+  among the others, marked "Codex" and "Codex CLI" (see [Codex](#codex)).
 - **Plan usage.** How much of your Claude and Codex plans' limits is used, from local sources only (see
   [Plan usage](#plan-usage)).
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
   owner (all repositories) are listed too, each with the state of its Actions runs.
+- **A newer release.** With the same token, the status column says when a newer release of Stellwerk is
+  out, with the command that sets it up (see [Updating](#updating)).
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
@@ -45,8 +47,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   the tool it used last below it; the next tap closes them.
 - **A reminder.** A request that waits longer than 20 seconds pulses, and with sound on the tones come
   once more (`remindAfterSeconds`).
-- **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes almost
-  black after a minute with nothing new; a tap or an open request wakes it.
+- **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes
+  almost black after a minute with nothing new; what wakes it by day wakes it at night too.
 - **The last decisions.** In the status column one line folds the last ten decisions on permission
   requests: what, when, whose session, and how each ended. A click opens it, the next closes it; a restart
   of the hub keeps them (they come from the audit log).
@@ -64,6 +66,7 @@ requests right there. Like a dispatcher who sees every train on the track diagra
 - Windows 10 or 11
 - Node.js 24 (LTS)
 - Claude Code: the Claude desktop app or the command line
+- Optional: the Codex app or its command line
 - Microsoft Edge for the display (any Chromium browser works)
 
 ## Installation
@@ -72,10 +75,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.6.1.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.6.1.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.6.1.zip -DestinationPath .
-cd stellwerk-0.6.1
+(Get-FileHash stellwerk-0.6.2.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.6.2.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.6.2.zip -DestinationPath .
+cd stellwerk-0.6.2
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -114,7 +117,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.6.1.zip
+stellwerk update stellwerk-0.6.2.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -122,11 +125,22 @@ It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
 two logon tasks at it. Then it moves Codex' hooks to the new forwarder, if they run Stellwerk's (allow
 them again in the Codex app), starts the hub again from the new version, and removes the previous
 releases; `--keep-previous` keeps them. It lists all of this before it asks. The display loads the new
-page by itself. The display stays on the screen its task uses now; give
-`--screen <number>` (as `autostart install` lists them) to move it, or when that screen is gone: then
-the update stops before it changes anything. It stops as well when Task Scheduler cannot read the display
-task; only a task it reports as missing makes the update a first setup. Stellwerk downloads nothing itself. Settings, token and keys stay
-where they are.
+page by itself. Stellwerk downloads nothing itself. Settings, token and keys stay where they are.
+
+The display stays on the screen its task uses now; give `--screen <number>` (as `autostart install`
+lists them) to move it, or when that screen is gone: then the update stops before it changes anything.
+It stops as well when Task Scheduler cannot read the display task; only a task it reports as missing
+makes the update a first setup.
+
+If you made the command `stellwerk` available with `npm link`, it still runs the version it was linked
+from. Run `npm link` in the new release's folder, so it runs the new one:
+
+```powershell
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.2"
+npm link
+```
+
+Do this after each update: the next one removes this folder, and a link to it would stop working.
 
 With a GitHub token set up (see below), the status column says when a newer release is out: the hub asks
 `api.github.com` at its start and every six hours for the newest release of `Azentrius/stellwerk`.
@@ -143,19 +157,15 @@ adding them. Both start at logon, without administrator rights:
 - **Stellwerk hub** starts the hub without a window. Its messages go to
   `%LOCALAPPDATA%\stellwerk\hub.log` (moved to `hub.log.1` when it grows beyond 1 MB).
 - **Stellwerk display** opens the display 20 s later with its start file in Edge's kiosk mode: full screen
-  on the 1920×720 screen, without title bar and over the taskbar, with an Edge profile of its own. `--screen <number>`
-  picks another screen. Alt+F4 closes the display.
+  on the 1920×720 screen, without title bar and over the taskbar, with an Edge profile of its own.
+  `--screen <number>` picks another screen. Alt+F4 closes the display.
 
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
-Node.js elsewhere or rearranging the screens. After an update, restarting the hub is enough: the open
-display notices that the hub serves a newer version and loads itself again.
+Node.js elsewhere or rearranging the screens; `stellwerk update` points them at the new release itself.
 
 Stop or start a task in the Task Scheduler or with `schtasks /End /TN "Stellwerk hub"` and
 `schtasks /Run /TN "Stellwerk hub"`; the hub ends together with its task. `stellwerk autostart uninstall`
 removes both tasks.
-
-**Updating from 0.4.1 or older:** run `stellwerk autostart install` again, so that the display task
-opens the start file, then restart both tasks; until then the display shows that it is not signed in.
 
 ## Open pull requests
 
@@ -181,9 +191,9 @@ left out), their open pull requests, and the Actions runs on each pull request's
 personal account it adds the private repositories of that owner the token may see, which GitHub's list
 of a user's repositories leaves out. Lists longer than one page are read to the end, following GitHub's
 links only on `api.github.com`; more than 1000 entries in one list are reported as a problem instead of
-showing an incomplete list. Each pull
-request is one line; the icon in front of its title stands for its checks (its word is the tooltip and
-the name a screen reader reads), so repository, number and author have room:
+showing an incomplete list. Each pull request is one line; the icon in front of its title stands for its
+checks (its word is the tooltip and the name a screen reader reads), so repository, number and author
+have room:
 
 | Icon | Checks |
 |---|---|
@@ -193,15 +203,17 @@ the name a screen reader reads), so repository, number and author have room:
 | none | no runs |
 
 At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
-last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it. The token is never logged and never sent to the display.
-With the same token the hub asks, at its start and every six hours, for the newest release of Stellwerk
-itself, so the status column can say when there is a newer one (see "Updating").
-`stellwerk github remove` deletes it; the hub then opens no connection to GitHub.
+last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it.
+The token is never logged and never sent to the display. With the same token the hub asks, at its start
+and every six hours, for the newest release of Stellwerk itself, so the status column can say when there
+is a newer one (see [Updating](#updating)). `stellwerk github remove` deletes it; the hub then opens no
+connection to GitHub.
 
 ## Hardware values
 
-Optional. Stellwerk reads the sensors through [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
-(MPL-2.0) and sets it up itself, in a terminal opened as administrator with your own account:
+Optional. Stellwerk reads the sensors through
+[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) (MPL-2.0) and sets
+it up itself, in a terminal opened as administrator with your own account:
 
 ```powershell
 stellwerk hardware install
@@ -392,7 +404,10 @@ session appears with its first event, which in the desktop app is the first prom
 `%APPDATA%\stellwerk\config.json`, all optional:
 
 ```json
-{ "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "remindAfterSeconds": 20, "nightFrom": "23:00", "nightTo": "07:00", "scale": 1, "debugRawLog": false }
+{
+  "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "remindAfterSeconds": 20,
+  "nightFrom": "23:00", "nightTo": "07:00", "scale": 1, "debugRawLog": false
+}
 ```
 
 | Setting | Meaning |
@@ -431,6 +446,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\sessions.json` | The sessions on the display (id, folder, title, project, context, last activity), for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` | Since when monitors of Uptime Kuma fail (ids and times only), for the display after a restart |
+| `%LOCALAPPDATA%\stellwerk\releases\` | The releases set up by `stellwerk update`, one folder `stellwerk-X.Y.Z` each |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
@@ -460,16 +476,17 @@ Restart the hub after a change.
 - Nothing is allowed automatically: no rules, no "always allow". A question of an MCP server
   (`Elicitation`) the hub never answers; the app asks you itself.
 - The hub starts no programs. It connects to other machines only to `api.github.com`, for the list of
-  pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set up; and to Uptime Kuma at the
-  address you set up, only for `/metrics` and only with its API key. Besides that it asks
+  pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
+  up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
+  that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
 - For the context meters the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
   and `%USERPROFILE%\.codex\sessions` (a path elsewhere in a hook event is ignored), only from their end,
   and only the token counts, the model, the context window, the session's title and, for Codex, who
-  approves and the usage of the plan's limits. Prompts, code and answers in them are not read into the hub's state and never reach
-  the display.
+  approves and the usage of the plan's limits. Prompts, code and answers in them are not read into the
+  hub's state and never reach the display.
 - Of what tools return, the hub looks only at the desktop app's answer to `get_usage`, and keeps only
   the plan's limits from it (percent, window, reset, the model of a model's own limit).
 - For the names of Codex sessions the hub reads Codex' session index
@@ -480,6 +497,8 @@ Restart the hub after a change.
 - Codex events come through Stellwerk's forwarder to their own endpoint, with the same checks as the
   others (token, content type, `Host`). The forwarder reads the hook token from the token file, talks
   only to `127.0.0.1` and prints only the hub's answer.
+- `stellwerk update` takes a release only if it matches the `SHA256SUMS` next to it and unpacks it only
+  into its own folder in `%LOCALAPPDATA%\stellwerk\releases`; it downloads nothing itself.
 - `stellwerk hardware install` downloads one file, pinned by size and SHA-256, and unpacks it only into
   its own folder in Program Files. LibreHardwareMonitor runs with administrator rights; its web server
   needs a password and is closed to other machines by a firewall rule.
@@ -514,6 +533,21 @@ not with `Remove-Item`, which in Windows PowerShell 5.1 can delete what the junc
 While the raw hook log is on (`debugRawLog` or `--debug-raw`), the status column says so: the file holds
 prompts and code, so turn it off and delete `debug-raw.jsonl` when you are done.
 
+## Known limits
+
+- Plan usage of Claude comes only through the desktop app: its tool `get_usage` is what reports the
+  limits. Claude Code in a terminal without the desktop app has no such tool.
+- The built-in browser's cards that ask to allow a site fire no permission request, so they do not show
+  on the display; answer them in the app.
+- Once a file edit was allowed in the app, Claude Code may switch the session to accepting edits; later
+  edits then ask for nothing, and no card appears for them.
+- For a request decided in the app, the hub only knows that it was answered there, not how.
+- A session appears with its first event (in the desktop app, the first prompt): its start takes no HTTP
+  hooks.
+- The Codex app and Codex' command line show their own approval only after the hook has answered, so a
+  Codex request waits on the display for a shorter time (`codexHoldSeconds`, 30 s by default, at most
+  35 s) before it goes to Codex.
+
 ## Uninstall
 
 ```powershell
@@ -528,22 +562,30 @@ npm rm -g stellwerk          # if you used npm link
 Remove-Item -Recurse "$env:LOCALAPPDATA\stellwerk", "$env:APPDATA\stellwerk"
 ```
 
+`stellwerk autostart uninstall` removes only the tasks: a hub or display they started keeps running until
+you close it or log off. To end the hub first: `schtasks /End /TN "Stellwerk hub"`.
+
 Restart the Claude desktop app afterwards.
 
 ## Development
 
 ```powershell
 npm run typecheck
-npm test                 # unit tests and the hub end to end; runs the TypeScript sources directly
-npm run build            # dist/: the hub and the display
-npm run demo             # a hub on port 4781 with made-up sessions and requests, own token and audit log
-npm run package          # build/: stellwerk-VERSION.zip and SHA256SUMS, reproducible
+npm test                       # unit tests and the hub end to end; runs the TypeScript sources directly
+npm run build                  # dist/: the hub and the display
+npm run demo                   # a hub on port 4781 with made-up sessions, own token and audit log
+npm run package                # build/: stellwerk-VERSION.zip and SHA256SUMS, reproducible
+node tools/check-browser.ts    # in a real Edge (after the build): the display's sign-in
+node tools/check-monitors.ts   # many failing monitors scroll to the last one
+node tools/check-columns.ts    # the agents and the waiting column, a card far down
+node tools/check-quiet.ts      # the display at rest: dims, what wakes it
 node dist/cli.js serve --debug-raw --simulate-hang
 ```
 
 `--simulate-hang` leaves status hooks unanswered, to see how Claude Code behaves with a hung hub. The hub
 reads the display's files when it starts: after `npm run build`, restart it. The screenshot above is the
-demo at `http://127.0.0.1:4781/?lang=en`, taken with Edge at 1920×720.
+demo at `http://127.0.0.1:4781/?lang=en`, taken with Edge at 1920×720. More in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 What comes next is in [ROADMAP.md](ROADMAP.md).
 

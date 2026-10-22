@@ -155,7 +155,8 @@ Usage:
       first setup, the 1920x720 screen cannot be told), nothing changes until one is given. When
       Task Scheduler cannot read the display task, nothing changes at all.
 
-Configuration: %APPDATA%\\stellwerk\\config.json (port, holdSeconds, sound, scale, debugRawLog).
+Configuration: %APPDATA%\\stellwerk\\config.json. Every setting is described in the README,
+section "Configuration".
 `;
 
 async function main(): Promise<void> {

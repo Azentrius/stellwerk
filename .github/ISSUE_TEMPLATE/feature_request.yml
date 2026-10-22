@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Feature request
+description: Suggest an improvement, another agent or another data source for Stellwerk.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the open issues and [ROADMAP.md](https://github.com/Azentrius/stellwerk/blob/main/ROADMAP.md)
+        first. This issue is public: leave out tokens, keys, prompts and other private data.
+
+        Some things Stellwerk does not do on purpose: it listens only on `127.0.0.1` (no other device, no
+        tunnel), and only a person allows or denies a request (no rules, no "always allow").
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What do you miss on the display, or what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Where would the information come from (a hook event, a local file, a service), and what should the display show?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other solutions or workarounds you have considered.
+  - type: dropdown
+    id: help
+    attributes:
+      label: Would you help?
+      options:
+        - "Yes, with a pull request"
+        - "Yes, by testing it on my setup"
+        - "No"
+    validations:
+      required: false
