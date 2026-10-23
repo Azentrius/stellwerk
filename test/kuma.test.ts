@@ -83,13 +83,13 @@ describe("reading Uptime Kuma's /metrics", () => {
 
 describe("Uptime Kuma's address", () => {
   test('http or https, a host and a port; kept without the slash', () => {
-    assert.equal(uptimeKumaAddress('http://192.168.0.130:3001'), 'http://192.168.0.130:3001');
-    assert.equal(uptimeKumaAddress('http://192.168.0.130:3001/'), 'http://192.168.0.130:3001');
+    assert.equal(uptimeKumaAddress('http://192.0.2.10:3001'), 'http://192.0.2.10:3001');
+    assert.equal(uptimeKumaAddress('http://192.0.2.10:3001/'), 'http://192.0.2.10:3001');
     assert.equal(uptimeKumaAddress('https://status.example.com'), 'https://status.example.com');
   });
 
   test('no other scheme, no user, path, query or fragment', () => {
-    for (const value of ['ftp://192.168.0.130', 'http://user:pw@192.168.0.130:3001', 'http://192.168.0.130:3001/metrics', 'http://x/?a=1', 'http://x/#f', 'file:///C:/x', '192.168.0.130:3001', '']) {
+    for (const value of ['ftp://192.0.2.10', 'http://user:pw@192.0.2.10:3001', 'http://192.0.2.10:3001/metrics', 'http://x/?a=1', 'http://x/#f', 'file:///C:/x', '192.0.2.10:3001', '']) {
       assert.equal(uptimeKumaAddress(value), null, value);
     }
   });

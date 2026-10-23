@@ -125,7 +125,7 @@ const configSchema = z.strictObject({
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */
   githubOwner: z.string().regex(GITHUB_OWNER).optional(),
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
-  /** Uptime Kuma's address, e.g. "http://192.168.0.130:3001" (with an API key from `stellwerk kuma key`). */
+  /** Uptime Kuma's address, e.g. "http://192.0.2.10:3001" (with an API key from `stellwerk kuma key`). */
   uptimeKumaUrl: z
     .string()
     .refine((value) => uptimeKumaAddress(value) === value, 'http(s)://host[:port], without a path')
