@@ -104,7 +104,7 @@ class KumaFailure extends Error {
 }
 
 export interface UptimeKumaWatcherOptions {
-  /** Uptime Kuma's address, such as http://192.168.0.130:3001 (checked by the configuration). */
+  /** Uptime Kuma's address, such as http://192.0.2.10:3001 (checked by the configuration). */
   url: string;
   /** An API key of Uptime Kuma ("uk1_…"), sent as the password; never logged. */
   key: string;

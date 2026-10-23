@@ -43,8 +43,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
-- **A session's details.** A tap on a session opens its folder, model, context in tokens, subagents and
-  the tool it used last below it; the next tap closes them.
+- **A session's details.** A tap on a session opens its folder, model, context in tokens, subagents, the
+  tool it used last and the first eight characters of its session id below it; the next tap closes them.
 - **A reminder.** A request that waits longer than 20 seconds pulses, and with sound on the tones come
   once more (`remindAfterSeconds`).
 - **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes
@@ -268,7 +268,7 @@ In Uptime Kuma create an API key (Settings › API Keys › Add API Key, a name 
 with Uptime Kuma's address:
 
 ```powershell
-stellwerk kuma key --url http://192.168.0.130:3001
+stellwerk kuma key --url http://192.0.2.10:3001
 ```
 
 It asks for the key without showing it, tries it once against the address's `/metrics` and keeps it,
@@ -429,7 +429,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
 | `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
-| `uptimeKumaUrl` | Uptime Kuma's address, such as `http://192.168.0.130:3001` (no path); set by `stellwerk kuma key --url`. Needs the API key. |
+| `uptimeKumaUrl` | Uptime Kuma's address, such as `http://192.0.2.10:3001` (no path); set by `stellwerk kuma key --url`. Needs the API key. |
 | `uptimeKumaIntervalSeconds` | How often to ask Uptime Kuma: 30 to 3600, 60 by default. |
 | `contextWindows` | Context windows by model id for the context meters, for models Stellwerk does not know, e.g. `{ "claude-sonnet-5-5": 1000000 }`. Known: Opus 5.5 with 1M. Otherwise 200k, or 1M once more than 200k are in use. Codex records its window itself. |
 | `codexHoldSeconds` | How long a Codex request waits on the display before the Codex app shows its own card: 10 to 35, 30 by default. |
@@ -481,7 +481,9 @@ Restart the hub after a change.
   or oversized message closes only its own connection.
 - Nothing is allowed automatically: no rules, no "always allow". A question of an MCP server
   (`Elicitation`) the hub never answers; the app asks you itself.
-- The hub starts no programs. It connects to other machines only to `api.github.com`, for the list of
+- The hub starts no programs, except that `serve` runs `icacls` (fixed arguments, no shell) when it
+  creates the token file or writes the display's start file, so that only your Windows account can read
+  them. It connects to other machines only to `api.github.com`, for the list of
   pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
   up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
   that it asks
@@ -611,7 +613,12 @@ What comes next is in [ROADMAP.md](ROADMAP.md).
 Stellwerk is licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE). The fonts DM
 Sans, DM Serif Display and Red Hat Mono are licensed under the SIL Open Font License 1.1. The icons are
 Font Awesome Free 5.15.4 by Fonticons, Inc., taken over through `@patternfly/react-icons` 6.4.0 and
-licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)). The Stellwerk
-sign (`ui/icon.svg`) is a mark of Azentrius and is not licensed under the Apache License.
+licensed under CC BY 4.0 ([ui/CC-BY-4.0-Font-Awesome.txt](ui/CC-BY-4.0-Font-Awesome.txt)), except the
+icon "pending", PatternFly's own icon from the same package, licensed under the MIT License
+([ui/MIT-PatternFly-Icons.txt](ui/MIT-PatternFly-Icons.txt)). The Stellwerk sign (`ui/icon.svg`) is a
+mark of Azentrius and is not licensed under the Apache License.
+
+Stellwerk is an independent project and is not affiliated with or endorsed by the makers of Claude
+Code, the Claude app or Codex. These names are trademarks of their respective owners.
 
 Made by [Azentrius](https://azentrius.com).

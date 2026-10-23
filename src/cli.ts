@@ -459,10 +459,10 @@ async function uptimeKumaKey(action: 'key' | 'remove', url: string | undefined):
     return;
   }
   const address = url === undefined ? undefined : uptimeKumaAddress(url);
-  if (address === null) throw new Error(`"${url}" is not an address like http://192.168.0.130:3001 (http or https, no path).`);
+  if (address === null) throw new Error(`"${url}" is not an address like http://192.0.2.10:3001 (http or https, no path).`);
   const config = loadConfig(paths.configFile);
   const target = address ?? config.uptimeKumaUrl;
-  if (!target) throw new Error("Where is Uptime Kuma? Give its address with --url, e.g. --url http://192.168.0.130:3001.");
+  if (!target) throw new Error("Where is Uptime Kuma? Give its address with --url, e.g. --url http://192.0.2.10:3001.");
 
   console.log(`An API key of Uptime Kuma at ${target}: in Uptime Kuma, Settings, API Keys, "Add API Key".`);
   console.log('Such a key can read /metrics and nothing else.');

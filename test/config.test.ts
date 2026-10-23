@@ -132,13 +132,13 @@ test('only fine-grained GitHub tokens are kept; they can be read back and remove
 
 test("Uptime Kuma's address is kept as an origin, the interval at least half a minute", () => {
   const file = path.join(tempDir(), 'config.json');
-  setConfigValue(file, 'uptimeKumaUrl', 'http://192.168.0.130:3001');
-  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.168.0.130:3001');
-  for (const url of ['http://192.168.0.130:3001/', 'http://192.168.0.130:3001/metrics', 'ftp://192.168.0.130', 'http://u:p@host']) {
+  setConfigValue(file, 'uptimeKumaUrl', 'http://192.0.2.10:3001');
+  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.0.2.10:3001');
+  for (const url of ['http://192.0.2.10:3001/', 'http://192.0.2.10:3001/metrics', 'ftp://192.0.2.10', 'http://u:p@host']) {
     assert.throws(() => setConfigValue(file, 'uptimeKumaUrl', url), /uptimeKumaUrl/, url);
   }
   assert.throws(() => setConfigValue(file, 'uptimeKumaIntervalSeconds', 10));
-  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.168.0.130:3001');
+  assert.equal(loadConfig(file).uptimeKumaUrl, 'http://192.0.2.10:3001');
 });
 
 test("only Uptime Kuma's API keys are kept; they can be read back and removed", () => {
