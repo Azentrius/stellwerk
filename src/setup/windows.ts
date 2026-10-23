@@ -15,11 +15,19 @@ function requireWindows(): void {
   if (process.platform !== 'win32') throw new Error('This step is only needed on Windows.');
 }
 
-/** Runs a fixed PowerShell script; passed encoded, so no quote in it is ever read twice. */
-function powershell(script: string, input = ''): string {
-  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+/**
+ * Runs a fixed PowerShell script; passed encoded, so no quote in it is ever read twice. Values never go into
+ * the script: they go in on standard input, each as Base64 of its UTF-8 on a line of its own, and the script
+ * finds them decoded, in order, in `$values`. Read as text, standard input would be decoded with the
+ * console's code page, and a path with "ö" would become another path.
+ */
+function powershell(script: string, values: string[] = []): string {
+  const read =
+    "$values = @(foreach ($line in [Console]::In.ReadToEnd().Split([char]10)) { if ($line.StartsWith(':')) { " +
+    '[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line.Substring(1).Trim())) } })';
+  const encoded = Buffer.from(`${read}; ${script}`, 'utf16le').toString('base64');
   return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
-    input,
+    input: values.map((value) => `:${Buffer.from(value, 'utf8').toString('base64')}\n`).join(''),
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
@@ -117,11 +125,11 @@ function taskQueryCode(name: string): number {
   // The name goes in on stdin. COM wraps the error code in PowerShell's exception: the innermost holds it.
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    '$name = [Console]::In.ReadLine()',
+    '$name = $values[0]',
     'try { $service = New-Object -ComObject Schedule.Service; $service.Connect(); [void]$service.GetFolder([string][char]92).GetTask($name); 0 } ' +
       'catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; $e.HResult }',
   ].join('; ');
-  const answer = powershell(script, `${name}\n`);
+  const answer = powershell(script, [name]);
   if (!/^-?\d+$/.test(answer)) throw new Error(`Task Scheduler gave no error code (${JSON.stringify(answer.slice(0, 200))})`);
   return Number(answer);
 }
@@ -166,12 +174,12 @@ export function edgeWithProfile(profileDir: string): number {
   requireWindows();
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    "$flag = ('--user-data-dir=' + [Console]::In.ReadLine() + ' ').ToLowerInvariant()",
+    "$flag = ('--user-data-dir=' + $values[0] + ' ').ToLowerInvariant()",
     "@(Get-CimInstance Win32_Process -Filter \"Name='msedge.exe'\" | Where-Object { $_.CommandLine -and ($_.CommandLine.Replace('\"', '') + ' ').ToLowerInvariant().Contains($flag) }).Count",
   ].join('; ');
   let answer: string;
   try {
-    answer = powershell(script, `${profileDir}\n`);
+    answer = powershell(script, [profileDir]);
   } catch (err) {
     const { stderr } = err as { stderr?: string };
     answer = (String(stderr ?? '').trim() || (err as Error).message).slice(0, 300);
@@ -186,13 +194,13 @@ export function stopProgram(exe: string): void {
   // No such process is no error (exit 0); a process that cannot be ended is one (exit 1).
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    '$exe = [Console]::In.ReadLine()',
+    '$exe = $values[0]',
     '$name = [IO.Path]::GetFileNameWithoutExtension($exe)',
     '$found = @(Get-Process -Name $name -ErrorAction Ignore | Where-Object { $_.Path -eq $exe })',
     'foreach ($p in $found) { $p.Kill(); [void]$p.WaitForExit(10000) }',
     'exit 0',
   ].join('; ');
-  powershell(script, `${exe}\n`);
+  powershell(script, [exe]);
 }
 
 function run(command: string, args: string[]): string {
@@ -204,11 +212,16 @@ function run(command: string, args: string[]): string {
   }
 }
 
-/** Reads a user environment variable as stored for new processes (not this process's copy). */
+/**
+ * Reads a user environment variable as stored for new processes (not this process's copy). It comes out as
+ * Base64 of its UTF-8, like the values that go in, so the console's code page cannot change it either.
+ */
 export function getUserEnv(name: string): string | null {
   requireWindows();
-  const value = powershell(`[Environment]::GetEnvironmentVariable('${name}', 'User')`);
-  return value === '' ? null : value;
+  const value = powershell(
+    `$v = [Environment]::GetEnvironmentVariable('${name}', 'User'); if ($v) { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($v)) }`,
+  );
+  return value === '' ? null : Buffer.from(value, 'base64').toString('utf8');
 }
 
 /** Sets (or with null removes) a user environment variable; Windows tells running programs about it. */
@@ -217,7 +230,7 @@ export function setUserEnv(name: string, value: string | null): void {
   if (value === null) {
     powershell(`[Environment]::SetEnvironmentVariable('${name}', $null, 'User')`);
   } else {
-    powershell(`$v = [Console]::In.ReadLine(); [Environment]::SetEnvironmentVariable('${name}', $v, 'User')`, `${value}\n`);
+    powershell(`[Environment]::SetEnvironmentVariable('${name}', $values[0], 'User')`, [value]);
   }
 }
 

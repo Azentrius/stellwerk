@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.4 – 2026-10-23
+
+`stellwerk update` finds the display's Edge in a profile path with umlauts, and starts a display again
+on the screen given when its task names no full placement.
+
+- **Values for PowerShell in any letters:** the setup commands hand values (a path, a task's name, the
+  token) to PowerShell on standard input as Base64 of their UTF-8, and it decodes them, so the console's
+  code page no longer changes them. Before, a profile folder like `C:\Users\Jörg\…` arrived as another
+  path: the display's running Edge counted as none, so a moved display was run again without waiting for
+  the old one to close, and could open where it was. A user environment variable is read back the same
+  way.
+- **A display task without a full placement:** with `--screen`, a display task that names no position,
+  no size or neither is now ended and run again on the screen given, as for a move; before, its display
+  stayed where it was. Without `--screen` such a task still stops the update before anything changes,
+  and a display that is on the screen given already still only loads the new page.
+- **Tests:** the Edge count against a real, headless Edge with profile folders in umlauts and spaces, in
+  any case, against other and shorter paths and after it closed; and the update for a display task
+  without its position, its size or both, with and without `--screen`, in the order of its steps.
+
 ## 0.6.3 – 2026-10-23
 
 `stellwerk update` starts a display moved to another screen again there, and no longer removes a
