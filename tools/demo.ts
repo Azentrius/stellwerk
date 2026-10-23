@@ -201,6 +201,8 @@ const hub = await startHub({
   sessionsFile,
   // Made-up data with a token of its own: the demo's display needs no sign-in.
   openDisplay: true,
+  // Its sessions and pull requests are made up: a tap opens nothing, it is only told.
+  open: (link) => console.log(`The display would open ${link}; the demo opens nothing.`),
 });
 console.log(`Demo hub on http://127.0.0.1:${hub.port}/  (add ?lang=en or ?lang=de)`);
 if (hub.missingBuild) console.log('The display is not built yet. Run "npm run build" first.');
@@ -218,7 +220,13 @@ function send(session: string, project: string, body: Record<string, unknown>, c
     method: 'POST',
     path: codex ? CODEX_HOOK_PATH : HOOK_PATH,
     agent: false,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(payload),
+      // Claude sessions as the desktop app's hooks send them, with the app's id of the session.
+      ...(codex ? {} : { 'X-Stellwerk-App-Session': `local_demo-${session}` }),
+    },
   });
   req.on('response', (res) => res.resume());
   req.on('error', () => {});

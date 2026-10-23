@@ -22,7 +22,7 @@ Security problems: do not open a pull request, see SECURITY.md.
 
 - [ ] Every new or changed text exists in English and German (both dictionaries in `ui/src/i18n.ts`)
 - [ ] The hub still listens on `127.0.0.1` only, checks every request, and allows or denies nothing by itself
-- [ ] No new connection to another machine and no program started by the hub (each needs a decision and a review first)
+- [ ] No new connection to another machine, no program started by the hub and no new kind of link it opens (each needs a decision and a review first)
 - [ ] The display loads only the hub's own files: nothing inline, no `style` attributes, hook data as text only
 - [ ] Tests for the change: the logic in `test/board.test.ts` and friends, behaviour over HTTP and the WebSocket in `test/hub.test.ts`
 - [ ] No secrets, tokens, keys, prompts or real data in code, tests or this description

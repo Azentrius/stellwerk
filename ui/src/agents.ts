@@ -3,8 +3,10 @@
 // project (and subagents) and its state below; the most urgent first (the hub sorts them). All agents look
 // alike. Sessions at rest (resting.ts) make way in one line at the foot, which opens on a tap. A tap on a
 // session (or Enter or Space on it) opens its details below it: folder, model, context, subagents, the tool
-// it used last; the next closes them. Each session keeps its element while only its content is drawn anew,
-// and that content takes no pointer events, so a tap that meets a render still reaches the session.
+// it used last; the next closes them. When the hub knows where (SessionView.openable), the details end with a
+// button that opens the session in its app. Each session keeps its element while only its content is drawn
+// anew, and that content takes no pointer events, so a tap that meets a render still reaches the session; the
+// button takes its own and stays in place.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -21,6 +23,7 @@ import { ago, elapsed } from './time.ts';
 export class AgentItems {
   readonly open = new Set<string>();
   private readonly items = new Map<string, HTMLLIElement>();
+  private readonly buttons = new Map<string, HTMLButtonElement>();
 
   /** The element of a session: the same one each time; a tap or Enter or Space on it calls `toggle`. */
   item(id: string, toggle: (id: string) => void): HTMLLIElement {
@@ -41,11 +44,35 @@ export class AgentItems {
     return item;
   }
 
+  /**
+   * The button in a session's open details that opens it in its app: the same one each time. A tap, Enter or
+   * Space on it calls `open` and does not fold the details.
+   */
+  openButton(id: string, label: string, open: (id: string) => void): HTMLButtonElement {
+    let button = this.buttons.get(id);
+    if (!button) {
+      button = el('button', 'az-btn az-btn--secondary btn agent__open');
+      button.type = 'button';
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        open(id);
+      });
+      button.addEventListener('keydown', (event) => event.stopPropagation());
+      this.buttons.set(id, button);
+    }
+    if (button.dataset.label !== label) {
+      button.dataset.label = label;
+      button.replaceChildren(icon('external-link-alt'), document.createTextNode(label));
+    }
+    return button;
+  }
+
   /** Forgets the elements (and open details) of sessions no longer shown. */
   keep(ids: Set<string>): void {
     for (const id of this.items.keys()) {
       if (ids.has(id)) continue;
       this.items.delete(id);
+      this.buttons.delete(id);
       this.open.delete(id);
     }
   }
@@ -60,7 +87,7 @@ export function renderAgents(
   list: HTMLElement,
   sessions: { active: SessionView[]; resting: SessionView[] },
   line: { item: HTMLLIElement; button: HTMLButtonElement; open: boolean },
-  agents: { items: AgentItems; toggle: (id: string) => void },
+  agents: { items: AgentItems; toggle: (id: string) => void; open: (id: string) => void },
   now: number,
   texts: Texts,
 ): void {
@@ -81,7 +108,11 @@ export function renderAgents(
     item.className = `${fresh.className} agent--tappable`;
     item.title = fresh.title;
     item.setAttribute('aria-expanded', String(open));
-    item.replaceChildren(...fresh.childNodes, ...(open ? [agentDetails(session, now, texts)] : []));
+    // The button stays where it is over the renders, so a press on it is not lost; what is before it is new.
+    const button = open && session.openable ? agents.items.openButton(session.id, texts.openIn(providerName(session.provider, session.terminal, texts)), agents.open) : null;
+    for (const child of [...item.childNodes]) if (child !== button) child.remove();
+    item.prepend(...fresh.childNodes, ...(open ? [agentDetails(session, now, texts)] : []));
+    if (button && button.parentElement !== item) item.append(button);
     return item;
   };
   const before = sessions.active.map(fill);

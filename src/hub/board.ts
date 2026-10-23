@@ -13,6 +13,7 @@ import type {
   WaitingFor,
 } from '../shared/protocol.js';
 import { isOther, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
+import { APP_SESSION, sessionLink } from './links.ts';
 
 /** Ended sessions disappear after this time. */
 export const ENDED_VISIBLE_MS = 10 * 60_000;
@@ -31,6 +32,8 @@ export interface SavedSession {
   /** As the agent's app names it ('' for none); null: the last part of cwd. */
   project: string | null;
   context: ContextUsage | null;
+  /** The Claude desktop app's own id of the session (`local_…`), when its hooks sent it. */
+  appSession?: string | null;
   lastActivity: number;
 }
 
@@ -110,6 +113,8 @@ interface Session {
   lastTool: { name: string; at: number } | null;
   /** Runs in Codex' command line (from its transcript); its own cards show in the terminal. */
   terminal: boolean;
+  /** The Claude desktop app's own id of the session (`local_…`), from a header of its hooks; null: none sent. */
+  appSession: string | null;
   lastActivity: number;
   endedAt: number | null;
 }
@@ -318,6 +323,23 @@ export class Board {
     return true;
   }
 
+  /** What it takes to open a session in its app (links.ts); null for a session the board does not know. */
+  session(sessionId: string): { id: string; provider: Provider; terminal: boolean; appSession: string | null } | null {
+    const session = this.sessions.get(sessionId);
+    return session ? { id: session.id, provider: session.provider, terminal: session.terminal, appSession: session.appSession } : null;
+  }
+
+  /**
+   * The Claude desktop app's own id of the session, which its hooks send along (`local_…`); anything else is
+   * left out. True when it changed.
+   */
+  setAppSession(sessionId: string, appSession: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.provider !== 'claude' || !APP_SESSION.test(appSession) || session.appSession === appSession) return false;
+    session.appSession = appSession;
+    return true;
+  }
+
   /** The session runs in Codex' command line; true when that is new. */
   setTerminal(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);
@@ -373,6 +395,7 @@ export class Board {
       session.title = s.title;
       session.project = s.project;
       session.context = s.context;
+      session.appSession = s.appSession != null && APP_SESSION.test(s.appSession) ? s.appSession : null;
       this.sessions.set(session.id, session);
       restored++;
     }
@@ -383,7 +406,16 @@ export class Board {
   snapshot(): SavedSession[] {
     return [...this.sessions.values()]
       .filter((s) => s.base !== 'ended')
-      .map((s) => ({ id: s.id, provider: s.provider, cwd: s.cwd, title: s.title, project: s.project, context: s.context, lastActivity: s.lastActivity }));
+      .map((s) => ({
+        id: s.id,
+        provider: s.provider,
+        cwd: s.cwd,
+        title: s.title,
+        project: s.project,
+        context: s.context,
+        appSession: s.appSession,
+        lastActivity: s.lastActivity,
+      }));
   }
 
   /**
@@ -465,6 +497,7 @@ export class Board {
           subagents: s.subagents.size,
           lastTool: s.lastTool,
           terminal: s.terminal,
+          openable: sessionLink(s) !== null,
           lastActivity: s.lastActivity,
           endedAt: s.endedAt,
         };
@@ -577,6 +610,7 @@ function newSession(id: string, provider: Provider, cwd: string, now: number): S
     subagents: new Set(),
     lastTool: null,
     terminal: false,
+    appSession: null,
     lastActivity: now,
     endedAt: null,
   };

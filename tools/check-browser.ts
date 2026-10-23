@@ -24,6 +24,8 @@ const ROOT = path.join(import.meta.dirname, '..');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-browser-'));
 const token = randomBytes(32).toString('hex');
 const hub = await startHub({
+  // The checks open nothing on this machine.
+  open: () => {},
   port: 0,
   token,
   holdMs: 30_000,

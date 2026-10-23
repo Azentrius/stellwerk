@@ -119,6 +119,13 @@ export interface Texts {
   contextUnknown: string;
   alreadyDecided: string;
   notOpen: string;
+  /** The button in a session's details that opens it in its app ("Claude", "Codex"). */
+  openIn: (app: string) => string;
+  /** A tap on a pull request opens it in the browser: its tooltip. */
+  openPull: string;
+  /** Opening did not work: there is nothing to open for it any more, or the shell failed. */
+  openUnknown: string;
+  openFailed: string;
   command: string;
   file: string;
   change: string;
@@ -288,6 +295,10 @@ const en: Texts = {
   contextUnknown: 'Context not known yet',
   alreadyDecided: 'Already decided.',
   notOpen: 'This request is no longer open.',
+  openIn: (app) => `Open in ${app}`,
+  openPull: 'Open in the browser',
+  openUnknown: 'There is nothing to open for it.',
+  openFailed: 'It could not be opened.',
   command: 'Command',
   file: 'File',
   change: 'Change',
@@ -456,6 +467,10 @@ const de: Texts = {
   contextUnknown: 'Kontext noch unbekannt',
   alreadyDecided: 'Bereits entschieden.',
   notOpen: 'Diese Anfrage ist nicht mehr offen.',
+  openIn: (app) => `In ${app} öffnen`,
+  openPull: 'Im Browser öffnen',
+  openUnknown: 'Dafür gibt es nichts zu öffnen.',
+  openFailed: 'Ließ sich nicht öffnen.',
   command: 'Befehl',
   file: 'Datei',
   change: 'Änderung',

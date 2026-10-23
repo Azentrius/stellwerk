@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Decision, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
+import type { Decision, OpenMessage, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { AgentItems, renderAgents } from './agents.ts';
 import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
@@ -15,10 +15,11 @@ import { TimedFold } from './fold.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
-import { renderPulls } from './pulls.ts';
+import { pullKey, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { Rest, inNight, restAfter, watched } from './quiet.ts';
 import { splitResting } from './resting.ts';
+import { TapList } from './taps.ts';
 import { shouldReload } from './reload.ts';
 import {
   githubLine,
@@ -81,8 +82,15 @@ const decisionsLine = new TimedFold();
 restingButton.type = 'button';
 restingItem.append(restingButton);
 const answers = byId<HTMLUListElement>('answers');
+/** A tap on a session waiting for an answer opens it in its app. */
+const answerTaps = new TapList((id) => openTarget({ session: id }));
 const answersSection = byId('answers-section');
 const pulls = byId<HTMLUListElement>('pulls');
+/** A tap on a pull request opens it in the default browser. */
+const pullTaps = new TapList((key) => {
+  const pr = state?.pullRequests.find((p) => pullKey(p) === key);
+  if (pr) openTarget({ repo: pr.repo, number: pr.number });
+});
 const pullsSection = byId('pulls-section');
 const githubState = byId('github-state');
 const hardwareSection = byId('hardware');
@@ -171,6 +179,8 @@ function onMessage(message: ServerMessage): void {
   } else if (message.type === 'decision-result' && !message.ok) {
     queue.release(message.id);
     toast(message.reason === 'already-decided' ? texts.alreadyDecided : texts.notOpen);
+  } else if (message.type === 'open-result' && !message.ok && message.reason !== 'busy') {
+    toast(message.reason === 'unknown' ? texts.openUnknown : texts.openFailed);
   }
 }
 
@@ -187,6 +197,11 @@ function reloadForNewBuild(hubBuild: string): boolean {
   } catch {}
   location.reload();
   return true;
+}
+
+/** Asks the hub to open a session in its app or a pull request in the browser; it builds the link itself. */
+function openTarget(target: OpenMessage['target']): void {
+  socket?.send(JSON.stringify({ type: 'open', target } satisfies OpenMessage));
 }
 
 function decide(id: string, decision: Decision): void {
@@ -208,17 +223,17 @@ function tick(): void {
   // A request that waits long reminds once more with the tones, when sound is on.
   if (newReminders(state?.permissions ?? [], state?.hub.remindAfterMs ?? 0, now, reminded).length > 0 && state?.hub.sound) chime();
   const sessions = state?.sessions ?? [];
-  renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, { items: agentItems, toggle: toggleDetails }, now, texts);
+  renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, { items: agentItems, toggle: toggleDetails, open: (id) => openTarget({ session: id }) }, now, texts);
   // With the line's button in it, the browser no longer makes the list a tab stop by itself.
   markScrolling(agents);
   agentsEmpty.hidden = sessions.length > 0;
   agentsCount.textContent = sessions.length > 0 ? `(${sessions.length})` : '';
 
   const due = waitingForAnswer(sessions);
-  renderAnswers(answers, due, now, texts);
+  renderAnswers(answers, answerTaps, due, now, texts);
   answersSection.hidden = due.length === 0;
   const open = state?.pullRequests ?? [];
-  renderPulls(pulls, open, now, texts);
+  renderPulls(pulls, pullTaps, open, now, texts);
   pullsSection.hidden = open.length === 0;
   const waiting = queue.openCount() + due.length + open.length;
   waitingCount.textContent = waiting > 0 ? `(${waiting})` : '';

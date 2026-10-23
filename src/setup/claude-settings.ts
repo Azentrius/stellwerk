@@ -25,13 +25,19 @@ export function hookUrl(port: number): string {
   return `http://${HOST}:${port}${HOOK_PATH}`;
 }
 
+/**
+ * The desktop app gives each of its sessions its own id in this variable (`local_…`); a hook sends it along,
+ * so a tap on the display can open the session in the app. Outside the app it is not set and stays empty.
+ */
+export const APP_SESSION_ENV = 'CLAUDE_CODE_HOST_SESSION_ID';
+
 function handler(port: number, timeout: number) {
   return {
     type: 'http',
     url: hookUrl(port),
     timeout,
-    headers: { Authorization: `Bearer $${TOKEN_ENV}` },
-    allowedEnvVars: [TOKEN_ENV],
+    headers: { Authorization: `Bearer $${TOKEN_ENV}`, 'X-Stellwerk-App-Session': `$${APP_SESSION_ENV}` },
+    allowedEnvVars: [TOKEN_ENV, APP_SESSION_ENV],
   };
 }
 

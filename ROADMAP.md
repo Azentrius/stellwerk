@@ -8,8 +8,10 @@ until they are decided.
 - **Local only:** the hub listens on `127.0.0.1`, fixed in the code. No access from other devices, no
   tablet, no tunnel, in no stage.
 - **No automatic decisions:** a request is allowed or denied by a person, on the display or in the app.
-- **The hub runs nothing:** it answers requests and shows status. Stage 4 changes that and gets its own
-  security review first.
+- **The hub runs nothing:** it answers requests and shows status. Its one exception (since 0.7.0): a tap
+  on the display can have it open a session in its app or a pull request in the browser, through the
+  Windows shell and only as three fixed forms of links it builds itself. Stage 4 changes more and gets its
+  own security review first.
 - **No outgoing connections** unless a stage needs one for its data source, and then only to that source.
 - **Display:** only the hub's own files, strict Content Security Policy, nothing inline, hook data as text
   only. Every text in English and German. Usable with fingers at 1920×720.
@@ -148,10 +150,11 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ---
 
-## 0.7.0 – The last decisions where the requests are ✅
+## 0.7.0 – Open it where it is; the last decisions where the requests are ✅
 
-Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): the last decisions moved from the status column to the
-foot of the waiting column, show only the last 24 hours, and open over the requests without moving them.
+Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): a tap opens a session in the Claude desktop app or in the
+Codex app and a pull request in the browser; the last decisions moved from the status column to the foot
+of the waiting column, show only the last 24 hours, and open over the requests without moving them.
 
 ---
 

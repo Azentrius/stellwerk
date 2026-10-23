@@ -21,6 +21,8 @@ import type {
   Decision,
   DecisionResultMessage,
   HubView,
+  OpenMessage,
+  OpenResultMessage,
   PermissionOutcome,
   Provider,
   RejectionReason,
@@ -37,6 +39,7 @@ import { GitHubWatcher, newerRelease } from './github.ts';
 import { HardwareWatcher } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
+import { isOpenableLink, openWithShell, pullLink, sessionLink } from './links.ts';
 import { PlanBook, claudePlanOfHook } from './plans.ts';
 import { SessionFile } from './sessions.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
@@ -118,6 +121,11 @@ export interface HubOptions {
   rawLogFile?: string | null;
   /** Debug: status hooks are never answered, as if the hub hung. */
   simulateHang?: boolean;
+  /**
+   * Opens a link the hub built (links.ts) with the program registered for it; by default the Windows shell.
+   * Tests and the demo record instead.
+   */
+  open?: (link: string) => void;
   /** Open pull requests from GitHub; the only outgoing connection, and only with a token. */
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
@@ -187,6 +195,19 @@ const decideMessage = z.object({
   id: z.string().max(100),
   decision: z.enum(['allow', 'deny', 'app']),
 });
+const openMessage = z.object({
+  type: z.literal('open'),
+  target: z.union([
+    z.object({ session: z.string().max(200) }).strict(),
+    z.object({ repo: z.string().max(100), number: z.number().int().positive() }).strict(),
+  ]),
+});
+const clientMessage = z.discriminatedUnion('type', [decideMessage, openMessage]);
+
+/** The header with the Claude desktop app's own id of a session (CLAUDE_CODE_HOST_SESSION_ID). */
+export const APP_SESSION_HEADER = 'x-stellwerk-app-session';
+/** At most one link opened in this time: a tap opens one thing. */
+const OPEN_EVERY_MS = 1_000;
 
 interface Held {
   res: http.ServerResponse;
@@ -206,6 +227,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   decisions.load(options.auditFile);
   const held = new Map<string, Held>();
   const startedAt = now();
+  /** When the display last had a link opened; null: never. */
+  let lastOpened: number | null = null;
   const expectedAuthorization = Buffer.from(`Bearer ${options.token}`);
   // Derived from the hook token (which they do not reveal), so an open display reconnects after a restart.
   const sessionToken = createHmac('sha256', options.token).update('stellwerk display session').digest('hex');
@@ -421,11 +444,20 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         if (project !== null && board.setProject(sessionId, project)) scheduleBroadcast();
       });
     }
-    if (!isOther(event) && event.hook_event_name === 'PermissionRequest') return holdPermission(event, res, provider);
+    // The Claude desktop app's own id of the session, which its hooks send along, so a tap can open it there.
+    const appSession = provider === 'claude' ? req.headers[APP_SESSION_HEADER] : undefined;
+    const noteApp = () => {
+      if (typeof appSession === 'string' && board.setAppSession(event.session_id, appSession)) scheduleBroadcast();
+    };
+    if (!isOther(event) && event.hook_event_name === 'PermissionRequest') {
+      holdPermission(event, res, provider);
+      return noteApp();
+    }
     noteUnshown(event);
 
     // An Elicitation gets the same empty answer as a status event: the app shows its own dialog.
     for (const { permission, outcome } of board.apply(event, now(), provider)) closeOut(permission, outcome);
+    noteApp();
     scheduleBroadcast();
     if (options.simulateHang) return; // Claude Code gives up after the hook's timeout
     send(res, 200);
@@ -601,13 +633,39 @@ export async function startHub(options: HubOptions): Promise<Hub> {
 
   function onMessage(ws: WebSocket, data: RawData, isBinary: boolean): void {
     if (isBinary) return;
-    let message: z.infer<typeof decideMessage>;
+    let message: z.infer<typeof clientMessage>;
     try {
-      message = decideMessage.parse(JSON.parse(String(data)));
+      message = clientMessage.parse(JSON.parse(String(data)));
     } catch {
       return;
     }
-    ws.send(JSON.stringify(decide(message.id, message.decision)));
+    ws.send(JSON.stringify(message.type === 'decide' ? decide(message.id, message.decision) : open(message.target)));
+  }
+
+  /**
+   * Opens a session in its app or a pull request in the default browser. The display names it; the link is
+   * built here from what the hub shows (a session it knows, a pull request of the owner it watches) and must
+   * be one of the three forms of links.ts.
+   */
+  function open(target: OpenMessage['target']): OpenResultMessage {
+    let link: string | null = null;
+    if ('session' in target) {
+      const session = board.session(target.session);
+      link = session ? sessionLink(session) : null;
+    } else if (options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
+      link = pullLink(options.github.owner, target.repo, target.number);
+    }
+    if (link === null || !isOpenableLink(link)) return { type: 'open-result', ok: false, reason: 'unknown' };
+    if (lastOpened !== null && now() - lastOpened < OPEN_EVERY_MS) return { type: 'open-result', ok: false, reason: 'busy' };
+    lastOpened = now();
+    try {
+      (options.open ?? ((l: string) => openWithShell(l, log)))(link);
+    } catch (err) {
+      log(`Could not open ${link}: ${(err as Error).message}`);
+      return { type: 'open-result', ok: false, reason: 'failed' };
+    }
+    log(`Opened ${link} for the display.`);
+    return { type: 'open-result', ok: true };
   }
 
   /** The first decision counts; any later one, from this display or another, gets "already decided". */

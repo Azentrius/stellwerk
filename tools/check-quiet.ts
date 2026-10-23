@@ -48,6 +48,8 @@ const kumaFetch = (async () => {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-quiet-'));
 const token = randomBytes(32).toString('hex');
 const hub = await startHub({
+  // The checks open nothing on this machine.
+  open: () => {},
   port: 0,
   token,
   holdMs: 60_000,
@@ -159,6 +161,8 @@ try {
   const minute = local.getHours() * 60 + local.getMinutes();
   const nightToken = randomBytes(32).toString('hex');
   nightHub = await startHub({
+    // The checks open nothing on this machine.
+    open: () => {},
     port: 0,
     token: nightToken,
     holdMs: 60_000,

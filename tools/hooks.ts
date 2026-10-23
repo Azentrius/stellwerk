@@ -7,8 +7,11 @@ import http from 'node:http';
 import { HOOK_PATH } from '../src/config.ts';
 import { pause } from './edge.ts';
 
-/** A hook event of `session`; resolves with the hub's answer (for a request: once it is decided). */
-export function hook(port: number, token: string, session: string, body: Record<string, unknown>): Promise<string> {
+/**
+ * A hook event of `session`, with more headers if given (the desktop app's id of the session); resolves with
+ * the hub's answer (for a request: once it is decided).
+ */
+export function hook(port: number, token: string, session: string, body: Record<string, unknown>, headers: Record<string, string> = {}): Promise<string> {
   const payload = JSON.stringify({ session_id: session, cwd: `C:\\Projects\\${session.replace(/-\d+$/, '')}`, ...body });
   return new Promise((resolve, reject) => {
     const req = http.request({
@@ -17,7 +20,7 @@ export function hook(port: number, token: string, session: string, body: Record<
       method: 'POST',
       path: HOOK_PATH,
       agent: false,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers },
     });
     req.on('response', (res) => {
       let text = '';

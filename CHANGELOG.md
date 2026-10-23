@@ -2,7 +2,20 @@
 
 ## 0.7.0 – 2026-10-23
 
-The last decisions stand where the requests are, and only those of the last day.
+A tap opens a session in its app and a pull request in the browser; the last decisions stand where the
+requests are, and only those of the last day.
+
+- **Open it where it is:** in a session's details a button opens it in its app, a session of the Claude
+  desktop app there and a chat of the Codex app in Codex; a tap on a session waiting for an answer opens
+  it where the answer is given, a tap on a pull request opens it in the default browser. The display only
+  names what to open; the hub builds the link from what it shows and hands it to the Windows shell
+  (`explorer.exe`, the link as its only argument), only as one of three forms
+  (`claude://claude.ai/epitaxy/local_…`, `codex://threads/<id>`,
+  `https://github.com/<owner>/<repo>/pull/<n>`) and at most one a second. That is the one program the hub
+  starts. The desktop app's own id of a session comes with its hooks in a new header
+  (`X-Stellwerk-App-Session` from `CLAUDE_CODE_HOST_SESSION_ID`): run `stellwerk hooks install` once.
+  The hub keeps that id over a restart and never sends it to the display. Claude Code in a terminal and
+  Codex' command line have no app to open.
 
 - **At the foot of the waiting column:** the line with the last decisions moved from the status column to
   the foot of "Waiting for you", above GitHub's line. Open, the decisions lie over the requests, from the
@@ -13,7 +26,11 @@ The last decisions stand where the requests are, and only those of the last day.
   just happened.
 - **Tests:** which decisions are shown, the line closing at once, where the line stands on the page; in a
   real Edge the line at the foot of the column, the decisions over the requests without moving them, a
-  new request folding them, and two decisions older than a day left out.
+  new request folding them, and two decisions older than a day left out. For opening: the three forms and
+  what they refuse, the app's id from the header (forged ones left out, kept over a restart), the
+  display's message over the WebSocket (unknown sessions, pull requests the hub does not list, links the
+  display writes, one a second, a failing shell), and in a real Edge the button in the details, a session
+  waiting for an answer and a pull request, each pressed over a render.
 
 ## 0.6.4 – 2026-10-23
 

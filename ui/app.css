@@ -225,9 +225,11 @@ button { font: inherit; }
 .agents-empty { margin: 0; color: var(--text-subtle); }
 /* A tap anywhere on a session opens its details. Its parts take no pointer events, so a tap meets the
    session's own element, which stays while its content is drawn anew. */
-.agent--tappable { cursor: pointer; touch-action: manipulation; }
-.agent--tappable > * { pointer-events: none; }
-.agent--tappable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.agent--tappable, .entry--tappable { cursor: pointer; touch-action: manipulation; }
+.agent--tappable > *, .entry--tappable > * { pointer-events: none; }
+.agent--tappable:focus-visible, .entry--tappable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* The button in a session's details that opens it in its app: it takes its own taps. */
+.agent--tappable > .agent__open { grid-column: 2; justify-self: start; margin-block-start: var(--sp-sm); pointer-events: auto; }
 .agent__details { grid-column: 2; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-xs) var(--sp-md); margin: var(--sp-xs) 0 0; color: var(--text-subtle); }
 .agent__details dt { color: var(--text-subtle); }
 .agent__details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }

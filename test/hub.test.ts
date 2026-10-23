@@ -1395,3 +1395,160 @@ describe('permission requests', () => {
     assert.equal((await pending.reply).body, '');
   });
 });
+
+describe('opening from the display', () => {
+  const APP = 'local_a50b48e9-658d-487b-b484-a0fec652f2bf';
+  const THREAD = '01a16862-8f6e-75f1-bd2e-ebb5eba616ff';
+  /** The display's "open", given a moment to arrive. */
+  async function open(screen: Display, target: Record<string, unknown>) {
+    screen.ws.send(JSON.stringify({ type: 'open', target }));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  /** The hub's next answer that is no state. */
+  const answer = (screen: Display) =>
+    new Promise<ServerMessage>((resolve) => {
+      const listen = (data: unknown) => {
+        const message = JSON.parse(String(data)) as ServerMessage;
+        if (message.type === 'state') return;
+        screen.ws.off('message', listen);
+        resolve(message);
+      };
+      screen.ws.on('message', listen);
+    });
+  const inApp = (port: number, session: string, appSession: string) =>
+    call(port, { headers: { ...AUTH, 'X-Stellwerk-App-Session': appSession }, body: { session_id: session, cwd: 'C:\\x', hook_event_name: 'UserPromptSubmit', prompt: 'x' } }).reply;
+  const codexPrompt = (port: number, session: string, headers: Record<string, string> = {}) =>
+    call(port, {
+      path: CODEX_HOOK_PATH,
+      headers: { ...AUTH, ...headers },
+      body: { session_id: session, cwd: 'C:\\x', model: 'gpt', permission_mode: 'default', hook_event_name: 'UserPromptSubmit', transcript_path: 'C:\\none.jsonl', prompt: 'x' },
+    }).reply;
+
+  test("a Claude session of the desktop app opens there, by the app's id its hooks sent; one without it does not", async () => {
+    const opened: string[] = [];
+    let at = 1_000_000;
+    const { port } = await startTestHub({ open: (link) => opened.push(link), now: () => at });
+    const screen = await display(port);
+    // The app's hooks send the id; Claude Code in a terminal sends the header empty.
+    await inApp(port, 'in-app', APP);
+    await inApp(port, 'terminal', '');
+    const state = await screen.state((s) => s.sessions.length === 2);
+    assert.deepEqual(Object.fromEntries(state.sessions.map((s) => [s.id, s.openable])), { 'in-app': true, terminal: false });
+    assert.doesNotMatch(JSON.stringify(state), /local_/, "the app's id stays in the hub");
+    let reply = answer(screen);
+    await open(screen, { session: 'in-app' });
+    assert.deepEqual(await reply, { type: 'open-result', ok: true });
+    assert.deepEqual(opened, [`claude://claude.ai/epitaxy/${APP}`]);
+    at += 2000;
+    reply = answer(screen);
+    await open(screen, { session: 'terminal' });
+    assert.deepEqual(await reply, { type: 'open-result', ok: false, reason: 'unknown' });
+    reply = answer(screen);
+    await open(screen, { session: 'nobody' });
+    assert.deepEqual(await reply, { type: 'open-result', ok: false, reason: 'unknown' });
+    assert.equal(opened.length, 1);
+    screen.close();
+  });
+
+  test('a forged app id is not taken; a good one also comes with a request; Codex events carry none', async () => {
+    const opened: string[] = [];
+    const { port, hub } = await startTestHub({ open: (link) => opened.push(link) });
+    const screen = await display(port);
+    const forged = call(port, {
+      headers: { ...AUTH, 'X-Stellwerk-App-Session': 'local_x" & calc.exe' },
+      body: { session_id: 'forged', cwd: 'C:\\x', hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'ls' } },
+    });
+    await eventually(() => hub.board.pendingCount() === 1);
+    assert.equal(hub.board.session('forged')?.appSession, null);
+    const asking = call(port, {
+      headers: { ...AUTH, 'X-Stellwerk-App-Session': APP },
+      body: { session_id: 'asking', cwd: 'C:\\x', hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'pwd' } },
+    });
+    await eventually(() => hub.board.session('asking')?.appSession === APP);
+    await codexPrompt(port, THREAD, { 'X-Stellwerk-App-Session': APP });
+    assert.equal(hub.board.session(THREAD)?.appSession, null);
+    await open(screen, { session: 'forged' });
+    assert.deepEqual(opened, []);
+    screen.close();
+    await hub.close();
+    await Promise.all([forged.reply.catch(() => null), asking.reply.catch(() => null)]);
+  });
+
+  test('a Codex chat opens in the Codex app; a session of its command line does not', async () => {
+    const opened: string[] = [];
+    let at = 1_000_000;
+    const { port, hub } = await startTestHub({ open: (link) => opened.push(link), now: () => at });
+    const screen = await display(port);
+    await codexPrompt(port, THREAD);
+    assert.equal((await screen.state((s) => s.sessions.length === 1)).sessions[0]!.openable, true);
+    await open(screen, { session: THREAD });
+    assert.deepEqual(opened, [`codex://threads/${THREAD}`]);
+    hub.board.setTerminal(THREAD);
+    at += 2000;
+    await open(screen, { session: THREAD });
+    assert.equal(opened.length, 1, 'not from the terminal');
+    screen.close();
+  });
+
+  test('a pull request opens on github.com, only one the hub shows of the owner it watches; one tap opens one', async () => {
+    const opened: string[] = [];
+    let at = Date.parse('2026-10-23T12:00:00Z');
+    const fakeFetch = (async (input: string | URL | Request) => {
+      const { pathname } = new URL(String(input));
+      const body: Record<string, unknown> = {
+        '/orgs/acme/repos': [{ name: 'api' }],
+        '/repos/acme/api/pulls': [{ number: 7, title: 'Bump zod', updated_at: '2026-10-15T10:00:00Z', user: { login: 'a' }, head: { sha: 'a'.repeat(40) } }],
+        '/repos/acme/api/actions/runs': { workflow_runs: [] },
+      };
+      return new Response(JSON.stringify(body[pathname] ?? {}), { status: 200 });
+    }) as typeof fetch;
+    const { port } = await startTestHub({
+      open: (link) => opened.push(link),
+      now: () => at,
+      github: { owner: 'acme', token: `github_pat_${'t'.repeat(30)}`, intervalMs: 60_000, fetch: fakeFetch },
+    });
+    const screen = await display(port);
+    await screen.state((s) => s.pullRequests.length === 1);
+    await open(screen, { repo: 'api', number: 7 });
+    const busy = answer(screen);
+    await open(screen, { repo: 'api', number: 7 });
+    assert.deepEqual(await busy, { type: 'open-result', ok: false, reason: 'busy' }, 'right after another');
+    at += 2000;
+    await open(screen, { repo: 'api', number: 8 });
+    await open(screen, { repo: '../evil', number: 7 });
+    await open(screen, { repo: 'api', number: 7, url: 'https://evil.example' });
+    await open(screen, { link: 'calc.exe' });
+    assert.deepEqual(opened, ['https://github.com/acme/api/pull/7'], 'nothing it does not show, nothing the display names as a link');
+    screen.close();
+  });
+
+  test('when the shell fails, the display hears so', async () => {
+    const { port } = await startTestHub({
+      open: () => {
+        throw new Error('no shell');
+      },
+    });
+    const screen = await display(port);
+    await inApp(port, 'in-app', APP);
+    await screen.state((s) => s.sessions.length === 1);
+    const reply = answer(screen);
+    await open(screen, { session: 'in-app' });
+    assert.deepEqual(await reply, { type: 'open-result', ok: false, reason: 'failed' });
+    screen.close();
+  });
+
+  test("the desktop app's id of a session comes back after a restart, so it opens again", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-app-id-'));
+    const sessionsFile = path.join(dir, 'sessions.json');
+    const first = await startTestHub({ sessionsFile });
+    await inApp(first.port, 'in-app', 'local_abc-1');
+    await first.hub.close();
+    const opened: string[] = [];
+    const second = await startTestHub({ sessionsFile, open: (link) => opened.push(link) });
+    const screen = await display(second.port);
+    assert.equal((await screen.state((s) => s.sessions.length === 1)).sessions[0]!.openable, true);
+    await open(screen, { session: 'in-app' });
+    assert.deepEqual(opened, ['claude://claude.ai/epitaxy/local_abc-1']);
+    screen.close();
+  });
+});
