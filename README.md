@@ -75,10 +75,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.6.3.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.6.3.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.6.3.zip -DestinationPath .
-cd stellwerk-0.6.3
+(Get-FileHash stellwerk-0.6.4.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.6.4.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.6.4.zip -DestinationPath .
+cd stellwerk-0.6.4
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -117,7 +117,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.6.3.zip
+stellwerk update stellwerk-0.6.4.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -129,9 +129,11 @@ loads the new page by itself. Stellwerk downloads nothing itself. Settings, toke
 they are.
 
 The display stays on the screen its task uses now; give `--screen <number>` (as `autostart install`
-lists them) to move it, or when that screen is gone: then the update stops before it changes anything.
-A display moved to another screen is closed and started again there once the hub runs: only the Edge
-with the display's own profile, other Edge windows stay open. It stops as well when Task Scheduler
+lists them) to move it, or when that screen is gone or its task names no full placement (position and
+size): then the update stops before it changes anything. A display moved to another screen, or one whose
+place could not be told, is closed and started again on the screen given once the hub runs: only the
+Edge with the display's own profile, found by its folder whatever letters its path holds; other Edge
+windows stay open. It stops as well when Task Scheduler
 cannot read the display task; only a task it reports as missing makes the update a first setup. And it
 stops when Codex' `hooks.json` is there but cannot be read or is no JSON object, as it might still run
 a previous release's forwarder; if the file cannot be read only at the end, the previous releases stay.
@@ -140,7 +142,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.3"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.4"
 npm link
 ```
 

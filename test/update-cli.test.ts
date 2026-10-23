@@ -68,6 +68,8 @@ interface Outcome {
 interface Before {
   codexHooks?: Record<string, unknown> | string;
   releases?: string[];
+  /** The folder that stands for %LOCALAPPDATA% (default "local"). */
+  localAppData?: string;
 }
 
 /** Runs `stellwerk update <release> --yes …` against the made-up Windows. */
@@ -114,7 +116,7 @@ async function update(windows: Pick<FakeWindows, 'screens' | 'faults' | 'hub' | 
       calls: path.join(dir, 'calls.jsonl'),
     };
     fs.writeFileSync(fake.calls, '');
-    const local = path.join(dir, 'local');
+    const local = path.join(dir, windows.localAppData ?? 'local');
     const releases = path.join(local, 'stellwerk', 'releases');
     for (const folder of windows.releases ?? []) {
       fs.mkdirSync(path.join(releases, folder, 'dist', 'codex'), { recursive: true });
@@ -251,6 +253,32 @@ describe('stellwerk update', { concurrency: true }, () => {
     const plain = displayTaskOn(DESK).replace(/ --window-position=[\d,-]+ --window-size=[\d,]+/, '');
     assert.doesNotMatch(plain, /--window-/);
     stoppedBefore(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: plain } }), /names no screen\. Choose one with --screen/);
+  });
+
+  // A display task without its position, its size or both: where its display is cannot be told.
+  const unplaced = [
+    ['position', / --window-position=[\d,-]+/],
+    ['size', / --window-size=[\d,]+/],
+    ['position and size', / --window-position=[\d,-]+ --window-size=[\d,]+/],
+  ] as const;
+
+  test('a display task without position, size or both stops the update without --screen', async () => {
+    for (const [missing, flags] of unplaced) {
+      const task = displayTaskOn(DESK).replace(flags, '');
+      assert.notEqual(task, displayTaskOn(DESK), `the ${missing} is gone`);
+      stoppedBefore(await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: task } }), /names no screen\. Choose one with --screen/);
+    }
+  });
+
+  test('with --screen such a display starts again on that screen, also when it might be there already', async () => {
+    for (const [missing, flags] of unplaced) {
+      for (const on of [SIDE, DESK]) {
+        const task = displayTaskOn(on).replace(flags, '');
+        const outcome = await update({ screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: task } }, '--screen', '3');
+        // After the hub: the display's task ended, its Edge waited for, the task run once.
+        assert.doesNotThrow(() => setUpOn(outcome, 3, true), `without its ${missing}, from ${on.width}×${on.height}`);
+      }
+    }
   });
 
   // Task Scheduler's error codes (HRESULTs): not there, access denied, its service not reachable.
@@ -474,5 +502,18 @@ describe('stellwerk update', { concurrency: true }, () => {
     // Its task does not run.
     const stuck = await update({ ...moving, display: { starts: false } }, '--screen', '3');
     failed(stuck, /Its task did not run: FEHLER: Die Aufgabe konnte nicht gestartet werden\. Start it: schtasks \/Run \/TN "Stellwerk display"/);
+  });
+
+  test("the display's profile reaches the Edge count as it is, with umlauts and spaces in its path", async () => {
+    const outcome = await update(
+      { screens: [MAIN, SIDE, DESK], tasks: { [DISPLAY_TASK]: displayTaskOn(SIDE) }, localAppData: 'Jörg Müller' },
+      '--screen',
+      '3',
+    );
+    setUpOn(outcome, 3, true);
+    const counted = outcome.calls.filter((c) => c.asked === 'edge').map((c) => c.task);
+    assert.ok(counted.length > 0);
+    // The made-up Windows takes values on standard input only as Base64 of UTF-8 and decodes them as such.
+    for (const profile of counted) assert.match(profile ?? '', /[\\/]Jörg Müller[\\/]stellwerk[\\/]edge-display$/);
   });
 });

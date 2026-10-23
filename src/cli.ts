@@ -730,10 +730,14 @@ async function update(zipFile: string | undefined, yes: boolean, screenOption: s
   } catch (err) {
     throw new Error(`${(err as Error).message}\nNothing was changed. Repair or remove that file, then run the update again.`);
   }
-  // A display moved to another screen has to start again there; on the same screen it reloads by itself.
+  // A display moved to another screen has to start again there; on the same screen it reloads by itself. A
+  // display task without a full placement gets here only with --screen (updateScreen): where its display
+  // is cannot be told, so it starts again on the screen given. Without a task (a first setup) there is none.
   const place = current === null ? null : displayPlacement(current);
   const chosen = screens[screen.number - 1]!;
-  const moveDisplay = place !== null && (place.x !== chosen.x || place.y !== chosen.y || place.width !== chosen.width || place.height !== chosen.height);
+  const moveDisplay =
+    current !== null &&
+    (place === null || place.x !== chosen.x || place.y !== chosen.y || place.width !== chosen.width || place.height !== chosen.height);
   const previous = keepPrevious ? [] : previousReleases(fs.existsSync(paths.releasesDir) ? fs.readdirSync(paths.releasesDir) : [], version);
   console.log(`${name} matches SHA256SUMS. It goes to ${target}, with "npm ci --omit=dev" there. Then:`);
   console.log('  - the logon tasks start it;');

@@ -140,6 +140,14 @@ update before it changes anything, and keeps the previous releases when it fails
 
 ---
 
+## 0.6.4 – The display found in any profile path, and placed where it is told ✅
+
+Done in 0.6.4 (see [CHANGELOG](CHANGELOG.md)): the display's Edge is found by its profile folder also
+when that folder's path has umlauts; values reach PowerShell unchanged whatever the console's code page;
+`update --screen` starts a display again whose task names no full placement.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

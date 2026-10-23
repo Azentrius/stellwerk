@@ -61,6 +61,19 @@ export interface Call {
   task?: string;
 }
 
+/**
+ * The values on PowerShell's standard input, as src/setup/windows.ts sends them: each as Base64 of its UTF-8
+ * on a line of its own. Anything else there is refused: a console code page could change it.
+ */
+function values(input: unknown): string[] {
+  const text = String(input ?? '');
+  if (/[^\x20-\x7e\n]/.test(text)) refuse(`text on standard input that is not Base64: ${JSON.stringify(text)}`);
+  return text
+    .split('\n')
+    .filter((line) => line.startsWith(':'))
+    .map((line) => Buffer.from(line.slice(1), 'base64').toString('utf8'));
+}
+
 /** HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), as in src/setup/windows.ts. */
 const NOT_FOUND = -2147024894;
 const failed = (stderr: string) => Object.assign(new Error(`Command failed: ${stderr}`), { status: 1, stderr });
@@ -116,12 +129,12 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
       return JSON.stringify(fake.screens);
     }
     if (script.includes('msedge.exe')) {
-      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'edge', task: String(options.input ?? '').trim() });
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'edge', task: values(options.input)[0] });
       if (display.count !== undefined) throw failed(display.count);
       return String(display.running ? 3 : 0);
     }
     if (script.includes('Schedule.Service')) {
-      const name = String(options.input ?? '').trim();
+      const name = values(options.input)[0] ?? '';
       note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'task', task: name });
       const fault = fake.faults?.[name];
       if (fault?.powershell !== undefined) throw failed(fault.powershell);
