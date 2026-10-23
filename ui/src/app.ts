@@ -11,13 +11,14 @@ import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
 import { newReminders, waitingForAnswer } from './due.ts';
 import { alert, byId, el, icon, label } from './dom.ts';
+import { TimedFold } from './fold.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { Rest, inNight, restAfter, watched } from './quiet.ts';
-import { RestingLine, splitResting } from './resting.ts';
+import { splitResting } from './resting.ts';
 import { shouldReload } from './reload.ts';
 import {
   githubLine,
@@ -60,7 +61,7 @@ const agents = byId<HTMLUListElement>('agents');
 const agentsEmpty = byId('agents-empty');
 const agentsCount = byId('agents-count');
 /** The line at the foot of the agents column behind which the sessions at rest wait (resting.ts). */
-const restingLine = new RestingLine();
+const restingLine = new TimedFold();
 /** The open requests that have reminded already, each once. */
 const reminded = new Set<string>();
 const restingItem = el('li', 'resting');
@@ -71,9 +72,12 @@ const toggleDetails = (id: string) => {
   if (!agentItems.open.delete(id)) agentItems.open.add(id);
   tick();
 };
-/** The last decisions at the foot of the waiting column, folded until a click opens them. */
+/**
+ * The last decisions at the foot of the waiting column, folded until a tap opens them; open, they close by
+ * themselves a while after the last touch, and at once when a new request comes, so it is not hidden.
+ */
 const decisionsParts = { section: byId('decisions'), button: byId<HTMLButtonElement>('decisions-toggle'), list: byId<HTMLUListElement>('decisions-list') };
-let decisionsOpen = false;
+const decisionsLine = new TimedFold();
 restingButton.type = 'button';
 restingItem.append(restingButton);
 const answers = byId<HTMLUListElement>('answers');
@@ -192,6 +196,7 @@ function decide(id: string, decision: Decision): void {
 /** Draws everything from the last state; returns the ids of new open requests. */
 function render(): string[] {
   const added = queue.update(state?.permissions ?? [], connected);
+  if (added.length > 0) decisionsLine.close();
   tick();
   return added;
 }
@@ -221,7 +226,7 @@ function tick(): void {
   waitingEmpty.hidden = !nothing;
   waitingList.hidden = nothing;
   fadeWhileMore(waitingList, 'waiting--more');
-  renderDecisions(decisionsParts, state?.decisions ?? [], decisionsOpen, now, texts);
+  renderDecisions(decisionsParts, state?.decisions ?? [], decisionsLine.isOpen(now), now, texts);
   clockNode.textContent = clock(now);
   show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
@@ -342,9 +347,12 @@ window.addEventListener('resize', () => tick());
 waitingList.addEventListener('scroll', () => fadeWhileMore(waitingList, 'waiting--more'), { passive: true });
 monitorsFailing.addEventListener('scroll', () => markScrolling(monitorsFailing, 'monitors__failing--more'), { passive: true });
 decisionsParts.button.addEventListener('click', () => {
-  decisionsOpen = !decisionsOpen;
+  decisionsLine.toggle(Date.now() + clockOffset);
   tick();
 });
+// Touching the open decisions keeps them open.
+decisionsParts.list.addEventListener('pointerdown', () => decisionsLine.touched(Date.now() + clockOffset), { passive: true });
+decisionsParts.list.addEventListener('scroll', () => decisionsLine.touched(Date.now() + clockOffset), { passive: true });
 restingButton.addEventListener('click', () => {
   restingLine.toggle(Date.now() + clockOffset);
   tick();

@@ -148,6 +148,13 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ---
 
+## 0.7.0 – The last decisions where the requests are ✅
+
+Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): the last decisions moved from the status column to the
+foot of the waiting column, show only the last 24 hours, and open over the requests without moving them.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

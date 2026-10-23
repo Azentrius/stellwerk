@@ -29,6 +29,13 @@ test("GitHub's line stands below the pull requests, Uptime Kuma's below the moni
   assert.equal(columnOf('raw-log-state'), 'col--status');
 });
 
+test('the last decisions stand at the foot of the waiting column, below the requests and above GitHub\'s line', () => {
+  assert.equal(columnOf('decisions'), 'col--waiting');
+  const order = ['waiting-list', 'waiting-empty', 'decisions', 'decisions-list', 'decisions-toggle', 'github-state'].map((id) => page.indexOf(`id="${id}"`));
+  assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!)), 'in this order');
+  assert.ok(!page.slice(page.indexOf('id="status-details"'), page.indexOf('class="az-signature"')).includes('decisions'), 'no longer in the status column');
+});
+
 test("in the status column the hub's hints and the gauges share one area below the clock and the hub's state", () => {
   const order = ['clock', 'hub-state', 'last-event', 'status-details', 'rejected-state', 'raw-log-state', 'gauge-sections'].map((id) => page.indexOf(`id="${id}"`));
   assert.ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!)), 'in this order');

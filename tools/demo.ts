@@ -160,7 +160,7 @@ fs.writeFileSync(
     lastRun('cleanup', 'Remove old flags', 'shop-api', 240),
   ]),
 );
-// Decisions of the last run in the audit log: the status column folds them into one line.
+// Decisions of the last run in the audit log: the waiting column folds them into one line at its foot.
 const decided = (minutesAgo: number, tool: string, input: Record<string, unknown>, result: string, title: string, project: string) =>
   JSON.stringify({ ts: new Date(Date.now() - minutesAgo * 60_000).toISOString(), request: `earlier-${minutesAgo}`, project, title, provider: 'claude', tool, input, result });
 fs.writeFileSync(

@@ -1,26 +1,30 @@
-// The last decisions on permission requests, in the status column below the hub and its hints: folded into
-// one line by default, which a click opens and the next closes. Each decision: what it was about and when,
-// whose session and which tool, and how it ended.
+// The last decisions on permission requests, at the foot of the waiting column, where the requests are: only
+// those of the last day (recent.ts), folded into one line, which a tap opens and the next closes. Open, they
+// lie over the cards above the line instead of pushing them away. Each decision: what it was about and
+// when, whose session and which tool, and how it ended.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { DecisionView } from '../../src/shared/protocol.js';
 import { entry, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
+import { recentDecisions } from './recent.ts';
 import { decisionState } from './states.ts';
 import { clock } from './time.ts';
 
 /**
- * The line and, while it is open, the decisions below it. The line's button is the same element each time
+ * The line and, while it is open, the decisions above it. The line's button is the same element each time
  * and stays where it is, so a press on it is never lost; its content changes only with what it says.
+ * Without decisions of the last day the line is not there.
  */
 export function renderDecisions(
   parts: { section: HTMLElement; button: HTMLButtonElement; list: HTMLUListElement },
-  decisions: DecisionView[],
+  all: DecisionView[],
   open: boolean,
   now: number,
   texts: Texts,
 ): void {
+  const decisions = recentDecisions(all, now);
   parts.section.hidden = decisions.length === 0;
   const shown = `${open} ${decisions.length}`;
   if (parts.button.dataset.shown !== shown) {

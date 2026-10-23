@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0 – 2026-10-23
+
+The last decisions stand where the requests are, and only those of the last day.
+
+- **At the foot of the waiting column:** the line with the last decisions moved from the status column to
+  the foot of "Waiting for you", above GitHub's line. Open, the decisions lie over the requests, from the
+  line upwards, and scroll there; the requests keep their place. A tap on the line closes them, as do a
+  minute without a touch and a new request, which is never hidden behind them.
+- **Only the last 24 hours:** older decisions are left out, and without any of the last day the line is
+  not there. Before, the last ten stayed however old they were, and a test days ago looked like what had
+  just happened.
+- **Tests:** which decisions are shown, the line closing at once, where the line stands on the page; in a
+  real Edge the line at the foot of the column, the decisions over the requests without moving them, a
+  new request folding them, and two decisions older than a day left out.
+
 ## 0.6.4 – 2026-10-23
 
 `stellwerk update` finds the display's Edge in a profile path with umlauts, and starts a display again

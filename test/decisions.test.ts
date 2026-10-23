@@ -7,8 +7,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import type { DecisionView } from '../src/shared/protocol.js';
 import { DECISIONS_KEPT, Decisions, decisionOfAuditLine, decisionWhat } from '../src/hub/decisions.ts';
 import { pickTexts } from '../ui/src/i18n.ts';
+import { DECISIONS_FOR_MS, recentDecisions } from '../ui/src/recent.ts';
 import { decisionState } from '../ui/src/states.ts';
 
 const languages = ['en', 'de'].map((lang) => pickTexts([lang]).texts);
@@ -96,4 +98,13 @@ test('each way a request ends has its word in both languages; allowed is good, d
   }
   assert.equal(en!.decisionsTitle(10), 'The last 10 decisions');
   assert.equal(de!.decisionsTitle(1), 'Die letzte Entscheidung');
+});
+
+test('the display shows only the decisions of the last day, newest first as the hub gave them', () => {
+  const now = Date.parse('2026-10-23T18:00:00Z');
+  const at = (hoursAgo: number, id: string) => ({ id, at: now - hoursAgo * 3_600_000 }) as DecisionView;
+  const all = [at(0, 'now'), at(23.9, 'yesterday evening'), at(24, 'a day ago'), at(96, 'four days ago')];
+  assert.deepEqual(recentDecisions(all, now).map((d) => d.id), ['now', 'yesterday evening']);
+  assert.equal(DECISIONS_FOR_MS, 24 * 3_600_000);
+  assert.deepEqual(recentDecisions(all, now + 4 * DECISIONS_FOR_MS), [], 'old ones leave, nothing is shown');
 });

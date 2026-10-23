@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { SessionStatus, SessionView } from '../src/shared/protocol.js';
-import { OPEN_FOR_MS, REST_AFTER_MS, RestingLine, splitResting } from '../ui/src/resting.ts';
+import { OPEN_FOR_MS, TimedFold } from '../ui/src/fold.ts';
+import { REST_AFTER_MS, splitResting } from '../ui/src/resting.ts';
 
 const NOW = 10 * REST_AFTER_MS;
 const session = (id: string, status: SessionStatus, idleMs: number) => ({ id, status, lastActivity: NOW - idleMs }) as SessionView;
@@ -26,7 +27,7 @@ test('done and unknown sessions rest after a while without an event; the others 
 });
 
 test('the line opens on a tap and closes on the next, or by itself a while after the last touch', () => {
-  const line = new RestingLine();
+  const line = new TimedFold();
   assert.equal(line.isOpen(0), false);
   line.touched(0);
   assert.equal(line.isOpen(0), false, 'a touch alone does not open it');
@@ -38,4 +39,7 @@ test('the line opens on a tap and closes on the next, or by itself a while after
   assert.equal(line.isOpen(3 * OPEN_FOR_MS + 1), true, 'a touch keeps it open');
   line.toggle(3 * OPEN_FOR_MS + 2);
   assert.equal(line.isOpen(3 * OPEN_FOR_MS + 3), false, 'the next tap closes it');
+  line.toggle(4 * OPEN_FOR_MS);
+  line.close();
+  assert.equal(line.isOpen(4 * OPEN_FOR_MS + 1), false, 'closed at once, before its time');
 });

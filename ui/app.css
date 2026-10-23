@@ -233,9 +233,37 @@ button { font: inherit; }
 .agent__details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
 /* The line behind which the sessions at rest wait: quiet, but as high as a button, so a finger finds it. */
 .resting { border-block-end: 1px solid var(--line); }
-/* The last decisions in the status column, below the hub and its hints: one such line, folded by default;
-   open, its list scrolls with the hints and gauges. */
-.decisions { border-block: 1px solid var(--line); }
+/* The last decisions at the foot of the waiting column, above GitHub's line: one such line, folded by
+   default. Open, the list lies over the area of the cards (the same grid cell), from the line upwards, and
+   scrolls there; the cards keep their place. The section itself makes no box, so line and list sit in the
+   column's grid. */
+.col--waiting {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'title' 'main' 'line' 'foot';
+}
+.col--waiting > .col__title { grid-area: title; }
+.col--waiting > .waiting, .col--waiting > .all-clear { grid-area: main; }
+.decisions { display: contents; }
+.decisions__toggle { grid-area: line; border-block-start: 1px solid var(--line); }
+.decisions__list {
+  grid-area: main;
+  align-self: end;
+  z-index: 1;
+  box-sizing: border-box;
+  max-block-size: 100%;
+  min-block-size: 0;
+  margin: 0;
+  padding: var(--sp-xs) var(--sp-sm);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-control) transparent;
+  background: var(--bg-floating);
+  border: 1px solid var(--line);
+  border-block-end: 0;
+  border-radius: var(--radius-small) var(--radius-small) 0 0;
+}
 .resting__toggle, .decisions__toggle {
   display: flex;
   align-items: center;
@@ -274,7 +302,7 @@ button { font: inherit; }
 .monitors__ok .az-label { white-space: nowrap; }
 .monitors__state { margin-block-start: auto; color: var(--text-subtle); }
 /* GitHub's line at the foot of its column, below the pull requests, as Uptime Kuma's is in its own. */
-.col--waiting .github-state { flex: none; margin-block-start: var(--sp-sm); }
+.col--waiting .github-state { grid-area: foot; margin-block-start: var(--sp-sm); }
 
 /* ---------- status column ---------- */
 .col--status { gap: var(--sp-sm); }
