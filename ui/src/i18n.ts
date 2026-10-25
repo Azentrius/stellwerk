@@ -7,6 +7,7 @@ import type {
   ChecksState,
   GitHubProblem,
   HardwareProblem,
+  OpenedIn,
   PermissionOutcome,
   Provider,
   RejectionReason,
@@ -126,6 +127,8 @@ export interface Texts {
   /** Opening did not work: there is nothing to open for it any more, or the shell failed. */
   openUnknown: string;
   openFailed: string;
+  /** Said at once after a tap that opens something, while the app takes its time. */
+  opening: Record<OpenedIn, string>;
   command: string;
   file: string;
   change: string;
@@ -299,6 +302,7 @@ const en: Texts = {
   openPull: 'Open in the browser',
   openUnknown: 'There is nothing to open for it.',
   openFailed: 'It could not be opened.',
+  opening: { claude: 'Opening in Claude …', codex: 'Opening in Codex …', browser: 'Opening in the browser …' },
   command: 'Command',
   file: 'File',
   change: 'Change',
@@ -471,6 +475,7 @@ const de: Texts = {
   openPull: 'Im Browser öffnen',
   openUnknown: 'Dafür gibt es nichts zu öffnen.',
   openFailed: 'Ließ sich nicht öffnen.',
+  opening: { claude: 'Öffnet in Claude …', codex: 'Öffnet in Codex …', browser: 'Öffnet im Browser …' },
   command: 'Befehl',
   file: 'Datei',
   change: 'Änderung',

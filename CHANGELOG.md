@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1 – 2026-10-25
+
+The display says at once where a tap opens something.
+
+- **"Opening in Codex …":** after a tap that opens a session or a pull request, the display says for a few
+  seconds where it opens: in Claude, in Codex or in the browser. The hub's answer to the display now names
+  where it opened. An app can take a few seconds to show a session (Codex the longest, as it loads the
+  chat first), and without a word on the display a second tap opened it twice.
+- **Tests:** the hub's answer for a Claude session, a Codex chat and a pull request; in a real Edge the
+  words after a tap on the button in a session's details and on a pull request.
+
 ## 0.7.0 – 2026-10-25
 
 A tap opens a session in its app and a pull request in the browser; the last decisions stand where the

@@ -55,8 +55,9 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   touch and a new request. A restart of the hub keeps them (they come from the audit log).
 - **Open it where it is.** In a session's details a button opens it in its app: a session of the Claude
   desktop app in the app, a chat of the Codex app in Codex. A session waiting for an answer opens there
-  with a tap, a pull request in your default browser. The hub opens only these three kinds of links, which
-  it builds itself (see Security). Claude Code in a terminal and Codex' command line have no app to open.
+  with a tap, a pull request in your default browser. The display says at once where it opens ("Opening
+  in Codex …"), as an app may take a few seconds to show it. The hub opens only these three kinds of links,
+  which it builds itself (see Security). Claude Code in a terminal and Codex' command line have no app to open.
   The desktop app's sessions need the hooks of 0.7.0 or later (`stellwerk hooks install`), which send the
   app's own id of the session along.
 - **At rest when nothing is new.** After 10 minutes with nothing new and no open request the display
@@ -82,10 +83,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.7.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.7.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.7.0.zip -DestinationPath .
-cd stellwerk-0.7.0
+(Get-FileHash stellwerk-0.7.1.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.7.1.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.7.1.zip -DestinationPath .
+cd stellwerk-0.7.1
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -124,7 +125,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.7.0.zip
+stellwerk update stellwerk-0.7.1.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -149,7 +150,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.7.0"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.7.1"
 npm link
 ```
 
