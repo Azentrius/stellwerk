@@ -1556,3 +1556,25 @@ describe('opening from the display', () => {
     screen.close();
   });
 });
+
+describe('LibreHardwareMonitor with the hub', () => {
+  test('the hub runs its task when it starts and ends it when it stops; the display hears it is starting', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-lhm-'));
+    const settingsFile = path.join(dir, 'LibreHardwareMonitor.config');
+    fs.writeFileSync(settingsFile, '<configuration><appSettings></appSettings></configuration>');
+    const calls: string[] = [];
+    const fetch = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof globalThis.fetch;
+    const { hub, port } = await startTestHub({
+      hardware: { settingsFile, intervalMs: 60_000, fetch, task: { run: () => void calls.push('run'), end: () => void calls.push('end') } },
+    });
+    assert.deepEqual(calls, ['run']);
+    const screen = await display(port);
+    const state = await screen.state((s) => s.hardware !== null);
+    assert.deepEqual(state.hardware, { values: null, updatedAt: null, problem: null, starting: true });
+    screen.close();
+    await hub.close();
+    assert.deepEqual(calls, ['run', 'end']);
+  });
+});

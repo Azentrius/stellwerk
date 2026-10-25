@@ -150,6 +150,14 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ---
 
+## 0.8.0 – LibreHardwareMonitor runs with Stellwerk ✅
+
+Done in 0.8.0 (see [CHANGELOG](CHANGELOG.md)): the hub runs LibreHardwareMonitor's task when it starts,
+again when it stops answering, and ends it when it stops; `stellwerk start`, `stop` and `restart` control
+the whole of it.
+
+---
+
 ## 0.7.1 – Says where it opens ✅
 
 Done in 0.7.1 (see [CHANGELOG](CHANGELOG.md)): after a tap that opens a session or a pull request, the

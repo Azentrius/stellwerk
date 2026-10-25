@@ -1,6 +1,6 @@
 {
   "name": "stellwerk",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "A signal box for your AI agents: a local desk display for Claude Code and Codex sessions and their permission requests.",
   "keywords": [
     "ai-agents",

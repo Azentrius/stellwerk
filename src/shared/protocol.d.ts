@@ -176,6 +176,8 @@ export interface HardwareValues {
 export type HardwareProblem = 'not-running' | 'rejected' | 'unexpected';
 
 export interface HardwareView {
+  /** The hub just started LibreHardwareMonitor, which does not answer yet. */
+  starting?: boolean;
   /** Null before the first answer and while there is a problem: old values would mislead. */
   values: HardwareValues | null;
   updatedAt: number | null;

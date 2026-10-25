@@ -37,7 +37,7 @@ import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
 import { Decisions, decisionWhat } from './decisions.ts';
 import { GitHubWatcher, newerRelease } from './github.ts';
-import { HardwareWatcher } from './hardware.ts';
+import { HardwareWatcher, type HardwareTask } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
 import { isOpenableLink, openWithShell, pullLink, sessionLink } from './links.ts';
@@ -130,7 +130,8 @@ export interface HubOptions {
   /** Open pull requests from GitHub; the only outgoing connection, and only with a token. */
   github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
-  hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch } | null;
+  /** With `task`, the hub keeps LibreHardwareMonitor running while it runs (HardwareKeeper). */
+  hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch; task?: HardwareTask } | null;
   /**
    * The monitors of Uptime Kuma: its /metrics at the address set up, with its API key. Since when they
    * fail is remembered in `stateFile` between runs; without it, in memory only.

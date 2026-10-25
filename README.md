@@ -84,10 +84,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.7.1.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.7.1.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.7.1.zip -DestinationPath .
-cd stellwerk-0.7.1
+(Get-FileHash stellwerk-0.8.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.8.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.8.0.zip -DestinationPath .
+cd stellwerk-0.8.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -126,7 +126,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.7.1.zip
+stellwerk update stellwerk-0.8.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -151,7 +151,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.7.1"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.8.0"
 npm link
 ```
 
@@ -178,9 +178,18 @@ adding them. Both start at logon, without administrator rights:
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens; `stellwerk update` points them at the new release itself.
 
-Stop or start a task in the Task Scheduler or with `schtasks /End /TN "Stellwerk hub"` and
-`schtasks /Run /TN "Stellwerk hub"`; the hub ends together with its task. `stellwerk autostart uninstall`
-removes both tasks.
+Start, stop or restart Stellwerk with
+
+```powershell
+stellwerk start
+stellwerk stop
+stellwerk restart
+```
+
+They run or end the tasks in order, without administrator rights: the hub first, then the display;
+stopping the other way round. The hub runs LibreHardwareMonitor while it runs, when it is set up (see
+below), and `stop` ends it too. In the Task Scheduler the tasks can be run and ended by hand as well; the
+hub ends together with its task. `stellwerk autostart uninstall` removes the hub's and the display's task.
 
 ## Open pull requests
 
@@ -244,8 +253,10 @@ It shows what it does and asks first:
    it minimized to the tray (closing its window keeps it running).
 4. Adds the firewall rule `Stellwerk-block-inbound-8085`: version 0.9.6 listens on every network
    interface and cannot be limited to `127.0.0.1`.
-5. Registers the task **Stellwerk hardware**, which starts it at logon with your administrator rights
-   (reading the sensors needs them), and starts it.
+5. Registers the task **Stellwerk hardware**, which starts it with your administrator rights (reading the
+   sensors needs them), and starts it. The task has no start at logon of its own: the hub runs it when it
+   starts, runs it again when LibreHardwareMonitor has not answered for a minute (at most every two
+   minutes), and ends it when it stops. The hub needs no administrator rights for that.
 
 Restart the hub afterwards. Every 5 s it asks `http://127.0.0.1:8085/data.json`, with the password it
 reads from LibreHardwareMonitor's settings, and shows at the foot of the status column:
@@ -265,7 +276,8 @@ page in a browser on this machine. With the password, a page can neither read th
 anything. Do not open `http://127.0.0.1:8085` in a browser and let it remember the password.
 
 A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its version and hash. Run
-`stellwerk hardware install` again after updating. `stellwerk hardware uninstall` stops it and removes
+`stellwerk hardware install` again after updating; so too once after updating to 0.8.0, which takes the
+start at logon out of the task. `stellwerk hardware uninstall` stops it and removes
 the task, the firewall rule and the folder.
 
 ## Uptime Kuma
@@ -467,7 +479,7 @@ Restart the hub after a change.
 | User environment variable `STELLWERK_TOKEN` | The token for Claude Code |
 | Firewall rule `Stellwerk-block-inbound-4780` | Blocks the port for other machines |
 | `C:\Program Files\Stellwerk\LibreHardwareMonitor\` | LibreHardwareMonitor with its settings, if set up |
-| Task `Stellwerk hardware`, firewall rule `Stellwerk-block-inbound-8085` | Its start at logon, and its port closed to other machines |
+| Task `Stellwerk hardware`, firewall rule `Stellwerk-block-inbound-8085` | Its start (run and ended by the hub), and its port closed to other machines |
 | `%USERPROFILE%\.codex\hooks.json` | Codex' hooks with Stellwerk's forwarder, if set up; backups next to it as `hooks.json.stellwerk-….bak` |
 
 ## Safety

@@ -124,7 +124,7 @@ describe('installing LibreHardwareMonitor', () => {
     assert.ok(!fs.existsSync(parent), 'an empty parent goes');
   });
 
-  test('the logon task starts the program with administrator rights, without arguments', () => {
+  test('the task starts the program with administrator rights, without arguments, only when the hub runs it', () => {
     const exe = 'C:\\Program Files\\Stellwerk\\LibreHardwareMonitor\\LibreHardwareMonitor.exe';
     const task = hardwareTask({ exe, dir: path.dirname(exe) });
     assert.equal(task.name, HARDWARE_TASK);
@@ -132,7 +132,7 @@ describe('installing LibreHardwareMonitor', () => {
     assert.match(xml, /<RunLevel>HighestAvailable<\/RunLevel>/);
     assert.match(xml, /<Command>C:\\Program Files\\Stellwerk\\LibreHardwareMonitor\\LibreHardwareMonitor\.exe<\/Command>/);
     assert.doesNotMatch(xml, /<Arguments>/);
-    assert.match(xml, /<LogonTrigger>/);
+    assert.doesNotMatch(xml, /<Triggers>|<LogonTrigger>/, 'not at logon: the hub runs it while it runs');
     assert.match(xml, /<RestartOnFailure>/);
   });
 });

@@ -42,7 +42,8 @@ installed as a user would; its job `test` has to be green before a merge.
 
 The hub can allow tool calls of AI agents, so its rules are not negotiable: it listens on `127.0.0.1`
 only, checks every request, and never allows or denies by itself. It starts no programs (but hands three
-fixed forms of links it builds itself to the Windows shell, on a tap on the display) and connects only to
+fixed forms of links it builds itself to the Windows shell, on a tap on the display, and runs and ends the
+task "Stellwerk hardware" so that LibreHardwareMonitor runs while it runs) and connects only to
 `api.github.com`, Uptime Kuma's `/metrics` and LibreHardwareMonitor, each only once set up; anything new
 there needs a decision and a review first. The display loads only the hub's own files and shows hook
 data as text. Details in [SECURITY.md](SECURITY.md).

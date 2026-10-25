@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.0 – 2026-10-26
+
+LibreHardwareMonitor runs while Stellwerk runs, and Stellwerk starts, stops and restarts with one command.
+
+- **LibreHardwareMonitor with the hub:** the hub runs the task "Stellwerk hardware" when it starts, runs
+  it again when LibreHardwareMonitor has not answered for a minute (at most every two minutes), and ends it
+  when it stops. The task no longer starts at logon by itself; run `stellwerk hardware install` again as
+  administrator once to register it so. It still runs LibreHardwareMonitor with administrator rights, from
+  its folder in Program Files, which only administrators can change; the hub needs none to run or end it.
+- **Starting, not failing:** while LibreHardwareMonitor starts (it takes about 20 s), the status column
+  says "Hardware: monitor starting …" instead of a warning. The hint for a monitor that does not run says
+  that the hub starts it again, or `stellwerk restart`.
+- **`stellwerk start`, `stop` and `restart`:** they run or end the tasks in order, without administrator
+  rights: the hub, which then runs LibreHardwareMonitor, and the display; stopping the other way round,
+  LibreHardwareMonitor's task last.
+- **Tests:** when the hub runs the task again and when not, a task that fails, the task without a start
+  at logon (also registered for real once, then deleted), the hub running and ending it, and the commands
+  against a made-up Windows: their order, a missing task, a hub that does not follow its task.
+
 ## 0.7.1 – 2026-10-26
 
 The display says at once where a tap opens something, and stays readable at night.

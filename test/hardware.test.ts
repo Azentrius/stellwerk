@@ -9,7 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
+  HardwareKeeper,
   HardwareWatcher,
+  RESTART_AFTER_MS,
+  RESTART_EVERY_MS,
+  STARTING_MS,
   LHM_URL,
   appSettingsXml,
   lhmAuthorization,
@@ -278,5 +282,113 @@ describe('asking LibreHardwareMonitor', () => {
     load = '11,0 %';
     await w.poll();
     assert.equal(changes, 2);
+  });
+});
+
+describe('LibreHardwareMonitor runs while the hub runs', () => {
+  /** Its task, written down: each run and end, with the time. */
+  function recordedTask(at: () => number) {
+    const calls: string[] = [];
+    return { calls, task: { run: () => void calls.push(`run ${at()}`), end: () => void calls.push(`end ${at()}`) } };
+  }
+
+  test('started with the hub, starting until it answers, ended with the hub', async () => {
+    let now = 0;
+    let running = false;
+    const { calls, task } = recordedTask(() => now);
+    const fetch = (async () => {
+      if (!running) throw new TypeError('fetch failed');
+      return json(laptop());
+    }) as typeof globalThis.fetch;
+    const log: string[] = [];
+    const w = new HardwareWatcher({ settingsFile: settingsFile(null), intervalMs: 3_600_000, fetch, now: () => now, task, log: (l) => log.push(l) });
+    w.start();
+    await w.poll();
+    assert.deepEqual(calls, ['run 0'], 'its task runs when the hub starts');
+    assert.deepEqual(w.view(), { values: null, updatedAt: null, problem: null, starting: true }, 'starting: no problem to show yet');
+    now = 20_000;
+    running = true;
+    await w.poll();
+    assert.equal(w.view().starting, undefined);
+    assert.ok(w.values);
+    w.stop();
+    assert.deepEqual(calls, ['run 0', 'end 20000'], 'ended when the hub stops');
+    assert.ok(log.some((l) => /started with the hub/.test(l)));
+    assert.ok(!log.some((l) => /does not answer/.test(l)), 'starting is no problem in the log either');
+  });
+
+  test('not answering for a minute, it runs again, at most every two minutes; a refused password does not', async () => {
+    let now = 0;
+    let answer: 'yes' | 'down' | 'refused' = 'yes';
+    const { calls, task } = recordedTask(() => now);
+    const fetch = (async () => {
+      if (answer === 'down') throw new TypeError('fetch failed');
+      if (answer === 'refused') return new Response('', { status: 401 });
+      return json(laptop());
+    }) as typeof globalThis.fetch;
+    const w = new HardwareWatcher({ settingsFile: settingsFile('pw'), intervalMs: 3_600_000, fetch, now: () => now, task });
+    w.start();
+    await w.poll();
+    now = 30_000;
+    await w.poll();
+    assert.deepEqual(calls, ['run 0']);
+    answer = 'down';
+    const at = async (t: number) => {
+      now = t;
+      await w.poll();
+    };
+    await at(60_000);
+    assert.equal(w.problem, 'not-running', 'after it answered, a gap is a problem at once');
+    await at(89_000);
+    assert.deepEqual(calls, ['run 0'], 'not before a minute without an answer');
+    await at(130_000);
+    assert.deepEqual(calls, ['run 0', 'run 130000'], 'a minute after its last answer, two after its last run');
+    assert.equal(w.view().starting, true, 'then it is starting again');
+    await at(200_000);
+    assert.deepEqual(calls, ['run 0', 'run 130000'], 'not again within two minutes');
+    await at(250_000);
+    assert.deepEqual(calls, ['run 0', 'run 130000', 'run 250000']);
+    answer = 'refused';
+    await at(400_000);
+    await at(600_000);
+    assert.equal(w.problem, 'rejected');
+    assert.deepEqual(calls, ['run 0', 'run 130000', 'run 250000'], 'running it again would not help a refused password');
+    w.stop();
+  });
+
+  test('a task that cannot be run or ended is only logged; without a task nothing is run', async () => {
+    const log: string[] = [];
+    const failing = {
+      run: () => {
+        throw new Error('FEHLER: Zugriff verweigert');
+      },
+      end: () => {
+        throw new Error('FEHLER: nicht gefunden');
+      },
+    };
+    const fetch = (async () => {
+      throw new TypeError('fetch failed');
+    }) as typeof globalThis.fetch;
+    const w = new HardwareWatcher({ settingsFile: settingsFile(null), intervalMs: 3_600_000, fetch, task: failing, log: (l) => log.push(l) });
+    w.start();
+    await w.poll();
+    w.stop();
+    assert.ok(log.some((l) => /could not be run: FEHLER: Zugriff verweigert/.test(l)));
+    assert.ok(log.some((l) => /could not be ended: FEHLER: nicht gefunden/.test(l)));
+    const plain = new HardwareWatcher({ settingsFile: settingsFile(null), intervalMs: 3_600_000, fetch });
+    plain.start();
+    await plain.poll();
+    plain.stop();
+    assert.equal(plain.problem, 'not-running', 'without a task, not answering is a problem at once');
+  });
+
+  test('the timing: starting for 45 s, again after a minute, at most every two minutes', () => {
+    assert.deepEqual([STARTING_MS, RESTART_AFTER_MS, RESTART_EVERY_MS], [45_000, 60_000, 120_000]);
+    const keeper = new HardwareKeeper({ run: () => {}, end: () => {} });
+    keeper.begin(0);
+    assert.equal(keeper.starting(44_999), true);
+    assert.equal(keeper.starting(45_000), false);
+    keeper.noted(true, false, 10_000);
+    assert.equal(keeper.starting(11_000), false, 'once it answered, it is no longer starting');
   });
 });
