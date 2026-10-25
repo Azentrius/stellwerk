@@ -38,6 +38,10 @@
           <span class="az-empty__icon" id="all-clear-icon"></span>
           <p class="az-empty__title" data-text="allClear"></p>
         </div>
+        <section class="decisions" id="decisions" hidden>
+          <ul class="entries decisions__list" id="decisions-list" hidden></ul>
+          <button type="button" class="decisions__toggle" id="decisions-toggle" aria-controls="decisions-list" aria-expanded="false"></button>
+        </section>
         <div class="github-state" id="github-state" hidden></div>
       </section>
       <section class="col col--monitors" aria-labelledby="monitors-title">
@@ -60,10 +64,6 @@
           <div class="log-state" id="rejected-state" hidden></div>
           <div class="log-state" id="raw-log-state" hidden></div>
           <div class="log-state" id="new-release-state" hidden></div>
-          <section class="decisions" id="decisions" hidden>
-            <button type="button" class="decisions__toggle" id="decisions-toggle" aria-controls="decisions-list" aria-expanded="false"></button>
-            <ul class="entries decisions__list" id="decisions-list" hidden></ul>
-          </section>
           <div class="gauge-sections" id="gauge-sections">
             <section class="gauge-section" id="hardware" aria-labelledby="hardware-title" hidden>
               <h2 class="section-title" id="hardware-title" data-text="hardwareTitle"></h2>

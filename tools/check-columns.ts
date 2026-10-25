@@ -5,8 +5,9 @@
 // the focus while the column is drawn anew, and Enter, Space and a press held over a render open and close
 // it once each; below two alerts in the status
 // column, the hardware values and the plans' usage scroll the same way, the clock and the alerts staying in
-// place; with only a few nothing scrolls and nothing moves; the last decisions wait folded in the status
-// column, and a click or Enter opens and closes them. Isolated hubs with made-up tokens;
+// place; with only a few nothing scrolls and nothing moves; the decisions of the last day wait folded at the
+// foot of the waiting column, a click or Enter opens and closes them, open they lie over the requests without
+// moving them, and a new request folds them. Isolated hubs with made-up tokens;
 // sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
 // answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
 // (npm run build) and Edge.
@@ -131,9 +132,10 @@ function restingSessions(dir: string): string {
 /** Decisions of an earlier run in the audit log, one a minute, the newest last: step 01 to step NN. */
 function earlierDecisions(file: string, count: number): void {
   const outcomes = ['allowed', 'denied', 'decided-in-app', 'timed-out'];
+  // The first four are two days old, the rest a minute apart up to now.
   const lines = Array.from({ length: count }, (_, i) =>
     JSON.stringify({
-      ts: new Date(Date.now() - (count - i) * 60_000).toISOString(),
+      ts: new Date(Date.now() - (count - i) * 60_000 - (i < 4 ? 2 * 24 * 3_600_000 : 0)).toISOString(),
       request: `earlier-${pad(i + 1)}`,
       project: 'shop-api',
       title: 'Deploy the shop',
@@ -627,9 +629,24 @@ try {
     );
   }
 
-  // ---------- the last decisions: folded in the status column, a click opens and closes them ----------
+  // ---------- the last decisions: folded at the foot of the waiting column, only those of the last day; open, they lie over the cards ----------
   const decisions = () =>
-    browser.call<{ hidden: boolean; expanded: string | null; text: string; names: string[]; labels: string[]; box: Box; inView: boolean; focused: boolean; first: boolean }>(
+    browser.call<{
+      hidden: boolean;
+      expanded: string | null;
+      text: string;
+      names: string[];
+      labels: string[];
+      box: Box;
+      inView: boolean;
+      aboveGitHub: boolean;
+      focused: boolean;
+      first: boolean;
+      overCards: boolean;
+      onTop: boolean;
+      cards: number[];
+      where: string;
+    }>(
       `() => {
       const section = document.querySelector('#decisions');
       const button = document.querySelector('#decisions-toggle');
@@ -637,8 +654,11 @@ try {
       const shown = [...list.querySelectorAll('.decision')].filter((n) => n.getClientRects().length > 0);
       const r = button.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      const details = document.querySelector('#status-details');
-      const column = details.getBoundingClientRect();
+      const column = document.querySelector('.col--waiting').getBoundingClientRect();
+      const area = document.querySelector('#waiting-list').getBoundingClientRect();
+      const github = document.querySelector('#github-state');
+      const l = list.getBoundingClientRect();
+      const middle = shown.length > 0 ? document.elementFromPoint(l.left + l.width / 2, l.top + l.height / 2) : null;
       return {
         hidden: section.hidden,
         expanded: button.getAttribute('aria-expanded'),
@@ -647,8 +667,13 @@ try {
         labels: shown.map((n) => n.querySelector('.az-label')?.textContent ?? ''),
         box: { top: r.top, bottom: r.bottom, left: r.left, right: r.right },
         inView: r.top >= column.top && r.bottom <= column.bottom && hit !== null && button.contains(hit),
+        aboveGitHub: github.hidden || r.bottom <= github.getBoundingClientRect().top + 0.5,
         focused: document.activeElement === button,
-        first: (() => { const b = shown[0]?.getBoundingClientRect(); return b !== undefined && b.top >= column.top && b.bottom <= column.top + details.clientHeight; })(),
+        first: (() => { const b = shown[0]?.getBoundingClientRect(); return b !== undefined && b.top >= l.top - 0.5 && b.bottom <= l.bottom + 0.5; })(),
+        overCards: shown.length > 0 && l.top >= area.top - 0.5 && l.bottom <= r.top + 0.5 && l.left >= column.left && l.right <= column.right,
+        onTop: middle !== null && list.contains(middle),
+        cards: [...document.querySelectorAll('#waiting-list .card, #waiting-list .entry')].map((n) => n.getBoundingClientRect().top),
+        where: 'list ' + Math.round(l.top) + '-' + Math.round(l.bottom) + ' x ' + Math.round(l.left) + '-' + Math.round(l.right) + ', requests from ' + Math.round(area.top) + ', line at ' + Math.round(r.top) + ', column ' + Math.round(column.left) + '-' + Math.round(column.right) + ', middle: ' + (middle ? middle.className || middle.tagName : 'none'),
       };
     }`,
     );
@@ -659,22 +684,28 @@ try {
     await browser.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
     await browser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
   };
-  const TITLE = /^(The last 10 decisions|Die letzten 10 Entscheidungen)$/;
+  // Of the ten the hub read back, the two oldest are two days old: eight are of the last day.
+  const TITLE = /^(The last 8 decisions|Die letzten 8 Entscheidungen)$/;
   let folded = await decisions();
-  check(!folded.hidden && folded.inView && folded.expanded === 'false' && folded.names.length === 0 && TITLE.test(folded.text), `the last ten decisions wait folded in one line in the status column ("${folded.text}")`);
-  check(shown(await measure(browser, STATUS)), 'the clock, the hub and its last event stay shown');
+  check(
+    !folded.hidden && folded.inView && folded.aboveGitHub && folded.expanded === 'false' && folded.names.length === 0 && TITLE.test(folded.text),
+    `the decisions of the last day wait folded in one line at the foot of the waiting column, above GitHub's line ("${folded.text}")`,
+  );
+  const cardsBefore = folded.cards;
   await click(folded.box);
   folded = await until('a click opens the decisions', async () => {
     const now = await decisions();
-    return now.expanded === 'true' && now.names.length === 10 ? now : null;
+    return now.expanded === 'true' && now.names.length === 8 ? now : null;
   });
-  check(folded.names[0] === 'npm run step-12' && folded.names[9] === 'npm run step-03', `a click opens them: the ten newest, the newest first (${folded.names[0]} … ${folded.names[9]})`);
+  check(folded.names[0] === 'npm run step-12' && folded.names[7] === 'npm run step-05', `a click opens them: the eight of the last day, the newest first (${folded.names[0]} … ${folded.names[7]})`);
   check(folded.first && folded.labels.every((l) => l !== ''), 'each with how it ended, the newest in view');
+  check(folded.overCards && folded.onTop, `open, they lie over the requests, from the line upwards, inside the column (${folded.where})`);
+  check(folded.cards.length === cardsBefore.length && folded.cards.every((top, i) => Math.abs(top - cardsBefore[i]!) < 0.5), 'the requests below them keep their place');
   check(shown(await measure(browser, STATUS)), 'the clock, the hub and its last event stay shown');
   const redrawn = await countRenders(browser, '#decisions-list');
   await pause(2500);
   folded = await decisions();
-  check((await redrawn()) >= 2 && folded.expanded === 'true' && folded.names.length === 10 && folded.focused, 'open, they stay open over the renders, the line keeps the focus');
+  check((await redrawn()) >= 2 && folded.expanded === 'true' && folded.names.length === 8 && folded.focused, 'open, they stay open over the renders, the line keeps the focus');
   await press(browser, 'Enter', 13, '\r');
   folded = await until('Enter closes the decisions', async () => {
     const now = await decisions();
@@ -682,7 +713,7 @@ try {
   });
   check(folded.focused && TITLE.test(folded.text), 'Enter folds them again; the line keeps the focus');
   await click(folded.box);
-  await until('another click opens them', async () => (await decisions()).names.length === 10);
+  await until('another click opens them', async () => (await decisions()).names.length === 8);
   await click((await decisions()).box);
   folded = await until('the next click closes them', async () => {
     const now = await decisions();
@@ -722,6 +753,25 @@ try {
     return !now.remind && now.allow === null ? now : null;
   });
   check(waited.animation === 'none', 'once decided it stops');
+
+  // ---------- open decisions close when a new request comes, so it is not hidden behind them ----------
+  await click((await decisions()).box);
+  await until('the decisions open once more', async () => (await decisions()).expanded === 'true');
+  const late = hook(few.hub.port, few.token, 'card-late', {
+    hook_event_name: 'PermissionRequest',
+    session_title: 'A late request',
+    tool_name: 'Bash',
+    tool_input: { command: 'npm run late', description: 'Late' },
+  }).catch(() => '');
+  folded = await until('a new request closes the decisions', async () => {
+    const now = await decisions();
+    return now.expanded === 'false' && now.names.length === 0 ? now : null;
+  });
+  const seen = await browser.call<boolean>(
+    `() => [...document.querySelectorAll('.card')].some((c) => c.textContent.includes('A late request') && c.getClientRects().length > 0)`,
+  );
+  check(seen, 'a new request folds the open decisions, and its card shows');
+  void late;
 } finally {
   await edge?.close();
   await many.hub.close();

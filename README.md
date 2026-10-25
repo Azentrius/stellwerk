@@ -49,9 +49,10 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   once more (`remindAfterSeconds`).
 - **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes
   almost black after a minute with nothing new; what wakes it by day wakes it at night too.
-- **The last decisions.** In the status column one line folds the last ten decisions on permission
-  requests: what, when, whose session, and how each ended. A click opens it, the next closes it; a restart
-  of the hub keeps them (they come from the audit log).
+- **The last decisions.** At the foot of the waiting column one line folds the decisions on permission
+  requests of the last 24 hours (at most ten): what, when, whose session, and how each ended. A tap opens
+  them over the requests, which keep their place; the next tap closes them, and so do a minute without a
+  touch and a new request. A restart of the hub keeps them (they come from the audit log).
 - **At rest when nothing is new.** After 10 minutes with nothing new and no open request the display
   dims, the clock still readable; anything new or a tap wakes it (`quietAfterMinutes`, see
   [Configuration](#configuration)).
@@ -75,10 +76,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.6.4.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.6.4.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.6.4.zip -DestinationPath .
-cd stellwerk-0.6.4
+(Get-FileHash stellwerk-0.7.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.7.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.7.0.zip -DestinationPath .
+cd stellwerk-0.7.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -117,7 +118,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.6.4.zip
+stellwerk update stellwerk-0.7.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -142,7 +143,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.6.4"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.7.0"
 npm link
 ```
 
