@@ -46,6 +46,8 @@ export interface SessionView {
   lastTool: { name: string; at: number } | null;
   /** Runs in Codex' command line, not in an app: its own card for a request shows in the terminal. */
   terminal: boolean;
+  /** A tap can open it in its app: a session of the Claude desktop app or a chat of the Codex app. */
+  openable: boolean;
   lastActivity: number;
   endedAt: number | null;
 }
@@ -255,7 +257,14 @@ export interface DecisionResultMessage {
   reason?: 'already-decided' | 'unknown';
 }
 
-export type ServerMessage = StateMessage | DecisionResultMessage;
+/** How opening a session or a pull request went: `unknown` when it has no place to open, `busy` right after another. */
+export interface OpenResultMessage {
+  type: 'open-result';
+  ok: boolean;
+  reason?: 'unknown' | 'busy' | 'failed';
+}
+
+export type ServerMessage = StateMessage | DecisionResultMessage | OpenResultMessage;
 
 /** `app` releases the request without a decision; the app's own card then takes it. */
 export type Decision = 'allow' | 'deny' | 'app';
@@ -266,4 +275,10 @@ export interface DecideMessage {
   decision: Decision;
 }
 
-export type ClientMessage = DecideMessage;
+/** Open a session in its app, or a pull request in the default browser; the hub builds the link. */
+export interface OpenMessage {
+  type: 'open';
+  target: { session: string } | { repo: string; number: number };
+}
+
+export type ClientMessage = DecideMessage | OpenMessage;

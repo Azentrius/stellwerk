@@ -53,6 +53,12 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   requests of the last 24 hours (at most ten): what, when, whose session, and how each ended. A tap opens
   them over the requests, which keep their place; the next tap closes them, and so do a minute without a
   touch and a new request. A restart of the hub keeps them (they come from the audit log).
+- **Open it where it is.** In a session's details a button opens it in its app: a session of the Claude
+  desktop app in the app, a chat of the Codex app in Codex. A session waiting for an answer opens there
+  with a tap, a pull request in your default browser. The hub opens only these three kinds of links, which
+  it builds itself (see Security). Claude Code in a terminal and Codex' command line have no app to open.
+  The desktop app's sessions need the hooks of 0.7.0 or later (`stellwerk hooks install`), which send the
+  app's own id of the session along.
 - **At rest when nothing is new.** After 10 minutes with nothing new and no open request the display
   dims, the clock still readable; anything new or a tap wakes it (`quietAfterMinutes`, see
   [Configuration](#configuration)).
@@ -484,7 +490,11 @@ Restart the hub after a change.
   (`Elicitation`) the hub never answers; the app asks you itself.
 - The hub starts no programs, except that `serve` runs `icacls` (fixed arguments, no shell) when it
   creates the token file or writes the display's start file, so that only your Windows account can read
-  them. It connects to other machines only to `api.github.com`, for the list of
+  them, and that a tap on the display can have it open a link with the Windows shell (`explorer.exe` with
+  the link as its only argument, no shell). The display only names what to open; the hub builds the link
+  from what it shows and opens only three forms: `claude://claude.ai/epitaxy/local_…` (a session of the
+  desktop app), `codex://threads/<id>` (a Codex chat) and `https://github.com/<owner>/<repo>/pull/<n>`
+  (a pull request it lists), at most one a second. It connects to other machines only to `api.github.com`, for the list of
   pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
   up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
   that it asks

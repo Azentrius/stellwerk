@@ -79,10 +79,18 @@ reachable only from the machine it runs on and only by the display it serves:
   only its own connection;
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;
-- the hub starts no programs; only the setup commands run `icacls`,
-  `powershell`, `netsh` and `schtasks`, with fixed arguments and without a
-  shell; `serve` restricts the token file and the display's start file with
-  `icacls` when it creates or changes them;
+- the hub starts no programs but one: on a tap on the display it hands a link
+  to the Windows shell (`explorer.exe` with the link as its only argument, no
+  shell), which opens it with the program registered for it. The display only
+  names a session or a pull request; the hub builds the link itself from what
+  it shows and opens only three forms, checked whole:
+  `claude://claude.ai/epitaxy/local_…` (the desktop app's own id of a
+  session, which its hooks send in a header), `codex://threads/<UUID>` (a chat
+  of the Codex app) and `https://github.com/<owner>/<repo>/pull/<n>` (a pull
+  request of the watched owner that it lists), at most one a second. Only the
+  setup commands run `icacls`, `powershell`, `netsh` and `schtasks`, with
+  fixed arguments and without a shell; `serve` restricts the token file and
+  the display's start file with `icacls` when it creates or changes them;
 - the hub connects to two other machines at most. One is `api.github.com`
   (fixed in the code), for the list of open pull requests and the newest release
   of `Azentrius/stellwerk` (to say that there is one; nothing is downloaded), and only once a GitHub
@@ -170,6 +178,9 @@ Reports are particularly welcome for:
 - the forwarder printing anything but the hub's answer, sending the token
   elsewhere, or making Codex wait beyond its hook timeout; `stellwerk codex
   install` or `uninstall` changing more of Codex' hooks than Stellwerk's own,
+- the hub opening anything else than those three forms of links, a link the
+  display wrote, or a session or pull request it does not show; or the
+  desktop app's id of a session reaching the display,
 - `stellwerk update` setting up a zip that does not match the `SHA256SUMS`
   next to it, unpacking anything outside its own folder in
   `%LOCALAPPDATA%\stellwerk\releases`, removing folders other than its own

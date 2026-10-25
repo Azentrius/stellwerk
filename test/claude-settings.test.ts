@@ -18,7 +18,7 @@ import {
 type Group = { matcher?: string; hooks: Array<Record<string, unknown>> };
 const groupsOf = (settings: Record<string, unknown>, event: string) => (settings.hooks as Record<string, Group[]>)[event] ?? [];
 
-test('every hook goes to the local hub with the token header and its timeout', () => {
+test("every hook goes to the local hub with the token header, the app's id of the session and its timeout", () => {
   const hooks = stellwerkHooks(4780);
   assert.deepEqual(Object.keys(hooks).sort(), [
     'Elicitation',
@@ -36,8 +36,8 @@ test('every hook goes to the local hub with the token header and its timeout', (
     const handler = groups[0]!.hooks![0] as Record<string, unknown>;
     assert.equal(handler.type, 'http', event);
     assert.equal(handler.url, 'http://127.0.0.1:4780/hooks/claude-code', event);
-    assert.deepEqual(handler.headers, { Authorization: `Bearer $${TOKEN_ENV}` }, event);
-    assert.deepEqual(handler.allowedEnvVars, [TOKEN_ENV], event);
+    assert.deepEqual(handler.headers, { Authorization: `Bearer $${TOKEN_ENV}`, 'X-Stellwerk-App-Session': '$CLAUDE_CODE_HOST_SESSION_ID' }, event);
+    assert.deepEqual(handler.allowedEnvVars, [TOKEN_ENV, 'CLAUDE_CODE_HOST_SESSION_ID'], event);
     assert.equal(handler.onFailure, undefined, `${event} must not block when the hub is down`);
   }
   const timeout = (event: string) => (hooks[event]![0]!.hooks![0] as Record<string, unknown>).timeout;

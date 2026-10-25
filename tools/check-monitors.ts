@@ -69,6 +69,8 @@ const statusOf = (e: Entry) => (e.classes.includes('monitor--down') ? 'down' : '
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-monitors-'));
 const token = randomBytes(32).toString('hex');
 const hub = await startHub({
+  // The checks open nothing on this machine.
+  open: () => {},
   port: 0,
   token,
   holdMs: 30_000,

@@ -737,8 +737,8 @@ describe('over a restart of the hub', () => {
     board.apply({ ...event('SessionEnd', { reason: 'other' }), session_id: 'gone' } as HookEvent, 1300);
     const snapshot = board.snapshot();
     assert.deepEqual(snapshot, [
-      { id: SESSION, provider: 'claude', cwd: CWD, title: 'Fix the login', project: null, context: null, lastActivity: 1100 },
-      { id: 'other', provider: 'claude', cwd: CWD, title: null, project: null, context: null, lastActivity: 1200 },
+      { id: SESSION, provider: 'claude', cwd: CWD, title: 'Fix the login', project: null, context: null, appSession: null, lastActivity: 1100 },
+      { id: 'other', provider: 'claude', cwd: CWD, title: null, project: null, context: null, appSession: null, lastActivity: 1200 },
     ]);
     assert.doesNotMatch(JSON.stringify(snapshot), /secret prompt|contrast|git push/);
     const again = new Board();

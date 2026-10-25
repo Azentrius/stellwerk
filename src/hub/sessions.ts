@@ -1,7 +1,7 @@
 // The sessions on the display, remembered over a restart of the hub, so that the agents column is not empty
 // until each session sends its next event. Only what the display shows of a session: its id, provider,
-// folder, title, project, how full its context is and when it was last active. Never a question, a prompt,
-// a tool's input or a request.
+// folder, title, project, how full its context is, the desktop app's own id of it (to open it there) and when
+// it was last active. Never a question, a prompt, a tool's input or a request.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -22,6 +22,7 @@ const savedSession = z.object({
   title: z.string().max(1000).nullable(),
   project: z.string().max(1000).nullable(),
   context: z.object({ used: z.number().nonnegative(), size: z.number().positive(), model: z.string().max(200).optional() }).nullable(),
+  appSession: z.string().max(100).nullable().optional(),
   lastActivity: z.number().nonnegative(),
 });
 const savedList = z.array(z.unknown()).max(MAX_SESSIONS);

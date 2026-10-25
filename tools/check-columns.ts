@@ -7,7 +7,9 @@
 // column, the hardware values and the plans' usage scroll the same way, the clock and the alerts staying in
 // place; with only a few nothing scrolls and nothing moves; the decisions of the last day wait folded at the
 // foot of the waiting column, a click or Enter opens and closes them, open they lie over the requests without
-// moving them, and a new request folds them. Isolated hubs with made-up tokens;
+// moving them, and a new request folds them; a press held over a render on the button in a session's
+// details, on a session waiting for an answer and on a pull request has the hub open it, once (the hubs
+// here only write down what they would open). Isolated hubs with made-up tokens;
 // sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
 // answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
 // (npm run build) and Edge.
@@ -26,6 +28,8 @@ import { answerOf, behaviorOf, hook } from './hooks.ts';
 import { countRenders, measure, openDisplay, press, screenshot, scrollWith, settled, swipe, tap, wheel, type Box, type Geometry, type ListSpec } from './lists.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
+/** The links a tap on the display had the hubs open. */
+const opened: string[] = [];
 const shots = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -159,6 +163,8 @@ async function testHub(dir: string, pulls: number, alerts = false, decisions = 0
   if (decisions > 0) earlierDecisions(path.join(dir, 'audit.jsonl'), decisions);
   const token = randomBytes(32).toString('hex');
   const hub = await startHub({
+    // What a tap would open, written down here; the check opens nothing on this machine.
+    open: (link) => opened.push(link),
     port: 0,
     token,
     holdMs: 5 * 60_000,
@@ -772,6 +778,53 @@ try {
   );
   check(seen, 'a new request folds the open decisions, and its card shows');
   void late;
+
+  // ---------- a tap opens: a session from its details, one waiting for an answer, a pull request ----------
+  // The desktop app's hooks send its id of the session along: these two can be opened in it.
+  await hook(few.hub.port, few.token, 'agent-01', { hook_event_name: 'UserPromptSubmit', prompt: 'x' }, { 'X-Stellwerk-App-Session': 'local_check-agent-01' });
+  await hook(few.hub.port, few.token, 'asking-01', { hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'x' }, { 'X-Stellwerk-App-Session': 'local_check-asking-01' });
+  /** Where an element is, scrolled into view in its list first. */
+  const boxOf = (selector: string) =>
+    browser.call<Box | null>(
+      `(selector) => { const n = document.querySelector(selector); if (!n) return null; n.scrollIntoView({ block: 'nearest' }); const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null; }`,
+      selector,
+    );
+  /** A mouse press on the middle of `box`, held until the list below has been drawn again, then let go. */
+  const pressOverRender = async (box: Box, list: string) => {
+    const x = (box.left + box.right) / 2;
+    const y = (box.top + box.bottom) / 2;
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await browser.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+    const renders = await countRenders(browser, list);
+    await until(`a render of ${list} while the button is down`, async () => (await renders()) >= 1);
+    await browser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+  };
+  const agent = (id: string) => `#agents [data-session="${id}"]`;
+  // A session without the app's id: its details hold no button.
+  await click((await until('the second session is in view', () => boxOf(agent('agent-02'))))!);
+  await until('its details open', async () => (await browser.call<string | null>(`(s) => document.querySelector(s)?.getAttribute('aria-expanded') ?? null`, agent('agent-02'))) === 'true');
+  check((await boxOf(`${agent('agent-02')} .agent__open`)) === null, 'a session the app gave no id to has no button to open it');
+  await click((await boxOf(agent('agent-02')))!);
+  // One of the app: its details end with the button, which a press held over a render still presses.
+  await click((await until('the first session is in view', () => boxOf(agent('agent-01'))))!);
+  const openButton = await until('its details show the button', () => boxOf(`${agent('agent-01')} .agent__open`));
+  const label = await browser.call<string>(`(s) => document.querySelector(s).textContent`, `${agent('agent-01')} .agent__open`);
+  check(/^(Open in Claude|In Claude öffnen)$/.test(label), `the details of a session of the app end with "${label}"`);
+  await pressOverRender(openButton, AGENTS.list);
+  await until('the session is opened', async () => opened.length === 1);
+  const still = await browser.call<string | null>(`(s) => document.querySelector(s)?.getAttribute('aria-expanded') ?? null`, agent('agent-01'));
+  check(opened[0] === 'claude://claude.ai/epitaxy/local_check-agent-01' && still === 'true', `a press held over a render opens it in the app (${opened[0]}); the details stay open`);
+  // A session waiting for an answer in the app, and a pull request: each a tap, a second apart.
+  await pause(1100);
+  const answer = await until('the answer is in view', () => boxOf('#answers .entry--tappable'));
+  await pressOverRender(answer, '#answers');
+  await until('the waiting session is opened', async () => opened.length === 2);
+  check(opened[1] === 'claude://claude.ai/epitaxy/local_check-asking-01', `a press on one waiting for an answer opens it where the answer is given (${opened[1]})`);
+  await pause(1100);
+  const pull = await until('the pull request is in view', () => boxOf('#pulls .entry--tappable'));
+  await pressOverRender(pull, '#pulls');
+  await until('the pull request is opened', async () => opened.length === 3);
+  check(/^https:\/\/github\.com\/example\/[a-z-]+\/pull\/\d+$/.test(opened[2]!), `a press on a pull request opens it in the browser (${opened[2]})`);
 } finally {
   await edge?.close();
   await many.hub.close();
