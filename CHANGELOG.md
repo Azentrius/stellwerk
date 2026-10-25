@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 – 2026-10-23
+## 0.7.0 – 2026-10-25
 
 A tap opens a session in its app and a pull request in the browser; the last decisions stand where the
 requests are, and only those of the last day.
