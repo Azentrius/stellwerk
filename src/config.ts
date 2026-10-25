@@ -147,7 +147,7 @@ const configSchema = z.strictObject({
   contextWindows: z.record(z.string().min(1).max(200), z.number().int().min(1000).max(100_000_000)).default({}),
   /**
    * The night, as hours and minutes of the display's clock ("23:00" to "07:00", also over midnight): the
-   * display then rests after a minute and goes almost black. Both or neither.
+   * display then rests after a minute and goes darker than by day. Both or neither.
    */
   nightFrom: z.string().regex(CLOCK_TIME).optional(),
   nightTo: z.string().regex(CLOCK_TIME).optional(),

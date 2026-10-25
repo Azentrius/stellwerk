@@ -2,7 +2,7 @@
 // and stays so while nothing changes; a tap wakes it without pressing what lies below; an open request
 // wakes it and keeps it awake; a new answer due in the app, a monitor going down, a new pull request and
 // failed checks wake it, and so does the hub going away. At night (a second hub whose night is now) it
-// rests almost black; a tap and an open request wake it. Isolated hubs with made-up tokens and a rest time
+// rests darker than by day, still readable; a tap and an open request wake it. Isolated hubs with made-up tokens and a rest time
 // of 1.5 s; GitHub's and Uptime Kuma's answers are made up here, nothing goes online. Needs the display
 // built (npm run build) and Edge.
 //
@@ -187,7 +187,7 @@ try {
     return { agents: filter('.col--agents'), status: filter('.col--status') };
   })()`);
   await screenshot(browser, shots, 'night');
-  check(black.agents === 'brightness(0.06)' && black.status === 'brightness(0.06)', `at night at rest it is almost black, the clock's column too (${black.agents}, ${black.status})`);
+  check(black.agents === 'brightness(0.2)' && black.status === 'brightness(0.3)', `at night at rest it is darker than by day but readable, the clock's column a little more (${black.agents}, ${black.status})`);
   const tapped = await rect('.col--agents');
   await tap(browser, center(tapped!).x, center(tapped!).y);
   await until('a tap wakes the display at night', async () => !(await night()) && !(await resting()), 5000);

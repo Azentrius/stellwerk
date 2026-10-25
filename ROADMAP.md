@@ -153,7 +153,7 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 ## 0.7.1 – Says where it opens ✅
 
 Done in 0.7.1 (see [CHANGELOG](CHANGELOG.md)): after a tap that opens a session or a pull request, the
-display says at once where it opens, while the app takes its time.
+display says at once where it opens, while the app takes its time; at night it stays readable.
 
 ---
 

@@ -1,15 +1,18 @@
 # Changelog
 
-## 0.7.1 – 2026-10-25
+## 0.7.1 – 2026-10-26
 
-The display says at once where a tap opens something.
+The display says at once where a tap opens something, and stays readable at night.
 
 - **"Opening in Codex …":** after a tap that opens a session or a pull request, the display says for a few
   seconds where it opens: in Claude, in Codex or in the browser. The hub's answer to the display now names
   where it opened. An app can take a few seconds to show a session (Codex the longest, as it loads the
   chat first), and without a word on the display a second tap opened it twice.
+- **Readable at night:** at rest at night the columns are dimmed to a fifth and the clock's column to
+  three tenths, a little darker than at rest by day (a quarter and four tenths). Before, everything went to
+  six hundredths, and on the display nothing could be made out.
 - **Tests:** the hub's answer for a Claude session, a Codex chat and a pull request; in a real Edge the
-  words after a tap on the button in a session's details and on a pull request.
+  words after a tap on the button in a session's details and on a pull request, and the night's dimming.
 
 ## 0.7.0 – 2026-10-25
 

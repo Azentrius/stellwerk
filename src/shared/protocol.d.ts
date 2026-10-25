@@ -112,7 +112,7 @@ export interface HubView {
   remindAfterMs: number;
   /**
    * The night, in minutes of the day by the display's clock (from may be after to: over midnight); then the
-   * display rests after a minute and goes almost black. Null: no night.
+   * display rests after a minute and goes darker than by day. Null: no night.
    */
   night: { from: number; to: number } | null;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
