@@ -2,7 +2,8 @@
 
 ## 0.8.0 – 2026-10-26
 
-LibreHardwareMonitor runs while Stellwerk runs, and Stellwerk starts, stops and restarts with one command.
+LibreHardwareMonitor runs while Stellwerk runs, Stellwerk starts, stops and restarts with one command,
+the display says where a tap opens something, and it stays readable at night.
 
 - **LibreHardwareMonitor with the hub:** the hub runs the task "Stellwerk hardware" when it starts, runs
   it again when LibreHardwareMonitor has not answered for a minute (at most every two minutes), and ends it
@@ -15,14 +16,6 @@ LibreHardwareMonitor runs while Stellwerk runs, and Stellwerk starts, stops and 
 - **`stellwerk start`, `stop` and `restart`:** they run or end the tasks in order, without administrator
   rights: the hub, which then runs LibreHardwareMonitor, and the display; stopping the other way round,
   LibreHardwareMonitor's task last.
-- **Tests:** when the hub runs the task again and when not, a task that fails, the task without a start
-  at logon (also registered for real once, then deleted), the hub running and ending it, and the commands
-  against a made-up Windows: their order, a missing task, a hub that does not follow its task.
-
-## 0.7.1 – 2026-10-26
-
-The display says at once where a tap opens something, and stays readable at night.
-
 - **"Opening in Codex …":** after a tap that opens a session or a pull request, the display says for a few
   seconds where it opens: in Claude, in Codex or in the browser. The hub's answer to the display now names
   where it opened. An app can take a few seconds to show a session (Codex the longest, as it loads the
@@ -30,8 +23,11 @@ The display says at once where a tap opens something, and stays readable at nigh
 - **Readable at night:** at rest at night the columns are dimmed to a fifth and the clock's column to
   three tenths, a little darker than at rest by day (a quarter and four tenths). Before, everything went to
   six hundredths, and on the display nothing could be made out.
-- **Tests:** the hub's answer for a Claude session, a Codex chat and a pull request; in a real Edge the
-  words after a tap on the button in a session's details and on a pull request, and the night's dimming.
+- **Tests:** when the hub runs the task again and when not, a task that fails, the task without a start
+  at logon (also registered for real once, then deleted), the hub running and ending it, and the commands
+  against a made-up Windows: their order, a missing task, a hub that does not follow its task. The hub's
+  answer for a Claude session, a Codex chat and a pull request; in a real Edge the words after a tap on the
+  button in a session's details and on a pull request, and the night's dimming.
 
 ## 0.7.0 – 2026-10-25
 
