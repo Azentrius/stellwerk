@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 – 2026-10-23
+## 0.7.0 – 2026-10-25
 
 The last decisions stand where the requests are, and only those of the last day.
 
