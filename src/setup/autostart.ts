@@ -107,6 +107,8 @@ export interface Task {
   restartOnFailure: boolean;
   /** Run with the user's administrator rights (only the hardware monitor, which reads the sensors). */
   elevated?: boolean;
+  /** Started at logon (default); without, only when something runs the task (the hub runs the hardware monitor's). */
+  atLogon?: boolean;
 }
 
 export function hubTask(paths: { node: string; cli: string; root: string; logFile: string; conhost: string }): Task {
@@ -165,6 +167,17 @@ function quoteArgument(arg: string): string {
 export function taskXml(task: Task, user: string): string {
   const x = escapeXml;
   const delay = task.delaySeconds > 0 ? `\n      <Delay>PT${task.delaySeconds}S</Delay>` : '';
+  // A task without a logon trigger starts only when something runs it.
+  const triggers =
+    task.atLogon === false
+      ? ''
+      : `  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>${x(user)}</UserId>${delay}
+    </LogonTrigger>
+  </Triggers>
+`;
   const restart = task.restartOnFailure
     ? '\n    <RestartOnFailure>\n      <Interval>PT1M</Interval>\n      <Count>3</Count>\n    </RestartOnFailure>'
     : '';
@@ -174,13 +187,7 @@ export function taskXml(task: Task, user: string): string {
     <Author>Stellwerk</Author>
     <Description>${x(task.description)}</Description>
   </RegistrationInfo>
-  <Triggers>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>${x(user)}</UserId>${delay}
-    </LogonTrigger>
-  </Triggers>
-  <Principals>
+${triggers}  <Principals>
     <Principal id="Author">
       <UserId>${x(user)}</UserId>
       <LogonType>InteractiveToken</LogonType>

@@ -163,11 +163,13 @@ export function hardwareTask(paths: { exe: string; dir: string }): Task {
   return {
     name: HARDWARE_TASK,
     description:
-      `Starts LibreHardwareMonitor ${LHM_VERSION} at logon, minimized to the tray, for Stellwerk's hardware values. ` +
-      'It reads the sensors, so it runs with administrator rights.',
+      `Starts LibreHardwareMonitor ${LHM_VERSION}, minimized to the tray, for Stellwerk's hardware values: the ` +
+      'Stellwerk hub runs this task when it starts and ends it when it stops. It reads the sensors, so it runs ' +
+      'with administrator rights.',
     action: { command: paths.exe, args: [], workingDirectory: paths.dir },
     delaySeconds: 0,
     restartOnFailure: true,
     elevated: true,
+    atLogon: false,
   };
 }

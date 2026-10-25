@@ -108,6 +108,7 @@ export function githubLine(github: GitHubView | null, now: number, texts: Texts)
  */
 export function hardwareLine(hardware: HardwareView | null, texts: Texts): string | Problem | null {
   if (!hardware || hardware.values) return null;
+  if (hardware.starting) return texts.hardware.starting;
   if (hardware.problem) return { title: texts.hardware.problem[hardware.problem], fix: texts.hardware.fix[hardware.problem] };
   return texts.hardware.asking;
 }

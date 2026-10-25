@@ -111,6 +111,11 @@ Usage:
   stellwerk serve [--debug-raw] [--simulate-hang] [--log-file <file>] [--exit-with-parent]
       Start the hub on ${HOST}. Then open the display with its start file, which only
       you can read: %LOCALAPPDATA%\\stellwerk\\display.html
+  stellwerk start
+  stellwerk stop
+  stellwerk restart
+      Start or stop Stellwerk through its logon tasks: the hub (which runs LibreHardwareMonitor while it
+      runs, when it is set up) and the display; restart does both, the hub again from its task.
   stellwerk hooks install [--yes] [--settings <file>]
       Add Stellwerk's hooks to Claude Code's settings and give Claude Code the token
       through the user environment variable ${TOKEN_ENV}.
@@ -200,6 +205,7 @@ async function main(): Promise<void> {
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
   if (command === 'update') return update(action, values.yes, values.screen, values['keep-previous']);
+  if (command === 'start' || command === 'stop' || command === 'restart') return control(command);
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -220,8 +226,14 @@ async function serve(
     config.githubOwner && githubToken
       ? { owner: config.githubOwner, token: githubToken, intervalMs: config.githubIntervalSeconds * 1000 }
       : null;
+  // LibreHardwareMonitor runs while the hub runs: its task (registered by `hardware install`, with administrator
+  // rights) is run and ended here, with fixed arguments.
   const hardware = config.hardwareMonitor
-    ? { settingsFile: path.join(paths.hardwareDir, LHM_SETTINGS_FILE), intervalMs: HARDWARE_INTERVAL_MS }
+    ? {
+        settingsFile: path.join(paths.hardwareDir, LHM_SETTINGS_FILE),
+        intervalMs: HARDWARE_INTERVAL_MS,
+        task: { run: () => startTask(HARDWARE_TASK), end: () => endTask(HARDWARE_TASK) },
+      }
     : null;
   const kumaKey = config.uptimeKumaUrl ? readUptimeKumaKey(paths.uptimeKumaKeyFile) : null;
   const uptimeKuma =
@@ -284,7 +296,9 @@ async function serve(
   } else if (config.githubOwner) {
     console.log(`githubOwner is set, but there is no GitHub token. Run "stellwerk github token".`);
   }
-  if (hardware) console.log(`Hardware values from LibreHardwareMonitor on 127.0.0.1:${LHM_PORT}, every ${HARDWARE_INTERVAL_MS / 1000} s.`);
+  if (hardware) {
+    console.log(`Hardware values from LibreHardwareMonitor on 127.0.0.1:${LHM_PORT}, every ${HARDWARE_INTERVAL_MS / 1000} s; it runs while the hub runs.`);
+  }
   if (uptimeKuma) {
     console.log(`Monitors of Uptime Kuma from ${uptimeKuma.url}/metrics, every ${config.uptimeKumaIntervalSeconds} s.`);
   } else if (config.uptimeKumaUrl) {
@@ -565,8 +579,8 @@ async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<
   console.log(`              LibreHardwareMonitor's settings and asks only for data.json`);
   console.log(`  firewall    rule "${rule}": other machines cannot reach port ${LHM_PORT}`);
   console.log(`              (LibreHardwareMonitor ${LHM_VERSION} listens on every network interface)`);
-  console.log(`  task        "${HARDWARE_TASK}" for ${user} at logon, minimized to the tray, with administrator`);
-  console.log('              rights: it reads the sensors');
+  console.log(`  task        "${HARDWARE_TASK}" for ${user}, minimized to the tray, with administrator rights (it`);
+  console.log('              reads the sensors); not at logon: the Stellwerk hub runs it while it runs');
   console.log('Processor temperatures need the PawnIO driver, which you install yourself.\n');
   if (!(await confirm(yes))) return void console.log('Nothing changed.');
 
@@ -671,11 +685,6 @@ function colorDiff(lines: string[]): string {
     .map((line) => (line.startsWith('+ ') ? `\x1b[32m${line}\x1b[0m` : line.startsWith('- ') ? `\x1b[31m${line}\x1b[0m` : line))
     .join('\n');
 }
-
-main().catch((err: Error) => {
-  console.error(err.message);
-  process.exitCode = 1;
-});
 
 /** Deletes the raw hook log; says when the configuration would have the hub write it again. */
 function rawLogDelete(): void {
@@ -821,6 +830,34 @@ function removeRelease(dir: string, codexHooks: string): void {
  * The hub task ended and started again, from the version its task now names. Waits until the port is free
  * (the hub follows its task within seconds, --exit-with-parent) and until the new hub answers on it.
  */
+/**
+ * Starts or stops Stellwerk through its tasks, in order: the hub first, then the display; stopping the other
+ * way round. The hub runs and ends LibreHardwareMonitor itself; stopping ends its task as well, in case the
+ * hub could not.
+ */
+async function control(what: 'start' | 'stop' | 'restart'): Promise<void> {
+  const paths = defaultPaths();
+  const config = loadConfig(paths.configFile);
+  const display = taskExists(DISPLAY_TASK);
+  if (!taskExists(HUB_TASK)) throw new Error(`The task "${HUB_TASK}" is missing. Set Stellwerk up first: stellwerk autostart install`);
+  if (what !== 'start') {
+    if (display) endTask(DISPLAY_TASK);
+    endTask(HUB_TASK);
+    if (!(await within(HUB_STOP_MS, async () => !(await listening(config.port))))) {
+      throw new Error(`A hub not started by its task still listens on ${HOST}:${config.port}. Stop it (Ctrl+C in its window).`);
+    }
+    if (config.hardwareMonitor && taskExists(HARDWARE_TASK)) endTask(HARDWARE_TASK);
+    console.log('Stellwerk stopped: the hub, the display and LibreHardwareMonitor.');
+    if (what === 'stop') return;
+  }
+  if (!(await listening(config.port))) startTask(HUB_TASK);
+  if (!(await within(HUB_START_MS, () => listening(config.port)))) throw new Error(`The hub did not start; its messages are in ${paths.hubLogFile}.`);
+  if (display) startTask(DISPLAY_TASK);
+  console.log(
+    `Stellwerk runs on ${HOST}:${config.port}${display ? ', the display opens' : ''}${config.hardwareMonitor ? ', LibreHardwareMonitor starts with the hub' : ''}.`,
+  );
+}
+
 async function restartHub(port: number, logFile: string): Promise<void> {
   endTask(HUB_TASK);
   if (!(await within(HUB_STOP_MS, async () => !(await listening(port))))) {
@@ -891,3 +928,9 @@ function runStep(command: string, args: string[], cwd: string): void {
   const result = spawnSync(command, args, { cwd, stdio: 'inherit' });
   if (result.status !== 0) throw new Error(`${args.slice(1).join(' ')} in ${cwd} failed (${result.status ?? result.error?.message}).`);
 }
+
+// Last, so that every constant above is set before a command uses it.
+main().catch((err: Error) => {
+  console.error(err.message);
+  process.exitCode = 1;
+});

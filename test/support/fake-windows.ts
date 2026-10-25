@@ -17,6 +17,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { DISPLAY_TASK, HUB_TASK, type Screen } from '../../src/setup/autostart.ts';
+import { HARDWARE_TASK } from '../../src/setup/hardware.ts';
 import { withStellwerkCodexHooks } from '../../src/setup/codex-settings.ts';
 
 export interface FakeWindows {
@@ -110,7 +111,10 @@ const port = await new Promise<number>((resolve) => {
 });
 const configDir = path.join(process.env.APPDATA ?? '', 'stellwerk');
 fs.mkdirSync(configDir, { recursive: true });
-fs.writeFileSync(path.join(configDir, 'config.json'), JSON.stringify({ port }));
+// A configuration the test wrote keeps its other settings.
+const configFile = path.join(configDir, 'config.json');
+const earlier = fs.existsSync(configFile) ? (JSON.parse(String(readFile(configFile, 'utf8'))) as Record<string, unknown>) : {};
+fs.writeFileSync(configFile, JSON.stringify({ ...earlier, port }));
 const startHub = () => {
   socket ??= net.createServer((connection) => connection.destroy()).listen(port, '127.0.0.1');
   socket.unref();
@@ -162,6 +166,10 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     if (args[0] === '/End' && display.endsWithTask) display.running = false;
     if (args[0] === '/Run' && !display.starts) throw failed('FEHLER: Die Aufgabe konnte nicht gestartet werden.');
     if (args[0] === '/Run') display.running = true;
+    return 'ERFOLGREICH';
+  }
+  // The hardware monitor's task may be ended and run: nothing more to it here.
+  if (command === 'schtasks' && (args[0] === '/End' || args[0] === '/Run') && args[args.indexOf('/TN') + 1] === HARDWARE_TASK) {
     return 'ERFOLGREICH';
   }
   // The hub's task may be ended and started.

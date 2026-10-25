@@ -41,7 +41,7 @@ export interface Texts {
   };
   hardwareTitle: string;
   parts: { cpu: string; gpu: string; memory: string };
-  hardware: { asking: string; problem: Record<HardwareProblem, string>; fix: Record<HardwareProblem, string> };
+  hardware: { asking: string; starting: string; problem: Record<HardwareProblem, string>; fix: Record<HardwareProblem, string> };
   /** The column of Uptime Kuma's monitors. */
   monitorsTitle: string;
   monitorStatus: { down: string; pending: string };
@@ -193,13 +193,14 @@ const en: Texts = {
   parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
   hardware: {
     asking: 'Hardware: asking',
+    starting: 'Hardware: monitor starting …',
     problem: {
       'not-running': 'Hardware: monitor not running',
       rejected: 'Hardware: password rejected',
       unexpected: 'Hardware: unexpected answer',
     },
     fix: {
-      'not-running': 'Start the task "Stellwerk hardware" or sign in again.',
+      'not-running': 'The hub starts it again by itself; if not, run `stellwerk restart`.',
       rejected: 'Run `stellwerk hardware install` again as administrator.',
       unexpected: 'Run `stellwerk hardware install` again as administrator.',
     },
@@ -366,13 +367,14 @@ const de: Texts = {
   parts: { cpu: 'CPU', gpu: 'GPU', memory: 'RAM' },
   hardware: {
     asking: 'Hardware: wird abgefragt',
+    starting: 'Hardware: Monitor startet …',
     problem: {
       'not-running': 'Hardware: Monitor läuft nicht',
       rejected: 'Hardware: Passwort abgelehnt',
       unexpected: 'Hardware: unerwartete Antwort',
     },
     fix: {
-      'not-running': 'Starte die Aufgabe „Stellwerk hardware“ oder melde dich neu an.',
+      'not-running': 'Der Hub startet ihn von selbst neu; sonst `stellwerk restart`.',
       rejected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
       unexpected: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
     },

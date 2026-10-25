@@ -79,6 +79,10 @@ reachable only from the machine it runs on and only by the display it serves:
   only its own connection;
 - every request is checked against `Host` (DNS rebinding);
 - nothing is allowed automatically;
+- the hub runs and ends one task: "Stellwerk hardware", with `schtasks /Run`
+  and `/End` and fixed arguments, no shell, so that LibreHardwareMonitor runs
+  while the hub runs; that task was registered by an administrator and starts
+  only the program in its own folder in Program Files;
 - the hub starts no programs but one: on a tap on the display it hands a link
   to the Windows shell (`explorer.exe` with the link as its only argument, no
   shell), which opens it with the program registered for it. The display only
@@ -187,6 +191,8 @@ Reports are particularly welcome for:
   previous releases or one that Codex' hooks may still run, ending tasks
   other than Stellwerk's own two, or closing Edge windows other than the
   display's,
+- the hub running or ending any other task than "Stellwerk hardware", or
+  that task starting anything but LibreHardwareMonitor in its own folder,
 - `stellwerk hardware install` accepting another file than the pinned one,
   writing outside its folder, or leaving LibreHardwareMonitor's web server
   reachable without the password or from other machines,

@@ -73,7 +73,7 @@ test('the status lines are plain text, or a problem with its fix', () => {
   assert.equal(hardwareLine(hardware(null), en), 'Hardware: asking');
   assert.deepEqual(hardwareLine(hardware('not-running'), en), {
     title: 'Hardware: monitor not running',
-    fix: 'Start the task "Stellwerk hardware" or sign in again.',
+    fix: 'The hub starts it again by itself; if not, run `stellwerk restart`.',
   });
   const kuma = (problem: UptimeKumaView['problem'], updatedAt: number | null): UptimeKumaView => ({ monitors: null, updatedAt, problem });
   assert.equal(uptimeKumaLine(null, 0, en), null);

@@ -167,10 +167,85 @@ class HardwareFailure extends Error {
   }
 }
 
+/** Its task, which the hub runs and ends (schtasks /Run and /End of "Stellwerk hardware"). */
+export interface HardwareTask {
+  run(): void;
+  end(): void;
+}
+
+/** LibreHardwareMonitor takes about 20 s to answer after its task ran: until then it is starting. */
+export const STARTING_MS = 45_000;
+/** Without an answer for this long, its task runs again … */
+export const RESTART_AFTER_MS = 60_000;
+/** … but not more often than this. */
+export const RESTART_EVERY_MS = 120_000;
+
+/**
+ * LibreHardwareMonitor runs while the hub runs: its task runs when the hub starts, again when it has not
+ * answered for a while, and ends with the hub. Errors of the task are only logged: the values then stay away,
+ * and the display says why.
+ */
+export class HardwareKeeper {
+  private readonly task: HardwareTask;
+  private readonly log: (line: string) => void;
+  private lastRun: number | null = null;
+  private lastAnswer: number | null = null;
+
+  constructor(task: HardwareTask, log: (line: string) => void = () => {}) {
+    this.task = task;
+    this.log = log;
+  }
+
+  /** The hub starts: so does LibreHardwareMonitor. */
+  begin(now: number): void {
+    this.run(now, 'Hardware: LibreHardwareMonitor is started with the hub.');
+  }
+
+  /** Just started and not answering yet. */
+  starting(now: number): boolean {
+    return this.lastRun !== null && now - this.lastRun < STARTING_MS && (this.lastAnswer === null || this.lastAnswer < this.lastRun);
+  }
+
+  /** After each round: an answer, or none (only "not running" restarts it; a wrong password would not change). */
+  noted(answered: boolean, notRunning: boolean, now: number): void {
+    if (answered) {
+      this.lastAnswer = now;
+      return;
+    }
+    if (!notRunning) return;
+    const since = Math.max(this.lastAnswer ?? -Infinity, this.lastRun ?? -Infinity);
+    const ranLately = this.lastRun !== null && now - this.lastRun < RESTART_EVERY_MS;
+    if (now - since >= RESTART_AFTER_MS && !ranLately) {
+      this.run(now, `Hardware: LibreHardwareMonitor has not answered for ${Math.round((now - since) / 1000)} s; its task runs again.`);
+    }
+  }
+
+  /** The hub ends: so does LibreHardwareMonitor. */
+  end(): void {
+    try {
+      this.task.end();
+    } catch (err) {
+      this.log(`Hardware: its task could not be ended: ${(err as Error).message}`);
+    }
+  }
+
+  private run(now: number, line: string): void {
+    this.lastRun = now;
+    try {
+      this.task.run();
+      this.log(line);
+    } catch (err) {
+      this.log(`Hardware: its task could not be run: ${(err as Error).message}`);
+    }
+  }
+}
+
 export interface HardwareWatcherOptions {
   /** LibreHardwareMonitor's settings file, for its user name and password. */
   settingsFile: string;
   intervalMs: number;
+  /** Its task, when the hub keeps it running (HardwareKeeper); without it, it is only asked. */
+  task?: HardwareTask;
   /** For tests; the global fetch otherwise. */
   fetch?: typeof fetch;
   now?: () => number;
@@ -189,25 +264,32 @@ export class HardwareWatcher {
   private polling: Promise<void> | null = null;
   /** Undefined until the settings file has been read. */
   private authorization: string | null | undefined;
+  private readonly keeper: HardwareKeeper | null;
+  /** Started by the hub and not answering yet: no problem to show. */
+  private starting = false;
 
   constructor(options: HardwareWatcherOptions) {
     this.options = options;
     this.fetch = options.fetch ?? fetch;
     this.now = options.now ?? Date.now;
+    this.keeper = options.task ? new HardwareKeeper(options.task, options.log) : null;
   }
 
   start(): void {
+    this.keeper?.begin(this.now());
     void this.poll();
     this.timer = setInterval(() => void this.poll(), this.options.intervalMs);
   }
 
+  /** Stops asking; with the hub keeping it running, LibreHardwareMonitor ends too. */
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.keeper?.end();
   }
 
   view(): HardwareView {
-    return { values: this.values, updatedAt: this.updatedAt, problem: this.problem };
+    return { values: this.values, updatedAt: this.updatedAt, problem: this.problem, ...(this.starting ? { starting: true } : {}) };
   }
 
   /** One round; a round still running is not started twice. */
@@ -219,7 +301,7 @@ export class HardwareWatcher {
   }
 
   private async round(): Promise<void> {
-    const before = JSON.stringify([this.values, this.problem]);
+    const before = JSON.stringify([this.values, this.problem, this.starting]);
     const problemBefore = this.problem;
     try {
       if (this.authorization === undefined) this.authorization = this.readAuthorization();
@@ -244,14 +326,20 @@ export class HardwareWatcher {
       this.values = pickValues(sensors);
       this.updatedAt = this.now();
       this.problem = null;
+      this.starting = false;
+      this.keeper?.noted(true, false, this.now());
       if (problemBefore !== null) this.options.log?.('Hardware: LibreHardwareMonitor answers again.');
     } catch (err) {
       this.values = null;
-      this.problem = err instanceof HardwareFailure ? err.problem : 'not-running';
+      const problem = err instanceof HardwareFailure ? err.problem : 'not-running';
+      this.keeper?.noted(false, problem === 'not-running', this.now());
+      // Just started by the hub, it does not answer yet: that is no problem.
+      this.starting = problem === 'not-running' && (this.keeper?.starting(this.now()) ?? false);
+      this.problem = this.starting ? null : problem;
       // Once per new problem, not every round.
-      if (this.problem !== problemBefore) this.options.log?.(`Hardware: ${describeHardwareProblem(this.problem)}`);
+      if (this.problem !== null && this.problem !== problemBefore) this.options.log?.(`Hardware: ${describeHardwareProblem(this.problem)}`);
     }
-    if (JSON.stringify([this.values, this.problem]) !== before) this.options.onChange?.();
+    if (JSON.stringify([this.values, this.problem, this.starting]) !== before) this.options.onChange?.();
   }
 
   private ask(): Promise<Response> {
