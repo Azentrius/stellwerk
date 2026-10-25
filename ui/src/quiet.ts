@@ -3,7 +3,7 @@
 // Anything new wakes it: a request, an answer due in the app, a monitor that goes down, a pull request or
 // checks that failed, the hub gone away. So does a tap. The hub cannot dim the screen itself (it starts no
 // programs); the display dims its own page. At night (the hours set up) it rests after a minute already
-// and goes almost black; what wakes it by day wakes it at night too.
+// and goes darker than by day, still readable; what wakes it by day wakes it at night too.
 //
 // SPDX-License-Identifier: Apache-2.0
 

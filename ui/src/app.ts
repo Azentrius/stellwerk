@@ -282,7 +282,7 @@ function tick(): void {
   const kumaNote = uptimeKumaLine(kuma, now, texts);
   if (kumaNote) show(monitorsState, kumaNote);
 
-  // At rest after a while with nothing new and no open request: dimmed; at night sooner and almost black (quiet.ts).
+  // At rest after a while with nothing new and no open request: dimmed; at night sooner and darker (quiet.ts).
   const local = new Date(now);
   const atNight = inNight(state?.hub.night ?? null, local.getHours() * 60 + local.getMinutes());
   const resting = rest.update(watched(state, connected), restAfter(state?.hub.quietAfterMs ?? 0, atNight), now);
