@@ -1437,7 +1437,7 @@ describe('opening from the display', () => {
     assert.doesNotMatch(JSON.stringify(state), /local_/, "the app's id stays in the hub");
     let reply = answer(screen);
     await open(screen, { session: 'in-app' });
-    assert.deepEqual(await reply, { type: 'open-result', ok: true });
+    assert.deepEqual(await reply, { type: 'open-result', ok: true, opened: 'claude' }, 'it says where it opens');
     assert.deepEqual(opened, [`claude://claude.ai/epitaxy/${APP}`]);
     at += 2000;
     reply = answer(screen);
@@ -1481,7 +1481,9 @@ describe('opening from the display', () => {
     const screen = await display(port);
     await codexPrompt(port, THREAD);
     assert.equal((await screen.state((s) => s.sessions.length === 1)).sessions[0]!.openable, true);
+    const inCodex = answer(screen);
     await open(screen, { session: THREAD });
+    assert.deepEqual(await inCodex, { type: 'open-result', ok: true, opened: 'codex' });
     assert.deepEqual(opened, [`codex://threads/${THREAD}`]);
     hub.board.setTerminal(THREAD);
     at += 2000;
@@ -1509,7 +1511,9 @@ describe('opening from the display', () => {
     });
     const screen = await display(port);
     await screen.state((s) => s.pullRequests.length === 1);
+    const inBrowser = answer(screen);
     await open(screen, { repo: 'api', number: 7 });
+    assert.deepEqual(await inBrowser, { type: 'open-result', ok: true, opened: 'browser' });
     const busy = answer(screen);
     await open(screen, { repo: 'api', number: 7 });
     assert.deepEqual(await busy, { type: 'open-result', ok: false, reason: 'busy' }, 'right after another');

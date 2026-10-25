@@ -37,6 +37,8 @@ import { ago, clock } from './time.ts';
 const WS_PROTOCOL = 'stellwerk.v1';
 const WS_SESSION_PREFIX = 'stellwerk.session.';
 const TOAST_MS = 3000;
+/** Long enough for the slowest app to show what a tap opened. */
+const OPENING_TOAST_MS = 6000;
 /** sessionStorage: the hub build a reload was last tried for. */
 const RELOAD_KEY = 'stellwerk-reloaded-for';
 
@@ -179,8 +181,10 @@ function onMessage(message: ServerMessage): void {
   } else if (message.type === 'decision-result' && !message.ok) {
     queue.release(message.id);
     toast(message.reason === 'already-decided' ? texts.alreadyDecided : texts.notOpen);
-  } else if (message.type === 'open-result' && !message.ok && message.reason !== 'busy') {
-    toast(message.reason === 'unknown' ? texts.openUnknown : texts.openFailed);
+  } else if (message.type === 'open-result') {
+    // Where it opens, at once: an app may take a few seconds to show it, and a second tap would open it twice.
+    if (message.ok && message.opened) toast(texts.opening[message.opened], OPENING_TOAST_MS);
+    else if (!message.ok && message.reason !== 'busy') toast(message.reason === 'unknown' ? texts.openUnknown : texts.openFailed);
   }
 }
 
@@ -327,11 +331,11 @@ function showOrHide(node: HTMLElement, content: string | State | Problem | null)
   if (content !== null) show(node, content);
 }
 
-function toast(text: string): void {
+function toast(text: string, ms = TOAST_MS): void {
   toastNode.replaceChildren(icon('info-circle'), text);
   toastNode.hidden = false;
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (toastNode.hidden = true), TOAST_MS);
+  toastTimer = window.setTimeout(() => (toastNode.hidden = true), ms);
 }
 
 /** Two soft tones for a new request, only when the configuration turns sound on. */

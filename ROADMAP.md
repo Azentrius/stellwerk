@@ -150,6 +150,13 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ---
 
+## 0.7.1 – Says where it opens ✅
+
+Done in 0.7.1 (see [CHANGELOG](CHANGELOG.md)): after a tap that opens a session or a pull request, the
+display says at once where it opens, while the app takes its time.
+
+---
+
 ## 0.7.0 – Open it where it is; the last decisions where the requests are ✅
 
 Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): a tap opens a session in the Claude desktop app or in the

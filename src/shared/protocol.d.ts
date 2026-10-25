@@ -257,10 +257,17 @@ export interface DecisionResultMessage {
   reason?: 'already-decided' | 'unknown';
 }
 
-/** How opening a session or a pull request went: `unknown` when it has no place to open, `busy` right after another. */
+/** Where a tap opens something: the Claude desktop app, the Codex app, the default browser. */
+export type OpenedIn = 'claude' | 'codex' | 'browser';
+
+/**
+ * How opening a session or a pull request went: on success where it opens, so the display can say so while
+ * the app takes its time; `unknown` when it has no place to open, `busy` right after another.
+ */
 export interface OpenResultMessage {
   type: 'open-result';
   ok: boolean;
+  opened?: OpenedIn;
   reason?: 'unknown' | 'busy' | 'failed';
 }
 

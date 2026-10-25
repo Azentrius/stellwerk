@@ -23,6 +23,7 @@ import type {
   HubView,
   OpenMessage,
   OpenResultMessage,
+  OpenedIn,
   PermissionOutcome,
   Provider,
   RejectionReason,
@@ -649,9 +650,11 @@ export async function startHub(options: HubOptions): Promise<Hub> {
    */
   function open(target: OpenMessage['target']): OpenResultMessage {
     let link: string | null = null;
+    let opened: OpenedIn = 'browser';
     if ('session' in target) {
       const session = board.session(target.session);
       link = session ? sessionLink(session) : null;
+      if (session) opened = session.provider;
     } else if (options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
       link = pullLink(options.github.owner, target.repo, target.number);
     }
@@ -665,7 +668,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       return { type: 'open-result', ok: false, reason: 'failed' };
     }
     log(`Opened ${link} for the display.`);
-    return { type: 'open-result', ok: true };
+    return { type: 'open-result', ok: true, opened };
   }
 
   /** The first decision counts; any later one, from this display or another, gets "already decided". */

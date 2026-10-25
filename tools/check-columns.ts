@@ -8,8 +8,8 @@
 // place; with only a few nothing scrolls and nothing moves; the decisions of the last day wait folded at the
 // foot of the waiting column, a click or Enter opens and closes them, open they lie over the requests without
 // moving them, and a new request folds them; a press held over a render on the button in a session's
-// details, on a session waiting for an answer and on a pull request has the hub open it, once (the hubs
-// here only write down what they would open). Isolated hubs with made-up tokens;
+// details, on a session waiting for an answer and on a pull request has the hub open it, once, and the
+// display says where (the hubs here only write down what they would open). Isolated hubs with made-up tokens;
 // sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
 // answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
 // (npm run build) and Edge.
@@ -812,6 +812,10 @@ try {
   check(/^(Open in Claude|In Claude öffnen)$/.test(label), `the details of a session of the app end with "${label}"`);
   await pressOverRender(openButton, AGENTS.list);
   await until('the session is opened', async () => opened.length === 1);
+  const said = await until('the display says where it opens', () =>
+    browser.call<string | null>(`() => { const t = document.querySelector('#toast'); return t.hidden ? null : t.textContent; }`),
+  );
+  check(/^(Opening in Claude …|Öffnet in Claude …)$/.test(said), `at once the display says where it opens ("${said}"), while the app takes its time`);
   const still = await browser.call<string | null>(`(s) => document.querySelector(s)?.getAttribute('aria-expanded') ?? null`, agent('agent-01'));
   check(opened[0] === 'claude://claude.ai/epitaxy/local_check-agent-01' && still === 'true', `a press held over a render opens it in the app (${opened[0]}); the details stay open`);
   // A session waiting for an answer in the app, and a pull request: each a tap, a second apart.
@@ -824,6 +828,11 @@ try {
   const pull = await until('the pull request is in view', () => boxOf('#pulls .entry--tappable'));
   await pressOverRender(pull, '#pulls');
   await until('the pull request is opened', async () => opened.length === 3);
+  const browserSaid = await until('the display says it opens in the browser', async () => {
+    const text = await browser.call<string | null>(`() => { const t = document.querySelector('#toast'); return t.hidden ? null : t.textContent; }`);
+    return text && /browser|Browser/.test(text) ? text : null;
+  });
+  check(/^(Opening in the browser …|Öffnet im Browser …)$/.test(browserSaid), `for a pull request: "${browserSaid}"`);
   check(/^https:\/\/github\.com\/example\/[a-z-]+\/pull\/\d+$/.test(opened[2]!), `a press on a pull request opens it in the browser (${opened[2]})`);
 } finally {
   await edge?.close();
