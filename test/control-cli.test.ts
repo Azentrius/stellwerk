@@ -21,24 +21,45 @@ const FAKE = pathToFileURL(path.join(import.meta.dirname, 'support', 'fake-windo
 
 /** Runs `stellwerk <command>` against the made-up Windows; what it printed, its status and the task actions. */
 async function control(
-  command: 'start' | 'stop' | 'restart',
-  windows: { tasks: string[]; hub?: FakeWindows['hub']; hardwareMonitor?: boolean },
+  command: 'start' | 'stop' | 'restart' | 'status',
+  windows: {
+    tasks: string[] | Record<string, string>;
+    hub?: FakeWindows['hub'];
+    hardwareMonitor?: boolean;
+    display?: FakeWindows['display'];
+    userEnv?: Record<string, string>;
+    /** Files to write first, by their path below the test's folder. */
+    files?: Record<string, string>;
+  },
 ): Promise<{ status: number | null; output: string; actions: string[] }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-control-cli-'));
   try {
     const fake: FakeWindows = {
       screens: [],
-      tasks: Object.fromEntries(windows.tasks.map((name) => [name, '<Task/>'])),
+      tasks: Array.isArray(windows.tasks) ? Object.fromEntries(windows.tasks.map((name) => [name, '<Task/>'])) : windows.tasks,
       hub: windows.hub,
+      display: windows.display,
+      userEnv: windows.userEnv,
       calls: path.join(dir, 'calls.jsonl'),
     };
     fs.writeFileSync(fake.calls, '');
     const roaming = path.join(dir, 'roaming');
     fs.mkdirSync(path.join(roaming, 'stellwerk'), { recursive: true });
     fs.writeFileSync(path.join(roaming, 'stellwerk', 'config.json'), JSON.stringify({ hardwareMonitor: windows.hardwareMonitor ?? false }));
+    for (const [file, text] of Object.entries(windows.files ?? {})) {
+      fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      fs.writeFileSync(path.join(dir, file), text);
+    }
     const result = await new Promise<{ status: number | null; output: string }>((resolve, reject) => {
       const child = spawn(process.execPath, ['--import', FAKE, CLI, command], {
-        env: { ...process.env, APPDATA: roaming, LOCALAPPDATA: path.join(dir, 'local'), STELLWERK_FAKE_WINDOWS: JSON.stringify(fake) },
+        env: {
+          ...process.env,
+          APPDATA: roaming,
+          LOCALAPPDATA: path.join(dir, 'local'),
+          USERPROFILE: path.join(dir, 'home'),
+          CODEX_HOME: path.join(dir, 'codex'),
+          STELLWERK_FAKE_WINDOWS: JSON.stringify(fake),
+        },
       });
       let output = '';
       child.stdout.setEncoding('utf8').on('data', (chunk: string) => (output += chunk));
@@ -66,7 +87,7 @@ async function control(
 
 const ALL = [HUB_TASK, DISPLAY_TASK, HARDWARE_TASK];
 
-describe('stellwerk start | stop | restart', { concurrency: true }, () => {
+describe('stellwerk start | stop | restart | status', { concurrency: true }, () => {
   test('start runs the hub, waits until it answers, then the display; the hub itself runs LibreHardwareMonitor', async () => {
     const outcome = await control('start', { tasks: ALL, hub: { running: false }, hardwareMonitor: true });
     assert.equal(outcome.status, 0, outcome.output);
@@ -111,5 +132,69 @@ describe('stellwerk start | stop | restart', { concurrency: true }, () => {
     assert.equal(outcome.status, 1, outcome.output);
     assert.match(outcome.output, /A hub not started by its task still listens/);
     assert.ok(!outcome.actions.some((a) => a.startsWith('/Run')));
+  });
+
+  // ---------- stellwerk status ----------
+
+  const release = (version: string) => `<Task><Exec><Arguments>C:\\Users\\dev\\AppData\\Local\\stellwerk\\releases\\stellwerk-${version}\\dist\\cli.js serve</Arguments></Exec></Task>`;
+  const hubLog = (version: string) => `--- 2026-10-26T00:00:00.000Z  Stellwerk ${version}, process 4711\nStellwerk ${version} on http://127.0.0.1:4780\n`;
+  const claudeHooks = (header: boolean) =>
+    JSON.stringify({
+      hooks: {
+        Stop: [{ hooks: [{ type: 'http', url: 'http://127.0.0.1:4780/hooks/claude-code', headers: { Authorization: 'Bearer $STELLWERK_TOKEN', ...(header ? { 'X-Stellwerk-App-Session': '$CLAUDE_CODE_HOST_SESSION_ID' } : {}) } }] }],
+      },
+    });
+  const codexHooks = (version: string) =>
+    JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `node C:\\Users\\dev\\AppData\\Local\\stellwerk\\releases\\stellwerk-${version}\\dist\\codex\\hook.js` }] }] } });
+  const everything = (versions: { log: string; task: string; codex: string }, header = true) => ({
+    tasks: { [HUB_TASK]: release(versions.task), [DISPLAY_TASK]: '<Task/>' },
+    userEnv: { STELLWERK_TOKEN: 'a'.repeat(64) },
+    files: {
+      'local/stellwerk/hub.log': hubLog(versions.log),
+      'home/.claude/settings.json': claudeHooks(header),
+      'codex/hooks.json': codexHooks(versions.codex),
+    },
+  });
+
+  test('status: all is well when the hub, its task, the display and the hooks agree on one release', async () => {
+    const outcome = await control('status', everything({ log: '9.9.9', task: '9.9.9', codex: '9.9.9' }));
+    assert.equal(outcome.status, 0, outcome.output);
+    assert.match(outcome.output, /ok {2}Hub: answers on 127\.0\.0\.1:\d+, Stellwerk 9\.9\.9/);
+    assert.match(outcome.output, /ok {2}Task "Stellwerk hub": running, starts releases\\stellwerk-9\.9\.9/);
+    assert.match(outcome.output, /ok {2}Display: open/);
+    assert.match(outcome.output, /ok {2}Claude Code: 1 hooks, with the app's session id/);
+    assert.match(outcome.output, /ok {2}Claude Code: STELLWERK_TOKEN is set/);
+    assert.match(outcome.output, /ok {2}Codex: 1 hooks run the forwarder of 9\.9\.9/);
+    assert.match(outcome.output, /All is well\./);
+    assert.deepEqual(outcome.actions, [], 'it changes nothing');
+    assert.doesNotMatch(outcome.output, /a{64}/, 'never the token');
+  });
+
+  test('status: an old hub, old Codex hooks and hooks without the app id each say what to do, and it ends with 1', async () => {
+    const outcome = await control('status', { ...everything({ log: '9.9.8', task: '9.9.9', codex: '9.9.8' }, false), display: { running: false } });
+    assert.equal(outcome.status, 1, outcome.output);
+    assert.match(outcome.output, /!! {2}The hub runs 9\.9\.8, its task starts 9\.9\.9: stellwerk restart/);
+    assert.match(outcome.output, /!! {2}Codex: the hooks run the forwarder of 9\.9\.8, the hub's task starts 9\.9\.9\. Run stellwerk codex install from 9\.9\.9/);
+    assert.match(outcome.output, /!! {2}Claude Code: hooks without the app's session id\. Run stellwerk hooks install/);
+    assert.match(outcome.output, /!! {2}Display: closed \(task running\)\. Open it: stellwerk start/);
+    assert.match(outcome.output, /4 things need doing/);
+    assert.deepEqual(outcome.actions, []);
+  });
+
+  test('status: missing tasks and hooks, and an older LibreHardwareMonitor that still starts at logon', async () => {
+    const outcome = await control('status', {
+      tasks: { [HARDWARE_TASK]: '<Task><RegistrationInfo><Description>Starts LibreHardwareMonitor 0.9.5 at logon</Description></RegistrationInfo><Triggers><LogonTrigger/></Triggers></Task>' },
+      hardwareMonitor: true,
+      hub: { running: false },
+    });
+    assert.equal(outcome.status, 1, outcome.output);
+    assert.match(outcome.output, /!! {2}Hub: does not answer on 127\.0\.0\.1:\d+\. Start it: stellwerk start/);
+    assert.match(outcome.output, /!! {2}Task "Stellwerk hub": missing\. Set Stellwerk up: stellwerk autostart install/);
+    assert.match(outcome.output, /!! {2}Task "Stellwerk display": missing/);
+    assert.match(outcome.output, /LibreHardwareMonitor 0\.9\.5 (answers|does not answer) on port 8085/);
+    assert.match(outcome.output, /!! {2}This Stellwerk pins LibreHardwareMonitor \d+\.\d+\.\d+: run stellwerk hardware install as administrator/);
+    assert.match(outcome.output, /!! {2}Its task still starts at logon by itself/);
+    assert.match(outcome.output, /!! {2}Claude Code: no Stellwerk hooks\. Run stellwerk hooks install/);
+    assert.match(outcome.output, /ok {2}Codex: no Stellwerk hooks/);
   });
 });

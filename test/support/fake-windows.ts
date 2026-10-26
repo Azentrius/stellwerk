@@ -35,6 +35,8 @@ export interface FakeWindows {
   display?: { running?: boolean; endsWithTask?: boolean; starts?: boolean; count?: string };
   /** Codex' hooks.json cannot be read (EACCES): always, or only once the hub was started again (at the cleanup). */
   codexUnreadable?: 'always' | 'at-cleanup';
+  /** User environment variables as Windows stores them (getUserEnv). */
+  userEnv?: Record<string, string>;
   /** spawnSync fails (status 1) for a program whose arguments hold this. */
   failing?: string;
   /** Where each call goes, one JSON line each. */
@@ -136,6 +138,17 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
       note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'edge', task: values(options.input)[0] });
       if (display.count !== undefined) throw failed(display.count);
       return String(display.running ? 3 : 0);
+    }
+    if (script.includes('GetEnvironmentVariable')) {
+      const name = /GetEnvironmentVariable\('([^']+)'/.exec(script)?.[1] ?? '';
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'] });
+      const value = fake.userEnv?.[name];
+      return value === undefined ? '' : Buffer.from(value, 'utf8').toString('base64');
+    }
+    if (script.includes('.State')) {
+      const name = values(options.input)[0] ?? '';
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'], asked: 'task', task: name });
+      return name in fake.tasks ? (name === HUB_TASK && !hub.running ? '3' : '4') : `error ${NOT_FOUND}`;
     }
     if (script.includes('Schedule.Service')) {
       const name = values(options.input)[0] ?? '';

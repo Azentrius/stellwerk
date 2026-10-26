@@ -84,10 +84,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.8.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.8.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.8.0.zip -DestinationPath .
-cd stellwerk-0.8.0
+(Get-FileHash stellwerk-0.9.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.9.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.9.0.zip -DestinationPath .
+cd stellwerk-0.9.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -126,7 +126,7 @@ Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.8.0.zip
+stellwerk update stellwerk-0.9.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -151,7 +151,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.8.0"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.9.0"
 npm link
 ```
 
@@ -178,15 +178,20 @@ adding them. Both start at logon, without administrator rights:
 The tasks start what is built in this folder. Run the command again after moving the folder, installing
 Node.js elsewhere or rearranging the screens; `stellwerk update` points them at the new release itself.
 
-Start, stop or restart Stellwerk with
+See how Stellwerk stands, and start, stop or restart it, with
 
 ```powershell
+stellwerk status
 stellwerk start
 stellwerk stop
 stellwerk restart
 ```
 
-They run or end the tasks in order, without administrator rights: the hub first, then the display;
+`stellwerk status` shows what runs and what is set up, and changes nothing: whether the hub answers and
+which release it and its task run, the display, LibreHardwareMonitor, and whether the hooks of Claude
+Code and Codex point at the running release. What needs doing is marked `!!`, with the command for it.
+
+The other three run or end the tasks in order, without administrator rights: the hub first, then the display;
 stopping the other way round. The hub runs LibreHardwareMonitor while it runs, when it is set up (see
 below), and `stop` ends it too. In the Task Scheduler the tasks can be run and ended by hand as well; the
 hub ends together with its task. `stellwerk autostart uninstall` removes the hub's and the display's task.
@@ -275,8 +280,8 @@ The password matters: LibreHardwareMonitor's web server can also set fan speeds 
 page in a browser on this machine. With the password, a page can neither read the values nor change
 anything. Do not open `http://127.0.0.1:8085` in a browser and let it remember the password.
 
-A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its version and hash. Run
-`stellwerk hardware install` again after updating; so too once after updating to 0.8.0, which takes the
+A newer LibreHardwareMonitor comes with a newer Stellwerk, which pins its version and hash; the status
+column and `stellwerk status` say when it is due. Run `stellwerk hardware install` again after updating; so too once after updating to 0.8.0, which takes the
 start at logon out of the task. `stellwerk hardware uninstall` stops it and removes
 the task, the firewall rule and the folder.
 
@@ -473,6 +478,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\sessions.json` | The sessions on the display (id, folder, title, project, context, last activity), for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` | Since when monitors of Uptime Kuma fail (ids and times only), for the display after a restart |
+| `%LOCALAPPDATA%\stellwerk\hardware.json` | The version of LibreHardwareMonitor `hardware install` set up, to say when a newer one is due |
 | `%LOCALAPPDATA%\stellwerk\releases\` | The releases set up by `stellwerk update`, one folder `stellwerk-X.Y.Z` each |
 | Tasks `Stellwerk hub`, `Stellwerk display` | Start with Windows, in the Task Scheduler |
 | `%USERPROFILE%\.claude\settings.json` | Claude Code's settings with the hooks; backups next to it as `settings.json.stellwerk-….bak` |

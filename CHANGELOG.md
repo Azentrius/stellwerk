@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0 – 2026-10-26
+
+Stellwerk says how it stands, and when a newer LibreHardwareMonitor is due.
+
+- **`stellwerk status`:** what runs and what is set up, without changing anything: whether the hub
+  answers and which release it runs (from its log) and its task starts, the display, LibreHardwareMonitor
+  and its version, and whether the hooks of Claude Code (with the app's session id, the token set) and of
+  Codex point at the running release. What needs doing is marked `!!` with the command for it, and the
+  command then ends with 1. Task states come from Task Scheduler itself, in any language.
+- **A due LibreHardwareMonitor:** `stellwerk hardware install` notes the version it set up
+  (`%LOCALAPPDATA%\stellwerk\hardware.json`). When a newer Stellwerk pins a newer one, the status column
+  says so, with the command to run as administrator.
+- **Tests:** `stellwerk status` against a made-up Windows (all well; an old hub, old Codex hooks, hooks
+  without the app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts
+  at logon), the due version from the hub to the display, its note in both languages.
+
 ## 0.8.0 – 2026-10-26
 
 LibreHardwareMonitor runs while Stellwerk runs, Stellwerk starts, stops and restarts with one command,

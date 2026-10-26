@@ -29,6 +29,8 @@ export interface Paths {
   rawLogFile: string;
   /** The messages of the hub started at logon, which has no window. */
   hubLogFile: string;
+  /** Which LibreHardwareMonitor `hardware install` set up: {"version": "X.Y.Z"}. */
+  hardwareStateFile: string;
   /** The Edge profile of the display window started at logon. */
   displayProfileDir: string;
   /** The read-only GitHub token for the list of open pull requests. */
@@ -65,6 +67,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     auditFile: path.join(dataDir, 'audit.jsonl'),
     rawLogFile: path.join(dataDir, 'debug-raw.jsonl'),
     hubLogFile: path.join(dataDir, 'hub.log'),
+    hardwareStateFile: path.join(dataDir, 'hardware.json'),
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
     uptimeKumaKeyFile: path.join(dataDir, 'uptime-kuma-key'),

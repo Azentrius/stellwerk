@@ -26,6 +26,7 @@ import {
   hardwareLine,
   hubState,
   newReleaseLine,
+  hardwareDueLine,
   rawLogLine,
   rejectedLine,
   uptimeKumaLine,
@@ -114,6 +115,7 @@ const lastEvent = byId('last-event');
 const rejectedState = byId('rejected-state');
 const rawLogState = byId('raw-log-state');
 const newReleaseState = byId('new-release-state');
+const hardwareDueState = byId('hardware-due-state');
 const toastNode = byId('toast');
 
 let state: StateMessage | null = null;
@@ -255,6 +257,7 @@ function tick(): void {
   showOrHide(rejectedState, rejectedLine(hub, now, texts));
   showOrHide(rawLogState, rawLogLine(hub, texts));
   showOrHide(newReleaseState, newReleaseLine(hub, texts));
+  showOrHide(hardwareDueState, hardwareDueLine(hub, texts));
   // While the hub is away, its last problems with GitHub and the hardware are old news: only its own
   // alert shows.
   const current = <T>(line: T): T | null => (connected || typeof line === 'string' ? line : null);

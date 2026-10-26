@@ -83,6 +83,8 @@ export interface Texts {
   /** The raw hook log is on. */
   rawLog: { title: string; fix: string };
   newRelease: { title: (version: string) => string; fix: (version: string) => string };
+  /** The LibreHardwareMonitor set up is older than the one this Stellwerk pins. */
+  hardwareDue: { title: (version: string) => string; fix: string };
   /** The display was opened without its start file. */
   notSignedIn: string;
   notSignedInFix: string;
@@ -263,6 +265,10 @@ const en: Texts = {
     title: (version) => `Stellwerk ${version} is out`,
     fix: (version) => `Download \`stellwerk-${version}.zip\` and \`SHA256SUMS\` from its release on GitHub, then run \`stellwerk update stellwerk-${version}.zip\`.`,
   },
+  hardwareDue: {
+    title: (version) => `LibreHardwareMonitor ${version} is due`,
+    fix: 'Run `stellwerk hardware install` again as administrator.',
+  },
   notSignedIn: 'Display not signed in',
   notSignedInFix: 'Open it with its start file, `display.html` in `%LOCALAPPDATA%\\stellwerk`, or start the task "Stellwerk display" again.',
   lastEvent: (ago) => `last event ${ago}`,
@@ -436,6 +442,10 @@ const de: Texts = {
   newRelease: {
     title: (version) => `Stellwerk ${version} ist da`,
     fix: (version) => `Lade \`stellwerk-${version}.zip\` und \`SHA256SUMS\` aus dem Release auf GitHub und führe \`stellwerk update stellwerk-${version}.zip\` aus.`,
+  },
+  hardwareDue: {
+    title: (version) => `LibreHardwareMonitor ${version} steht an`,
+    fix: 'Führe `stellwerk hardware install` als Administrator erneut aus.',
   },
   notSignedIn: 'Anzeige nicht angemeldet',
   notSignedInFix: 'Öffne sie über ihre Startdatei, `display.html` in `%LOCALAPPDATA%\\stellwerk`, oder starte die Aufgabe „Stellwerk display“ neu.',
