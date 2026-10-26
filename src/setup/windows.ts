@@ -166,6 +166,23 @@ export function isElevated(): boolean {
   return powershell(script) === 'True';
 }
 
+/** What Task Scheduler says of a task: its state, or that it is not there (by its error code, in any language). */
+export type TaskState = 'missing' | 'disabled' | 'queued' | 'ready' | 'running';
+
+export function taskState(name: string): TaskState {
+  requireWindows();
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    'try { $service = New-Object -ComObject Schedule.Service; $service.Connect(); [string]$service.GetFolder([string][char]92).GetTask($values[0]).State } ' +
+      "catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; 'error ' + $e.HResult }",
+  ].join('; ');
+  const answer = powershell(script, [name]);
+  if (answer === `error ${TASK_NOT_FOUND}`) return 'missing';
+  const state = ({ '1': 'disabled', '2': 'queued', '3': 'ready', '4': 'running' } as const)[answer];
+  if (!state) throw unreadableTask(name, answer.slice(0, 200));
+  return state;
+}
+
 /**
  * How many Edge processes run with this profile folder (--user-data-dir); the folder goes in on stdin. Edge
  * passes it on to its child processes in quotes, and Windows paths ignore case.

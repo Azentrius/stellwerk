@@ -44,6 +44,7 @@ import {
   DEFAULT_SETTINGS_FILE,
   TOKEN_ENV,
   formatSettings,
+  isStellwerkHandler,
   lineDiff,
   withStellwerkHooks,
   withoutStellwerkHooks,
@@ -82,6 +83,7 @@ import {
   stopProgram,
   taskDefinition,
   taskExists,
+  taskState,
 } from './setup/windows.ts';
 import {
   ensureToken,
@@ -111,6 +113,10 @@ Usage:
   stellwerk serve [--debug-raw] [--simulate-hang] [--log-file <file>] [--exit-with-parent]
       Start the hub on ${HOST}. Then open the display with its start file, which only
       you can read: %LOCALAPPDATA%\\stellwerk\\display.html
+  stellwerk status
+      What runs and what is set up: the hub and the release its task starts, the display,
+      LibreHardwareMonitor, the hooks of Claude Code and Codex. Changes nothing; ends with 1 when
+      something needs doing, and says what.
   stellwerk start
   stellwerk stop
   stellwerk restart
@@ -206,6 +212,7 @@ async function main(): Promise<void> {
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
   if (command === 'update') return update(action, values.yes, values.screen, values['keep-previous']);
   if (command === 'start' || command === 'stop' || command === 'restart') return control(command);
+  if (command === 'status') return status();
   console.error(USAGE);
   process.exitCode = 2;
 }
@@ -249,6 +256,7 @@ async function serve(
       codexHoldMs: config.codexHoldSeconds * 1000,
       scale: config.scale,
       version: VERSION,
+      hardwareDue: config.hardwareMonitor ? hardwareDue(paths.hardwareStateFile) : null,
       sound: config.sound,
       quietAfterMs: config.quietAfterMinutes * 60_000,
       remindAfterMs: config.remindAfterSeconds * 1000,
@@ -565,6 +573,7 @@ async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<
     removeFirewallRule(LHM_PORT, { quiet: true });
     removeFiles(dir);
     setConfigValue(paths.configFile, 'hardwareMonitor', false);
+    fs.rmSync(paths.hardwareStateFile, { force: true });
     console.log('Removed.');
     return restartHub();
   }
@@ -604,6 +613,8 @@ async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<
   startTask(HARDWARE_TASK);
   console.log(`Task "${HARDWARE_TASK}" registered and started.`);
   setConfigValue(paths.configFile, 'hardwareMonitor', true);
+  // Which version this is, so that a later Stellwerk can tell when a newer one is due.
+  fs.writeFileSync(paths.hardwareStateFile, `${JSON.stringify({ version: LHM_VERSION })}\n`);
   restartHub();
 }
 
@@ -835,6 +846,99 @@ function removeRelease(dir: string, codexHooks: string): void {
  * way round. The hub runs and ends LibreHardwareMonitor itself; stopping ends its task as well, in case the
  * hub could not.
  */
+async function status(): Promise<void> {
+  const paths = defaultPaths();
+  const config = loadConfig(paths.configFile);
+  const lines: Array<{ ok: boolean; text: string }> = [];
+  const note = (ok: boolean, text: string) => void lines.push({ ok, text });
+  /** Each part on its own: one that cannot be read is said, the others still are. */
+  const part = async (name: string, check: () => void | Promise<void>) => {
+    try {
+      await check();
+    } catch (err) {
+      note(false, `${name}: ${(err as Error).message}`);
+    }
+  };
+  let target: string | null = null;
+
+  await part('Hub', async () => {
+    const answers = await listening(config.port);
+    const running = runningVersion(paths.hubLogFile);
+    note(answers, answers ? `Hub: answers on ${HOST}:${config.port}${running ? `, Stellwerk ${running}` : ''}` : `Hub: does not answer on ${HOST}:${config.port}. Start it: stellwerk start`);
+    const state = taskState(HUB_TASK);
+    if (state === 'missing') return note(false, `Task "${HUB_TASK}": missing. Set Stellwerk up: stellwerk autostart install`);
+    target = releaseOf(taskDefinition(HUB_TASK));
+    note(true, `Task "${HUB_TASK}": ${state}, starts ${target ? `releases\\stellwerk-${target}` : 'a build outside the releases folder'}`);
+    if (answers && running && target && running !== target) note(false, `The hub runs ${running}, its task starts ${target}: stellwerk restart`);
+  });
+
+  await part('Display', () => {
+    const state = taskState(DISPLAY_TASK);
+    if (state === 'missing') return note(false, `Task "${DISPLAY_TASK}": missing. Set Stellwerk up: stellwerk autostart install`);
+    const open = edgeWithProfile(paths.displayProfileDir) > 0;
+    note(open, open ? `Display: open (task ${state})` : `Display: closed (task ${state}). Open it: stellwerk start`);
+  });
+
+  await part('Hardware', async () => {
+    if (!config.hardwareMonitor) return note(true, 'Hardware: not set up (stellwerk hardware install, as administrator)');
+    const state = taskState(HARDWARE_TASK);
+    if (state === 'missing') return note(false, `Task "${HARDWARE_TASK}": missing. Run stellwerk hardware install as administrator`);
+    const task = taskDefinition(HARDWARE_TASK) ?? '';
+    const set = /LibreHardwareMonitor (\d+\.\d+\.\d+)/.exec(task)?.[1] ?? null;
+    const answers = await listening(LHM_PORT);
+    note(answers, `Hardware: LibreHardwareMonitor ${set ?? '(version not known)'} ${answers ? 'answers' : 'does not answer'} on port ${LHM_PORT} (task ${state})`);
+    if (set !== LHM_VERSION) note(false, `This Stellwerk pins LibreHardwareMonitor ${LHM_VERSION}: run stellwerk hardware install as administrator`);
+    if (/<LogonTrigger[\s/>]/.test(task)) note(false, 'Its task still starts at logon by itself: run stellwerk hardware install as administrator once');
+  });
+
+  await part('Claude Code', () => {
+    const settings = fs.existsSync(DEFAULT_SETTINGS_FILE) ? (readJsonFile(DEFAULT_SETTINGS_FILE) as Record<string, unknown>) : {};
+    const handlers = Object.values((settings.hooks ?? {}) as Record<string, Array<{ hooks?: unknown[] }>>)
+      .flatMap((groups) => (Array.isArray(groups) ? groups : []).flatMap((group) => group.hooks ?? []))
+      .filter(isStellwerkHandler) as Array<{ headers?: Record<string, string> }>;
+    if (handlers.length === 0) return note(false, 'Claude Code: no Stellwerk hooks. Run stellwerk hooks install');
+    const withApp = handlers.every((h) => h.headers?.['X-Stellwerk-App-Session'] !== undefined);
+    note(withApp, withApp ? `Claude Code: ${handlers.length} hooks, with the app's session id` : 'Claude Code: hooks without the app\'s session id. Run stellwerk hooks install');
+    const token = getUserEnv(TOKEN_ENV) !== null;
+    note(token, token ? `Claude Code: ${TOKEN_ENV} is set` : `Claude Code: ${TOKEN_ENV} is not set. Run stellwerk hooks install`);
+  });
+
+  await part('Codex', () => {
+    const commands = codexCommands(codexHooksFile(paths.codexHome));
+    if (commands.length === 0) return note(true, 'Codex: no Stellwerk hooks (stellwerk codex install, if you use Codex)');
+    const forwarder = releaseOf(commands[0]!);
+    const same = target === null || forwarder === target;
+    note(same, same ? `Codex: ${commands.length} hooks${forwarder ? ` run the forwarder of ${forwarder}` : ''}` : `Codex: the hooks run the forwarder of ${forwarder ?? 'another build'}, the hub's task starts ${target}. Run stellwerk codex install from ${target}`);
+  });
+
+  for (const line of lines) console.log(`${line.ok ? 'ok' : '!!'}  ${line.text}`);
+  const due = lines.filter((l) => !l.ok).length;
+  console.log(due === 0 ? '\nAll is well.' : `\n${due} ${due === 1 ? 'thing needs' : 'things need'} doing (marked !!).`);
+  if (due > 0) process.exitCode = 1;
+}
+
+/** The version of the hub that started last, from its log ("--- <time>  Stellwerk X.Y.Z, process N"). */
+function runningVersion(logFile: string): string | null {
+  if (!fs.existsSync(logFile)) return null;
+  const starts = [...fs.readFileSync(logFile, 'utf8').matchAll(/^--- \S+\s+Stellwerk (\d+\.\d+\.\d+), process \d+/gm)];
+  return starts.at(-1)?.[1] ?? null;
+}
+
+/** The release a task or a hook runs from, by its folder (releases\stellwerk-X.Y.Z\…). */
+function releaseOf(text: string | null): string | null {
+  return /releases[\\/]stellwerk-(\d+\.\d+\.\d+)[\\/]/.exec(text ?? '')?.[1] ?? null;
+}
+
+/** The pinned LibreHardwareMonitor, when `hardware install` set up an older one (it notes its version). */
+function hardwareDue(file: string): string | null {
+  try {
+    const { version } = JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: unknown };
+    return typeof version === 'string' && version !== LHM_VERSION ? LHM_VERSION : null;
+  } catch {
+    return null;
+  }
+}
+
 async function control(what: 'start' | 'stop' | 'restart'): Promise<void> {
   const paths = defaultPaths();
   const config = loadConfig(paths.configFile);

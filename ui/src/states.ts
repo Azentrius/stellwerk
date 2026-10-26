@@ -171,6 +171,12 @@ export function rawLogLine(hub: HubView | null, texts: Texts): Problem | null {
 }
 
 /** A note that a newer release of Stellwerk is out, and how to set it up. */
+/** The LibreHardwareMonitor set up is older than the pinned one: a note, as for a newer release. */
+export function hardwareDueLine(hub: HubView | null, texts: Texts): Problem | null {
+  const version = hub?.hardwareDue ?? null;
+  return version === null ? null : { tone: 'info', title: texts.hardwareDue.title(version), fix: texts.hardwareDue.fix };
+}
+
 export function newReleaseLine(hub: HubView | null, texts: Texts): Problem | null {
   const version = hub?.newRelease ?? null;
   return version === null ? null : { tone: 'info', title: texts.newRelease.title(version), fix: texts.newRelease.fix(version) };

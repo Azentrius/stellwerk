@@ -9,7 +9,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import type { GitHubView, HardwareView, HubView, UptimeKumaView } from '../src/shared/protocol.js';
 import { pickTexts } from '../ui/src/i18n.ts';
-import { githubLine, hardwareLine, newReleaseLine, rawLogLine, rejectedLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
+import { githubLine, hardwareDueLine, hardwareLine, newReleaseLine, rawLogLine, rejectedLine, splitCode, uptimeKumaLine } from '../ui/src/states.ts';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const cli = fs.readFileSync(path.join(ROOT, 'src', 'cli.ts'), 'utf8');
@@ -118,4 +118,13 @@ test('a newer release is a note that says how to set it up, in both languages', 
     fix: 'Download `stellwerk-0.6.0.zip` and `SHA256SUMS` from its release on GitHub, then run `stellwerk update stellwerk-0.6.0.zip`.',
   });
   assert.equal(newReleaseLine(hub('0.6.0'), de)?.title, 'Stellwerk 0.6.0 ist da');
+});
+
+test('a due LibreHardwareMonitor is a note that says to run the hardware setup again, in both languages', () => {
+  const hub = (hardwareDue: string | null): HubView => ({ startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: 0, remindAfterMs: 0, night: null, build: 'x', rejected: null, rawLog: false, newRelease: null, hardwareDue });
+  const de = languages[1]!;
+  assert.equal(hardwareDueLine(null, en), null, 'nothing while the hub is away');
+  assert.equal(hardwareDueLine(hub(null), en), null);
+  assert.deepEqual(hardwareDueLine(hub('0.9.7'), en), { tone: 'info', title: 'LibreHardwareMonitor 0.9.7 is due', fix: 'Run `stellwerk hardware install` again as administrator.' });
+  assert.equal(hardwareDueLine(hub('0.9.7'), de)?.title, 'LibreHardwareMonitor 0.9.7 steht an');
 });

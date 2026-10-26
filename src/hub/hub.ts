@@ -106,6 +106,8 @@ export interface HubOptions {
   scale: number;
   /** Stellwerk's version, named in the display's signature. */
   version: string;
+  /** The pinned LibreHardwareMonitor, when the one set up is older (HubView.hardwareDue). */
+  hardwareDue?: string | null;
   sound: boolean;
   /** The display dims after this long without anything new (config quietAfterMinutes); 0 or none: never. */
   quietAfterMs?: number;
@@ -698,6 +700,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         rejected,
         rawLog: Boolean(options.rawLogFile),
         newRelease: newerRelease(github?.latestRelease ?? null, options.version),
+        hardwareDue: options.hardwareDue ?? null,
       },
       github: github?.view() ?? null,
       hardware: hardware?.view() ?? null,

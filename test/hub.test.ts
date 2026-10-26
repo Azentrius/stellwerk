@@ -1578,3 +1578,14 @@ describe('LibreHardwareMonitor with the hub', () => {
     assert.deepEqual(calls, ['run', 'end']);
   });
 });
+
+describe('a due LibreHardwareMonitor', () => {
+  test('the hub tells the display which version is due; none by default', async () => {
+    for (const [hardwareDue, expected] of [['0.9.7', '0.9.7'], [undefined, null]] as const) {
+      const { port } = await startTestHub(hardwareDue ? { hardwareDue } : {});
+      const screen = await display(port);
+      assert.equal((await screen.state(() => true)).hub.hardwareDue, expected);
+      screen.close();
+    }
+  });
+});

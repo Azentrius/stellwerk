@@ -126,6 +126,11 @@ export interface HubView {
   rawLog: boolean;
   /** A newer release of Stellwerk on GitHub, its version (X.Y.Z); null when there is none or it is not known. */
   newRelease: string | null;
+  /**
+   * The LibreHardwareMonitor this Stellwerk pins (X.Y.Z), when the one set up is older: `stellwerk hardware
+   * install` as administrator brings it. Null when it is the same or not known.
+   */
+  hardwareDue?: string | null;
 }
 
 /** The Actions runs on a pull request's head commit, summed up. */
