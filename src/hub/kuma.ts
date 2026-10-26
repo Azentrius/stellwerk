@@ -261,7 +261,7 @@ export class UptimeKumaWatcher {
     const failing: FailingMonitor[] = [];
     for (const monitor of monitors) {
       if (monitor.status === 'down' || monitor.status === 'pending') {
-        failing.push({ name: monitor.name, status: monitor.status, since: seen.get(monitor.id)!.since });
+        failing.push({ id: monitor.id, name: monitor.name, status: monitor.status, since: seen.get(monitor.id)!.since });
       }
     }
     // Down before pending; within each the most recent first, those without a time last, then by name.

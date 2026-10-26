@@ -667,7 +667,7 @@ describe("Uptime Kuma's monitors", () => {
     const { port } = await startTestHub({ uptimeKuma: { url: 'http://192.0.2.10:3001', key, intervalMs: 60_000, fetch: fakeFetch } });
     const screen = await display(port);
     const state = await screen.state((s) => s.uptimeKuma?.monitors !== null && s.uptimeKuma?.monitors !== undefined);
-    assert.deepEqual(state.uptimeKuma?.monitors, { failing: [{ name: 'Backup - web', status: 'down', since: null }], up: 1, maintenance: 1 });
+    assert.deepEqual(state.uptimeKuma?.monitors, { failing: [{ id: '2', name: 'Backup - web', status: 'down', since: null }], up: 1, maintenance: 1 });
     assert.equal(state.uptimeKuma?.problem, null);
     assert.doesNotMatch(JSON.stringify(state), new RegExp(key));
     assert.deepEqual(calls.map((c) => c.url), ['http://192.0.2.10:3001/metrics']);
@@ -695,7 +695,7 @@ describe("Uptime Kuma's monitors", () => {
     const second = await startTestHub({ uptimeKuma: { ...kuma, intervalMs: 60_000 } });
     const again = await display(second.port);
     const state = await again.state((s) => (s.uptimeKuma?.monitors?.failing.length ?? 0) > 0);
-    assert.deepEqual(state.uptimeKuma?.monitors?.failing, [{ name: 'Server - web', status: 'down', since }], 'the time of the last run');
+    assert.deepEqual(state.uptimeKuma?.monitors?.failing, [{ id: '1', name: 'Server - web', status: 'down', since }], 'the time of the last run');
     again.close();
   });
 });
@@ -1587,5 +1587,38 @@ describe('a due LibreHardwareMonitor', () => {
       assert.equal((await screen.state(() => true)).hub.hardwareDue, expected);
       screen.close();
     }
+  });
+});
+
+describe('opening a failing monitor', () => {
+  test("a failing monitor opens its page in Uptime Kuma; one that works, or an unknown one, does not", async () => {
+    const opened: string[] = [];
+    let at = 1_000_000;
+    const fakeFetch = (async () =>
+      new Response(
+        '# HELP monitor_status Monitor Status\n# TYPE monitor_status gauge\n' +
+          'monitor_status{monitor_id="1",monitor_name="Server - web",monitor_type="ping"} 1\n' +
+          'monitor_status{monitor_id="2",monitor_name="Backup - web",monitor_type="push"} 0\n',
+        { status: 200 },
+      )) as typeof fetch;
+    const { port } = await startTestHub({
+      open: (link) => opened.push(link),
+      now: () => at,
+      uptimeKuma: { url: 'http://192.0.2.10:3001', key: `uk1_${'k3Y-_'.repeat(8)}`, intervalMs: 60_000, fetch: fakeFetch },
+    });
+    const screen = await display(port);
+    const state = await screen.state((s) => (s.uptimeKuma?.monitors?.failing.length ?? 0) === 1);
+    assert.equal(state.uptimeKuma?.monitors?.failing[0]?.id, '2');
+    const send = async (target: Record<string, unknown>) => {
+      screen.ws.send(JSON.stringify({ type: 'open', target }));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      at += 2000;
+    };
+    await send({ monitor: '2' });
+    await send({ monitor: '1' });
+    await send({ monitor: '9' });
+    await send({ monitor: '2/../x' });
+    assert.deepEqual(opened, ['http://192.0.2.10:3001/dashboard/2']);
+    screen.close();
   });
 });

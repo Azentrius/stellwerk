@@ -1,5 +1,5 @@
-// What the display may open with a tap: a session in its app (the Claude desktop app, the Codex app) and a
-// pull request in the default browser. The display only names what to open; the hub builds the link itself
+// What the display may open with a tap: a session in its app (the Claude desktop app, the Codex app), and a
+// pull request or a failing monitor's page in Uptime Kuma in the default browser. The display only names what to open; the hub builds the link itself
 // from what it knows, checks it against three fixed forms and hands it to the Windows shell: explorer.exe
 // with the link as its only argument, no shell in between. That is the one program the hub starts (chosen
 // by Stefan on 2026-10-23: the display's Edge in kiosk mode cannot hand a link to another program).
@@ -22,6 +22,7 @@ const LINKS = [
   /^claude:\/\/claude\.ai\/epitaxy\/local_[A-Za-z0-9-]{1,64}$/,
   /^codex:\/\/threads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/pull\/[1-9][0-9]{0,9}$/,
+  /^https?:\/\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?\/dashboard\/[1-9][0-9]{0,9}$/,
 ];
 
 export function isOpenableLink(link: string): boolean {
@@ -35,6 +36,22 @@ export function isOpenableLink(link: string): boolean {
 export function sessionLink(session: { id: string; provider: Provider; terminal: boolean; appSession: string | null }): string | null {
   if (session.provider === 'codex') return !session.terminal && CODEX_THREAD.test(session.id) ? `codex://threads/${session.id}` : null;
   return session.appSession !== null && APP_SESSION.test(session.appSession) ? `claude://claude.ai/epitaxy/${session.appSession}` : null;
+}
+
+/**
+ * A monitor's page in Uptime Kuma, at the address set up (`uptimeKumaUrl`, an origin without a path: checked
+ * by uptimeKumaAddress in config.ts).
+ */
+export function monitorLink(origin: string, id: string): string | null {
+  if (!/^[1-9][0-9]{0,9}$/.test(id)) return null;
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return null;
+  }
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return null;
+  return `${url.origin}/dashboard/${id}`;
 }
 
 /** A pull request on github.com. */

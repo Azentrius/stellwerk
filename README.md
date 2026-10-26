@@ -56,8 +56,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   touch and a new request. A restart of the hub keeps them (they come from the audit log).
 - **Open it where it is.** In a session's details a button opens it in its app: a session of the Claude
   desktop app in the app, a chat of the Codex app in Codex. A session waiting for an answer opens there
-  with a tap, a pull request in your default browser. The display says at once where it opens ("Opening
-  in Codex …"), as an app may take a few seconds to show it. The hub opens only these three kinds of links,
+  with a tap, a pull request and a failing monitor's page in Uptime Kuma in your default browser. The display says at once where it opens ("Opening
+  in Codex …"), as an app may take a few seconds to show it. The hub opens only these four kinds of links,
   which it builds itself (see Security). Claude Code in a terminal and Codex' command line have no app to open.
   The desktop app's sessions need the hooks of 0.7.0 or later (`stellwerk hooks install`), which send the
   app's own id of the session along.
@@ -514,7 +514,8 @@ Restart the hub after a change.
   the link as its only argument, no shell). The display only names what to open; the hub builds the link
   from what it shows and opens only three forms: `claude://claude.ai/epitaxy/local_…` (a session of the
   desktop app), `codex://threads/<id>` (a Codex chat) and `https://github.com/<owner>/<repo>/pull/<n>`
-  (a pull request it lists), at most one a second. It connects to other machines only to `api.github.com`, for the list of
+  (a pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
+  second. It connects to other machines only to `api.github.com`, for the list of
   pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
   up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
   that it asks

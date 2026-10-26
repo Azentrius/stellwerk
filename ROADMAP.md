@@ -152,8 +152,8 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ## 0.9.0 – How it stands ✅
 
-Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk status` shows what runs and what is set up, and
-the status column says when a newer LibreHardwareMonitor is due.
+Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk status` shows what runs and what is set up, the
+status column says when a newer LibreHardwareMonitor is due, and a failing monitor opens in Uptime Kuma.
 
 ---
 

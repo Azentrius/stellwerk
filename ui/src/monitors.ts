@@ -8,6 +8,7 @@ import type { FailingMonitor, UptimeKumaView } from '../../src/shared/protocol.j
 import { el, label } from './dom.ts';
 import type { Texts } from './i18n.ts';
 import { failingFor, monitorState, state } from './states.ts';
+import type { TapList } from './taps.ts';
 
 export interface MonitorNodes {
   down: HTMLElement;
@@ -15,12 +16,14 @@ export interface MonitorNodes {
   ok: HTMLElement;
 }
 
-/** Draws the monitors; returns how many fail. */
-export function renderMonitors(nodes: MonitorNodes, kuma: UptimeKumaView | null, now: number, texts: Texts): number {
+/** Draws the monitors; returns how many fail. A tap on a failing one opens its page in Uptime Kuma. */
+export function renderMonitors(nodes: MonitorNodes, taps: { down: TapList; pending: TapList }, kuma: UptimeKumaView | null, now: number, texts: Texts): number {
   const monitors = kuma?.monitors ?? null;
   const failing = monitors?.failing ?? [];
-  nodes.down.replaceChildren(...failing.filter((m) => m.status === 'down').map((m) => failingEntry(m, now, texts)));
-  nodes.pending.replaceChildren(...failing.filter((m) => m.status === 'pending').map((m) => failingEntry(m, now, texts)));
+  const entries = (status: FailingMonitor['status']) =>
+    failing.filter((m) => m.status === status).map((m) => ({ key: m.id, fresh: failingEntry(m, now, texts), tappable: true, hint: texts.openMonitor }));
+  taps.down.render(nodes.down, entries('down'));
+  taps.pending.render(nodes.pending, entries('pending'));
   nodes.ok.replaceChildren(...(monitors ? okLine(monitors.up, monitors.maintenance, failing.length, texts) : []));
   return failing.length;
 }

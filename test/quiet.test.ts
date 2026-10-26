@@ -40,8 +40,8 @@ describe('what wakes the display', () => {
           { repo: 'shop-api', number: 2, checks: 'failing' },
         ],
         failing: [
-          { name: 'Server', status: 'down', since: null },
-          { name: 'Shop', status: 'pending', since: null },
+          { id: '1', name: 'Server', status: 'down', since: null },
+          { id: '2', name: 'Shop', status: 'pending', since: null },
         ],
       }),
       true,

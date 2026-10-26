@@ -133,8 +133,8 @@ describe('asking Uptime Kuma', () => {
     // Already failing at the first answer: the hub did not see it start.
     assert.deepEqual(w.monitors, {
       failing: [
-        { name: 'Bravo', status: 'down', since: null },
-        { name: 'Charlie', status: 'pending', since: null },
+        { id: '2', name: 'Bravo', status: 'down', since: null },
+        { id: '3', name: 'Charlie', status: 'pending', since: null },
       ],
       up: 1,
       maintenance: 1,
@@ -143,18 +143,18 @@ describe('asking Uptime Kuma', () => {
     lines = [[1, 'Alpha', 0], [2, 'Bravo', 0], [3, 'Charlie', 2], [4, 'Delta', 3]];
     await w.poll();
     assert.deepEqual(w.monitors?.failing, [
-      { name: 'Alpha', status: 'down', since: 2000 },
-      { name: 'Bravo', status: 'down', since: null },
-      { name: 'Charlie', status: 'pending', since: null },
+      { id: '1', name: 'Alpha', status: 'down', since: 2000 },
+      { id: '2', name: 'Bravo', status: 'down', since: null },
+      { id: '3', name: 'Charlie', status: 'pending', since: null },
     ]);
     now = 3000;
     lines = [[1, 'Alpha', 0], [2, 'Bravo', 1], [3, 'Charlie', 0], [5, 'Echo', 2]];
     await w.poll();
     assert.deepEqual(w.monitors, {
       failing: [
-        { name: 'Charlie', status: 'down', since: 3000 },
-        { name: 'Alpha', status: 'down', since: 2000 },
-        { name: 'Echo', status: 'pending', since: 3000 },
+        { id: '3', name: 'Charlie', status: 'down', since: 3000 },
+        { id: '1', name: 'Alpha', status: 'down', since: 2000 },
+        { id: '5', name: 'Echo', status: 'pending', since: 3000 },
       ],
       up: 1,
       maintenance: 0,
@@ -180,8 +180,8 @@ describe('asking Uptime Kuma', () => {
     lines = [[1, 'Alpha', 0], [2, 'Bravo', 0]];
     await w.poll();
     assert.deepEqual(w.monitors?.failing, [
-      { name: 'Alpha', status: 'down', since: null },
-      { name: 'Bravo', status: 'down', since: null },
+      { id: '1', name: 'Alpha', status: 'down', since: null },
+      { id: '2', name: 'Bravo', status: 'down', since: null },
     ]);
   });
 
@@ -282,17 +282,17 @@ describe('since when, over a restart of the hub', () => {
     await w.poll();
     assert.deepEqual(w.monitors?.failing, [
       // Still down: since 2000, as the last run saw it.
-      { name: 'Alpha', status: 'down', since: 2000 },
+      { id: '1', name: 'Alpha', status: 'down', since: 2000 },
       // From pending to down while the hub was away: the hub did not see when.
-      { name: 'Bravo', status: 'down', since: null },
+      { id: '2', name: 'Bravo', status: 'down', since: null },
       // Already failing when the last run started: still no time.
-      { name: 'Delta', status: 'down', since: null },
+      { id: '4', name: 'Delta', status: 'down', since: null },
     ]);
     // From then on as always: a change seen now happened since the last answer.
     now += 60_000;
     lines = [[1, 'Alpha', 0], [2, 'Bravo', 0], [3, 'Charlie', 0], [4, 'Delta', 0], [5, 'Echo', 3]];
     await w.poll();
-    assert.deepEqual(w.monitors?.failing.find((m) => m.name === 'Charlie'), { name: 'Charlie', status: 'down', since: now });
+    assert.deepEqual(w.monitors?.failing.find((m) => m.name === 'Charlie'), { id: '3', name: 'Charlie', status: 'down', since: now });
     await w.flush();
     assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).at, now);
   });
@@ -303,14 +303,14 @@ describe('since when, over a restart of the hub', () => {
     await lastRun(file);
     const late = run(file, lines, () => 2000 + RESUME_WITHIN_MS + 1);
     await late.poll();
-    assert.deepEqual(late.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
+    assert.deepEqual(late.monitors?.failing, [{ id: '1', name: 'Alpha', status: 'down', since: null }]);
     await late.flush();
 
     const other = stateFile();
     await lastRun(other);
     const elsewhere = run(other, lines, () => 3000, { url: 'http://192.0.2.11:3001' });
     await elsewhere.poll();
-    assert.deepEqual(elsewhere.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
+    assert.deepEqual(elsewhere.monitors?.failing, [{ id: '1', name: 'Alpha', status: 'down', since: null }]);
     await elsewhere.flush();
   });
 
@@ -342,6 +342,6 @@ describe('since when, over a restart of the hub', () => {
     await w.flush();
     assert.equal(log.length, 1);
     assert.match(log[0]!, /^Uptime Kuma: /);
-    assert.deepEqual(w.monitors?.failing, [{ name: 'Alpha', status: 'down', since: null }]);
+    assert.deepEqual(w.monitors?.failing, [{ id: '1', name: 'Alpha', status: 'down', since: null }]);
   });
 });

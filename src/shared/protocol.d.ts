@@ -191,6 +191,8 @@ export interface HardwareView {
 
 /** A monitor of Uptime Kuma that fails: down, or pending (Uptime Kuma tries again before it says down). */
 export interface FailingMonitor {
+  /** Uptime Kuma's id of the monitor: a tap opens its page there. */
+  id: string;
   name: string;
   status: 'down' | 'pending';
   /** Since when the hub sees it so; null when it already was at the first answer the hub got. */
@@ -292,7 +294,7 @@ export interface DecideMessage {
 /** Open a session in its app, or a pull request in the default browser; the hub builds the link. */
 export interface OpenMessage {
   type: 'open';
-  target: { session: string } | { repo: string; number: number };
+  target: { session: string } | { repo: string; number: number } | { monitor: string };
 }
 
 export type ClientMessage = DecideMessage | OpenMessage;
