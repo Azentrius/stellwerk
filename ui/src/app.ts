@@ -89,6 +89,11 @@ const answers = byId<HTMLUListElement>('answers');
 const answerTaps = new TapList((id) => openTarget({ session: id }));
 const answersSection = byId('answers-section');
 const pulls = byId<HTMLUListElement>('pulls');
+/** A tap on a failing monitor opens its page in Uptime Kuma, in the default browser. */
+const monitorTaps = {
+  down: new TapList((id) => openTarget({ monitor: id })),
+  pending: new TapList((id) => openTarget({ monitor: id })),
+};
 /** A tap on a pull request opens it in the default browser. */
 const pullTaps = new TapList((key) => {
   const pr = state?.pullRequests.find((p) => pullKey(p) === key);
@@ -278,7 +283,7 @@ function tick(): void {
   // Uptime Kuma's column; while the hub is away its monitors are old news too.
   const kuma = connected ? (state?.uptimeKuma ?? null) : null;
   monitorsNode.hidden = kuma === null;
-  const failing = renderMonitors(monitorNodes, kuma, now, texts);
+  const failing = renderMonitors(monitorNodes, monitorTaps, kuma, now, texts);
   monitorsCount.textContent = failing > 0 ? `(${failing})` : '';
   monitorsFailing.hidden = failing === 0;
   markScrolling(monitorsFailing, 'monitors__failing--more');

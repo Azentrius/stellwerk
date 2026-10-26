@@ -2,7 +2,8 @@
 
 ## 0.9.0 – 2026-10-26
 
-Stellwerk says how it stands, and when a newer LibreHardwareMonitor is due.
+Stellwerk says how it stands and when a newer LibreHardwareMonitor is due, and a failing monitor opens in
+Uptime Kuma.
 
 - **`stellwerk status`:** what runs and what is set up, without changing anything: whether the hub
   answers and which release it runs (from its log) and its task starts, the display, LibreHardwareMonitor
@@ -12,7 +13,11 @@ Stellwerk says how it stands, and when a newer LibreHardwareMonitor is due.
 - **A due LibreHardwareMonitor:** `stellwerk hardware install` notes the version it set up
   (`%LOCALAPPDATA%\stellwerk\hardware.json`). When a newer Stellwerk pins a newer one, the status column
   says so, with the command to run as administrator.
-- **Tests:** `stellwerk status` against a made-up Windows (all well; an old hub, old Codex hooks, hooks
+- **A failing monitor opens in Uptime Kuma:** a tap on it opens its page there
+  (`<uptimeKumaUrl>/dashboard/<id>`) in the default browser, the fourth form of link the hub opens. The
+  hub builds it from the address set up and a monitor it shows as failing; the display names only its id.
+- **Tests:** the monitor's link and what it refuses, the hub opening only a failing monitor it shows;
+  `stellwerk status` against a made-up Windows (all well; an old hub, old Codex hooks, hooks
   without the app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts
   at logon), the due version from the hub to the display, its note in both languages.
 

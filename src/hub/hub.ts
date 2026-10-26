@@ -40,7 +40,7 @@ import { GitHubWatcher, newerRelease } from './github.ts';
 import { HardwareWatcher, type HardwareTask } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
-import { isOpenableLink, openWithShell, pullLink, sessionLink } from './links.ts';
+import { isOpenableLink, monitorLink, openWithShell, pullLink, sessionLink } from './links.ts';
 import { PlanBook, claudePlanOfHook } from './plans.ts';
 import { SessionFile } from './sessions.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
@@ -204,6 +204,7 @@ const openMessage = z.object({
   target: z.union([
     z.object({ session: z.string().max(200) }).strict(),
     z.object({ repo: z.string().max(100), number: z.number().int().positive() }).strict(),
+    z.object({ monitor: z.string().regex(/^[1-9][0-9]{0,9}$/) }).strict(),
   ]),
 });
 const clientMessage = z.discriminatedUnion('type', [decideMessage, openMessage]);
@@ -658,8 +659,10 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       const session = board.session(target.session);
       link = session ? sessionLink(session) : null;
       if (session) opened = session.provider;
-    } else if (options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
+    } else if ('repo' in target && options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
       link = pullLink(options.github.owner, target.repo, target.number);
+    } else if ('monitor' in target && options.uptimeKuma && uptimeKuma?.view().monitors?.failing.some((m) => m.id === target.monitor)) {
+      link = monitorLink(options.uptimeKuma.url, target.monitor);
     }
     if (link === null || !isOpenableLink(link)) return { type: 'open-result', ok: false, reason: 'unknown' };
     if (lastOpened !== null && now() - lastOpened < OPEN_EVERY_MS) return { type: 'open-result', ok: false, reason: 'busy' };

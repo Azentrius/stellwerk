@@ -126,6 +126,8 @@ export interface Texts {
   openIn: (app: string) => string;
   /** A tap on a pull request opens it in the browser: its tooltip. */
   openPull: string;
+  /** A tap on a failing monitor opens it in Uptime Kuma: its tooltip. */
+  openMonitor: string;
   /** Opening did not work: there is nothing to open for it any more, or the shell failed. */
   openUnknown: string;
   openFailed: string;
@@ -307,6 +309,7 @@ const en: Texts = {
   notOpen: 'This request is no longer open.',
   openIn: (app) => `Open in ${app}`,
   openPull: 'Open in the browser',
+  openMonitor: 'Open in Uptime Kuma',
   openUnknown: 'There is nothing to open for it.',
   openFailed: 'It could not be opened.',
   opening: { claude: 'Opening in Claude …', codex: 'Opening in Codex …', browser: 'Opening in the browser …' },
@@ -485,6 +488,7 @@ const de: Texts = {
   notOpen: 'Diese Anfrage ist nicht mehr offen.',
   openIn: (app) => `In ${app} öffnen`,
   openPull: 'Im Browser öffnen',
+  openMonitor: 'In Uptime Kuma öffnen',
   openUnknown: 'Dafür gibt es nichts zu öffnen.',
   openFailed: 'Ließ sich nicht öffnen.',
   opening: { claude: 'Öffnet in Claude …', codex: 'Öffnet in Codex …', browser: 'Öffnet im Browser …' },

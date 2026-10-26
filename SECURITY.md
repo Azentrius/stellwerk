@@ -87,11 +87,13 @@ reachable only from the machine it runs on and only by the display it serves:
   to the Windows shell (`explorer.exe` with the link as its only argument, no
   shell), which opens it with the program registered for it. The display only
   names a session or a pull request; the hub builds the link itself from what
-  it shows and opens only three forms, checked whole:
+  it shows and opens only four forms, checked whole:
   `claude://claude.ai/epitaxy/local_…` (the desktop app's own id of a
   session, which its hooks send in a header), `codex://threads/<UUID>` (a chat
   of the Codex app) and `https://github.com/<owner>/<repo>/pull/<n>` (a pull
-  request of the watched owner that it lists), at most one a second. Only the
+  request of the watched owner that it lists) and
+  `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows, at the address
+  set up), at most one a second. Only the
   setup commands run `icacls`, `powershell`, `netsh` and `schtasks`, with
   fixed arguments and without a shell; `serve` restricts the token file and
   the display's start file with `icacls` when it creates or changes them;
@@ -182,7 +184,7 @@ Reports are particularly welcome for:
 - the forwarder printing anything but the hub's answer, sending the token
   elsewhere, or making Codex wait beyond its hook timeout; `stellwerk codex
   install` or `uninstall` changing more of Codex' hooks than Stellwerk's own,
-- the hub opening anything else than those three forms of links, a link the
+- the hub opening anything else than those four forms of links, a link the
   display wrote, or a session or pull request it does not show; or the
   desktop app's id of a session reaching the display,
 - `stellwerk update` setting up a zip that does not match the `SHA256SUMS`

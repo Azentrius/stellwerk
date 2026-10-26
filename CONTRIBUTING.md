@@ -41,7 +41,7 @@ installed as a user would; its job `test` has to be green before a merge.
 ## How Stellwerk is built
 
 The hub can allow tool calls of AI agents, so its rules are not negotiable: it listens on `127.0.0.1`
-only, checks every request, and never allows or denies by itself. It starts no programs (but hands three
+only, checks every request, and never allows or denies by itself. It starts no programs (but hands four
 fixed forms of links it builds itself to the Windows shell, on a tap on the display, and runs and ends the
 task "Stellwerk hardware" so that LibreHardwareMonitor runs while it runs) and connects only to
 `api.github.com`, Uptime Kuma's `/metrics` and LibreHardwareMonitor, each only once set up; anything new

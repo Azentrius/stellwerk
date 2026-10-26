@@ -93,9 +93,9 @@ test('monitors: down is an error, pending (Uptime Kuma tries again) needs attent
   assert.equal(en.monitorsUp(35), '35 up');
   assert.equal(languages[1]!.monitorsUp(35), '35 in Ordnung');
   // How long, as far as the hub saw it; nothing when it was already failing at the first answer.
-  assert.equal(failingFor({ name: 'Server', status: 'down', since: 0 }, 4 * 60_000 + 5_000, en), 'for 4 min');
-  assert.equal(failingFor({ name: 'Server', status: 'down', since: 0 }, 13_000, languages[1]!), 'seit 13 s');
-  assert.equal(failingFor({ name: 'Server', status: 'down', since: null }, 13_000, en), '');
+  assert.equal(failingFor({ id: '1', name: 'Server', status: 'down', since: 0 }, 4 * 60_000 + 5_000, en), 'for 4 min');
+  assert.equal(failingFor({ id: '1', name: 'Server', status: 'down', since: 0 }, 13_000, languages[1]!), 'seit 13 s');
+  assert.equal(failingFor({ id: '1', name: 'Server', status: 'down', since: null }, 13_000, en), '');
 });
 
 test('a session is named by its title over its project; a chat without a project shows no second line', () => {
