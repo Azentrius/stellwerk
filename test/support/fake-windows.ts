@@ -35,8 +35,10 @@ export interface FakeWindows {
   display?: { running?: boolean; endsWithTask?: boolean; starts?: boolean; count?: string };
   /** Codex' hooks.json cannot be read (EACCES): always, or only once the hub was started again (at the cleanup). */
   codexUnreadable?: 'always' | 'at-cleanup';
-  /** User environment variables as Windows stores them (getUserEnv). */
+  /** User environment variables as Windows stores them (getUserEnv, setUserEnv). */
   userEnv?: Record<string, string>;
+  /** The terminal runs with administrator rights (isElevated). */
+  elevated?: boolean;
   /** spawnSync fails (status 1) for a program whose arguments hold this. */
   failing?: string;
   /** Where each call goes, one JSON line each. */
@@ -139,6 +141,16 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
       if (display.count !== undefined) throw failed(display.count);
       return String(display.running ? 3 : 0);
     }
+    if (script.includes('IsInRole')) {
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'] });
+      return fake.elevated ? 'True' : 'False';
+    }
+    if (script.includes('SetEnvironmentVariable')) {
+      const name = /SetEnvironmentVariable\('([^']+)'/.exec(script)?.[1] ?? '';
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…', `set ${name}`] });
+      fake.userEnv = { ...fake.userEnv, [name]: values(options.input)[0] ?? '' };
+      return '';
+    }
     if (script.includes('GetEnvironmentVariable')) {
       const name = /GetEnvironmentVariable\('([^']+)'/.exec(script)?.[1] ?? '';
       note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…'] });
@@ -172,6 +184,14 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
   // Stellwerk's two tasks may be deleted (autostart uninstall); a missing one fails as schtasks would.
   if (command === 'schtasks' && args[0] === '/Delete' && [HUB_TASK, DISPLAY_TASK].includes(args[args.indexOf('/TN') + 1] ?? '')) {
     if (!((args[args.indexOf('/TN') + 1] ?? '') in fake.tasks)) throw failed('FEHLER: Das System kann die angegebene Datei nicht finden.');
+    return 'ERFOLGREICH';
+  }
+  // A file only the current user may read (the token, the display's start file): nothing to do here.
+  if (/icacls/i.test(command)) return '';
+  // Stellwerk's tasks may be registered from their XML file (UTF-16 with a byte order mark).
+  if (command === 'schtasks' && args[0] === '/Create') {
+    const name = args[args.indexOf('/TN') + 1] ?? '';
+    fake.tasks[name] = (readFile(args[args.indexOf('/XML') + 1]!) as Buffer).subarray(2).toString('utf16le');
     return 'ERFOLGREICH';
   }
   // The display's task may be ended and run: its Edge closes and opens.

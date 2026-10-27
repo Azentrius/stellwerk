@@ -2,9 +2,13 @@
 
 ## 0.9.0 – 2026-10-26
 
-Stellwerk says how it stands and when a newer LibreHardwareMonitor is due, and a failing monitor opens in
-Uptime Kuma.
+Stellwerk sets itself up in one go, says how it stands and when a newer LibreHardwareMonitor is due, and a
+failing monitor opens in Uptime Kuma.
 
+- **`stellwerk setup`:** everything in one go, each step showing what it changes and asking first
+  (`--yes` for all): Claude Code's hooks, the start with Windows, Codex' hooks when Codex is used here,
+  and in a terminal with administrator rights the firewall rule and LibreHardwareMonitor (in any other it
+  names the two commands); then it starts Stellwerk and shows `stellwerk status`.
 - **`stellwerk status`:** what runs and what is set up, without changing anything: whether the hub
   answers and which release it runs (from its log) and its task starts, the display, LibreHardwareMonitor
   and its version, and whether the hooks of Claude Code (with the app's session id, the token set) and of
@@ -16,7 +20,8 @@ Uptime Kuma.
 - **A failing monitor opens in Uptime Kuma:** a tap on it opens its page there
   (`<uptimeKumaUrl>/dashboard/<id>`) in the default browser, the fourth form of link the hub opens. The
   hub builds it from the address set up and a monitor it shows as failing; the display names only its id.
-- **Tests:** the monitor's link and what it refuses, the hub opening only a failing monitor it shows;
+- **Tests:** `stellwerk setup` against a made-up Windows (the hooks, the two logon tasks, nothing as
+  administrator without its rights, started, how it stands); the monitor's link and what it refuses, the hub opening only a failing monitor it shows;
   `stellwerk status` against a made-up Windows (all well; an old hub, old Codex hooks, hooks
   without the app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts
   at logon), the due version from the hub to the display, its note in both languages.

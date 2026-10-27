@@ -104,6 +104,21 @@ npm link        # optional
 
 Without `npm link`, use `node dist/cli.js` wherever this README says `stellwerk`.
 
+Then set it up in one go:
+
+```powershell
+stellwerk setup
+```
+
+It connects Claude Code, and Codex when it is used here, adds the start with Windows (see
+[Start with Windows](#start-with-windows)), starts Stellwerk and says how it stands. Each step shows
+what it changes and asks first; `--yes` answers yes to all of them, `--screen <number>` picks the
+display's screen. In a terminal opened as administrator it also adds the firewall rule and sets up
+LibreHardwareMonitor (see [Hardware values](#hardware-values)); in any other it names the two commands
+for that. Restart the Claude desktop app afterwards, so it picks up the token.
+
+Or step by step, without the start with Windows:
+
 1. Start the hub: `stellwerk serve`. On its first start it creates the token for the hooks.
 2. Connect Claude Code: `stellwerk hooks install`. It shows what it adds to
    `%USERPROFILE%\.claude\settings.json`, asks before writing, keeps a backup of the previous file and

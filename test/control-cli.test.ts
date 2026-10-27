@@ -21,7 +21,7 @@ const FAKE = pathToFileURL(path.join(import.meta.dirname, 'support', 'fake-windo
 
 /** Runs `stellwerk <command>` against the made-up Windows; what it printed, its status and the task actions. */
 async function control(
-  command: 'start' | 'stop' | 'restart' | 'status',
+  command: 'start' | 'stop' | 'restart' | 'status' | 'setup',
   windows: {
     tasks: string[] | Record<string, string>;
     hub?: FakeWindows['hub'];
@@ -30,12 +30,16 @@ async function control(
     userEnv?: Record<string, string>;
     /** Files to write first, by their path below the test's folder. */
     files?: Record<string, string>;
+    screens?: FakeWindows['screens'];
+    elevated?: boolean;
   },
-): Promise<{ status: number | null; output: string; actions: string[] }> {
+  ...extra: string[]
+): Promise<{ status: number | null; output: string; actions: string[]; tasks: string[] }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-control-cli-'));
   try {
     const fake: FakeWindows = {
-      screens: [],
+      screens: windows.screens ?? [],
+      elevated: windows.elevated,
       tasks: Array.isArray(windows.tasks) ? Object.fromEntries(windows.tasks.map((name) => [name, '<Task/>'])) : windows.tasks,
       hub: windows.hub,
       display: windows.display,
@@ -51,7 +55,7 @@ async function control(
       fs.writeFileSync(path.join(dir, file), text);
     }
     const result = await new Promise<{ status: number | null; output: string }>((resolve, reject) => {
-      const child = spawn(process.execPath, ['--import', FAKE, CLI, command], {
+      const child = spawn(process.execPath, ['--import', FAKE, CLI, command, ...extra], {
         env: {
           ...process.env,
           APPDATA: roaming,
@@ -79,7 +83,8 @@ async function control(
     const actions = calls
       .filter((c) => c.command === 'schtasks' && (c.args[0] === '/End' || c.args[0] === '/Run'))
       .map((c) => `${c.args[0]} ${c.args[c.args.indexOf('/TN') + 1]}`);
-    return { ...result, actions };
+    const tasks = calls.filter((c) => c.command === 'schtasks' && c.args[0] === '/Create').map((c) => c.args[c.args.indexOf('/TN') + 1]!);
+    return { ...result, actions, tasks };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -196,5 +201,20 @@ describe('stellwerk start | stop | restart | status', { concurrency: true }, () 
     assert.match(outcome.output, /!! {2}Its task still starts at logon by itself/);
     assert.match(outcome.output, /!! {2}Claude Code: no Stellwerk hooks\. Run stellwerk hooks install/);
     assert.match(outcome.output, /ok {2}Codex: no Stellwerk hooks/);
+  });
+
+  // ---------- stellwerk setup ----------
+
+  test('setup sets up the hooks and the logon tasks, names what needs an administrator, starts Stellwerk and says how it stands', async () => {
+    const screen = { name: '\\\\.\\DISPLAY2', primary: false, x: 0, y: 1440, width: 1920, height: 720 };
+    const main = { name: '\\\\.\\DISPLAY1', primary: true, x: 0, y: 0, width: 3440, height: 1440 };
+    const outcome = await control('setup', { tasks: {}, screens: [main, screen], files: { 'codex/.keep': '' } }, '--yes');
+    assert.match(outcome.output, /== 1\. Claude Code's hooks/);
+    assert.match(outcome.output, /== 3\. Codex' hooks/);
+    assert.match(outcome.output, /no administrator rights\. In one that has, run:\n {2}stellwerk install[\s\S]*stellwerk hardware install/);
+    assert.deepEqual(outcome.tasks.sort(), [DISPLAY_TASK, HUB_TASK], 'the two logon tasks, nothing as administrator');
+    assert.ok(outcome.actions.includes(`/Run ${DISPLAY_TASK}`), 'started');
+    assert.match(outcome.output, /== 6\. How it stands[\s\S]*ok {2}Claude Code: \d+ hooks, with the app's session id[\s\S]*ok {2}Claude Code: STELLWERK_TOKEN is set/);
+    assert.match(outcome.output, /ok {2}Codex: \d+ hooks/);
   });
 });

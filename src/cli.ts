@@ -113,6 +113,11 @@ Usage:
   stellwerk serve [--debug-raw] [--simulate-hang] [--log-file <file>] [--exit-with-parent]
       Start the hub on ${HOST}. Then open the display with its start file, which only
       you can read: %LOCALAPPDATA%\\stellwerk\\display.html
+  stellwerk setup [--yes] [--screen <number>]
+      Set Stellwerk up in one go, each step asking first: Claude Code's hooks, the start with Windows,
+      Codex' hooks (when Codex is used here), and as administrator the firewall rule and
+      LibreHardwareMonitor (without administrator rights it names those two commands); then it starts
+      Stellwerk and says how it stands.
   stellwerk status
       What runs and what is set up: the hub and the release its task starts, the display,
       LibreHardwareMonitor, the hooks of Claude Code and Codex. Changes nothing; ends with 1 when
@@ -212,6 +217,7 @@ async function main(): Promise<void> {
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
   if (command === 'update') return update(action, values.yes, values.screen, values['keep-previous']);
   if (command === 'start' || command === 'stop' || command === 'restart') return control(command);
+  if (command === 'setup') return setup(values.yes, values.screen);
   if (command === 'status') return status();
   console.error(USAGE);
   process.exitCode = 2;
@@ -846,6 +852,32 @@ function removeRelease(dir: string, codexHooks: string): void {
  * way round. The hub runs and ends LibreHardwareMonitor itself; stopping ends its task as well, in case the
  * hub could not.
  */
+async function setup(yes: boolean, screenOption: string | undefined): Promise<void> {
+  const paths = defaultPaths();
+  let n = 0;
+  const step = (title: string) => console.log(`\n== ${++n}. ${title}\n`);
+  step("Claude Code's hooks");
+  await hooks('install', DEFAULT_SETTINGS_FILE, yes);
+  step('Start with Windows: the hub and the display');
+  await autostart('install', yes, screenOption);
+  step("Codex' hooks");
+  if (fs.existsSync(paths.codexHome)) await codex('install', yes);
+  else console.log(`Codex is not used here (no ${paths.codexHome}): its hooks are left out.`);
+  step('As administrator: the firewall rule and LibreHardwareMonitor');
+  if (isElevated()) {
+    firewall('install');
+    await hardware('install', yes);
+  } else {
+    console.log('This terminal has no administrator rights. In one that has, run:');
+    console.log('  stellwerk install            (the firewall rule for the hub\'s port)');
+    console.log('  stellwerk hardware install   (processor, graphics card and memory, if you want them)');
+  }
+  step('Start');
+  await control('start');
+  step('How it stands');
+  await status();
+}
+
 async function status(): Promise<void> {
   const paths = defaultPaths();
   const config = loadConfig(paths.configFile);
