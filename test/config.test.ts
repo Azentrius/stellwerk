@@ -31,6 +31,7 @@ test('without a file every setting has its default', () => {
     port: 4780,
     holdSeconds: 60,
     sound: false,
+    nightSound: 'quiet',
     quietAfterMinutes: 10,
     remindAfterSeconds: 20,
     scale: 1,
@@ -49,6 +50,18 @@ test('the night is two times of the day, both or neither', () => {
   fs.writeFileSync(file, '{ "nightFrom": "23:00", "nightTo": "07:30" }');
   assert.deepEqual(nightOf(loadConfig(file)), { from: 23 * 60, to: 7 * 60 + 30 });
   for (const bad of ['{ "nightFrom": "23:00" }', '{ "nightTo": "07:00" }', '{ "nightFrom": "24:00", "nightTo": "07:00" }', '{ "nightFrom": "7:00", "nightTo": "08:00" }', '{ "nightFrom": 23, "nightTo": 7 }']) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => loadConfig(file), bad);
+  }
+});
+
+test('the tones at night are on, quiet or off', () => {
+  const file = path.join(tempDir(), 'config.json');
+  for (const value of ['on', 'quiet', 'off']) {
+    fs.writeFileSync(file, JSON.stringify({ nightSound: value }));
+    assert.equal(loadConfig(file).nightSound, value);
+  }
+  for (const bad of ['{ "nightSound": "loud" }', '{ "nightSound": false }', '{ "nightSound": 0.5 }']) {
     fs.writeFileSync(file, bad);
     assert.throws(() => loadConfig(file), bad);
   }

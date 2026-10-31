@@ -118,6 +118,12 @@ Usage:
       Codex' hooks (when Codex is used here), and as administrator the firewall rule and
       LibreHardwareMonitor (without administrator rights it names those two commands); then it starts
       Stellwerk and says how it stands.
+  stellwerk teardown [--yes]
+      Remove Stellwerk in one go, each step asking first: it stops Stellwerk, removes the start with
+      Windows and the hooks of Claude Code and Codex, the GitHub token and the API key of Uptime Kuma
+      only if you say so (never with --yes), and as administrator LibreHardwareMonitor and the firewall
+      rule (without administrator rights it names those commands). Settings, the hook token, the audit
+      log and the releases stay; it names the command that removes them.
   stellwerk status
       What runs and what is set up: the hub and the release its task starts, the display,
       LibreHardwareMonitor, the hooks of Claude Code and Codex. Changes nothing; ends with 1 when
@@ -218,6 +224,7 @@ async function main(): Promise<void> {
   if (command === 'update') return update(action, values.yes, values.screen, values['keep-previous']);
   if (command === 'start' || command === 'stop' || command === 'restart') return control(command);
   if (command === 'setup') return setup(values.yes, values.screen);
+  if (command === 'teardown') return teardown(values.yes);
   if (command === 'status') return status();
   console.error(USAGE);
   process.exitCode = 2;
@@ -267,6 +274,7 @@ async function serve(
       quietAfterMs: config.quietAfterMinutes * 60_000,
       remindAfterMs: config.remindAfterSeconds * 1000,
       night: nightOf(config),
+      nightSound: config.nightSound,
       auditFile: paths.auditFile,
       uiRoot: path.join(ROOT, 'ui'),
       webRoot: path.join(ROOT, 'dist', 'ui'),
@@ -355,7 +363,8 @@ async function hooks(action: 'install' | 'uninstall', file: string, yes: boolean
   }
   const settings = current as Record<string, unknown>;
   const after = formatSettings(action === 'install' ? withStellwerkHooks(settings, config.port) : withoutStellwerkHooks(settings));
-  const settingsChange = normalize(after) !== normalize(before);
+  // Without a settings file there are no hooks to remove, and none is written.
+  const settingsChange = (exists || action === 'install') && normalize(after) !== normalize(before);
 
   const onWindows = process.platform === 'win32';
   const token = action === 'install' ? ensureToken(paths.tokenFile).token : null;
@@ -557,7 +566,7 @@ async function codex(action: 'install' | 'uninstall', yes: boolean): Promise<voi
   );
 }
 
-async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<void> {
+async function hardware(action: 'install' | 'uninstall', yes: boolean, hubRuns = true): Promise<void> {
   if (process.platform !== 'win32') throw new Error('The hardware monitor is set up on Windows only.');
   if (!isElevated()) throw new Error('Run this in a terminal opened as administrator, with your own account.');
   const paths = defaultPaths();
@@ -565,6 +574,7 @@ async function hardware(action: 'install' | 'uninstall', yes: boolean): Promise<
   const exe = path.join(dir, LHM_EXE);
   const rule = firewallRuleName(LHM_PORT);
   const restartHub = () => {
+    if (!hubRuns) return;
     console.log(`Restart the hub so that the display follows:\n  schtasks /End /TN "${HUB_TASK}"\n  schtasks /Run /TN "${HUB_TASK}"`);
   };
 
@@ -683,11 +693,11 @@ function logToFile(file: string): void {
   }
 }
 
-async function confirm(yes: boolean): Promise<boolean> {
+async function confirm(yes: boolean, question = 'Apply these changes? [y/N] '): Promise<boolean> {
   if (yes) return true;
   if (!process.stdin.isTTY) throw new Error('No terminal to confirm in. Run again with --yes to apply without asking.');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question('Apply these changes? [y/N] ');
+  const answer = await rl.question(question);
   rl.close();
   return /^y(es)?$/i.test(answer.trim());
 }
@@ -876,6 +886,64 @@ async function setup(yes: boolean, screenOption: string | undefined): Promise<vo
   await control('start');
   step('How it stands');
   await status();
+}
+
+async function teardown(yes: boolean): Promise<void> {
+  const paths = defaultPaths();
+  const config = loadConfig(paths.configFile);
+  let n = 0;
+  const step = (title: string) => console.log(`\n== ${++n}. ${title}\n`);
+  step('Stop');
+  if (taskExists(HUB_TASK)) await control('stop');
+  else if (await listening(config.port)) console.log(`A hub not started by its task listens on ${HOST}:${config.port}. Stop it (Ctrl+C in its window).`);
+  else console.log('Stellwerk does not run.');
+  step('Start with Windows: the hub and the display');
+  await autostart('uninstall', yes, undefined);
+  step("Claude Code's hooks");
+  await hooks('uninstall', DEFAULT_SETTINGS_FILE, yes);
+  step("Codex' hooks");
+  if (fs.existsSync(paths.codexHome)) await codex('uninstall', yes);
+  else console.log(`Codex is not used here (no ${paths.codexHome}).`);
+
+  // Tokens and keys go only when asked here, never with --yes: making them again takes their sites.
+  step('The GitHub token and the API key of Uptime Kuma');
+  const secrets = [
+    { name: 'the GitHub token', command: 'stellwerk github remove', remove: () => removeGitHubToken(paths.githubTokenFile), file: paths.githubTokenFile },
+    { name: 'the API key of Uptime Kuma', command: 'stellwerk kuma remove', remove: () => removeUptimeKumaKey(paths.uptimeKumaKeyFile), file: paths.uptimeKumaKeyFile },
+  ].filter((secret) => fs.existsSync(secret.file));
+  const names = secrets.map((secret) => secret.name).join(' and ');
+  if (secrets.length === 0) console.log('There is neither.');
+  else if (!yes && process.stdin.isTTY && (await confirm(false, `Remove ${names} as well? [y/N] `))) {
+    for (const secret of secrets) secret.remove();
+    console.log(`Removed ${names}.`);
+  } else {
+    console.log(`Kept ${names}${yes ? ' (--yes keeps tokens and keys)' : ''}. Remove with:`);
+    for (const secret of secrets) console.log(`  ${secret.command}`);
+  }
+
+  step('As administrator: LibreHardwareMonitor and the firewall rule');
+  const hardwareSetUp = config.hardwareMonitor || taskExists(HARDWARE_TASK) || fs.existsSync(paths.hardwareDir);
+  if (isElevated()) {
+    if (hardwareSetUp) await hardware('uninstall', yes, false);
+    else console.log('LibreHardwareMonitor is not set up here.');
+    try {
+      firewall('uninstall');
+    } catch (err) {
+      console.log(`No firewall rule removed: ${(err as Error).message.split('\n')[0]}`);
+    }
+  } else {
+    console.log('This terminal has no administrator rights. In one that has, run:');
+    if (hardwareSetUp) console.log('  stellwerk hardware uninstall   (LibreHardwareMonitor, its task and its firewall rule)');
+    console.log("  stellwerk uninstall            (the firewall rule for the hub's port)");
+  }
+
+  step('What stays');
+  const configDir = path.dirname(paths.configFile);
+  const dataDir = path.dirname(paths.tokenFile);
+  console.log(`The settings, the hook token, the audit log and the releases stay in\n  ${configDir}\n  ${dataDir}`);
+  console.log('To remove them as well, and the command if you made it available with npm link:');
+  console.log(`  Remove-Item -Recurse "${dataDir}", "${configDir}"`);
+  console.log('  npm rm -g stellwerk');
 }
 
 async function status(): Promise<void> {

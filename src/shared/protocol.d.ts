@@ -102,6 +102,9 @@ export interface DecisionView {
  */
 export type RejectionReason = 'token' | 'hook-data' | 'foreign' | 'display';
 
+/** The tones at night, with sound on: as by day, at a quarter of their loudness, or none. */
+export type NightSound = 'on' | 'quiet' | 'off';
+
 export interface HubView {
   startedAt: number;
   lastEventAt: number | null;
@@ -115,6 +118,8 @@ export interface HubView {
    * display rests after a minute and goes darker than by day. Null: no night.
    */
   night: { from: number; to: number } | null;
+  /** The tones at night (config nightSound). */
+  nightSound: NightSound;
   /** Fingerprint of the display files the hub serves; a page served with another one loads itself again. */
   build: string;
   /**

@@ -1,6 +1,6 @@
 # Roadmap
 
-As of 2026-10-22. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
+As of 2026-11-01. Each stage is useful on its own and brings its own tests. Stages after 1 are proposals
 until they are decided.
 
 **Guardrails for every stage** (they keep applying):
@@ -8,10 +8,11 @@ until they are decided.
 - **Local only:** the hub listens on `127.0.0.1`, fixed in the code. No access from other devices, no
   tablet, no tunnel, in no stage.
 - **No automatic decisions:** a request is allowed or denied by a person, on the display or in the app.
-- **The hub runs nothing:** it answers requests and shows status. Its one exception (since 0.7.0): a tap
-  on the display can have it open a session in its app or a pull request in the browser, through the
-  Windows shell and only as three fixed forms of links it builds itself. Stage 4 changes more and gets its
-  own security review first.
+- **The hub runs nothing:** it answers requests and shows status. Its two exceptions: a tap on the
+  display can have it open a session in its app, a pull request or a failing monitor in the browser,
+  through the Windows shell and only as four fixed forms of links it builds itself (since 0.7.0, the
+  monitors since 0.9.0); and it runs and ends the task that runs LibreHardwareMonitor (since 0.8.0).
+  Stage 4 changes more and gets its own security review first.
 - **No outgoing connections** unless a stage needs one for its data source, and then only to that source.
 - **Display:** only the hub's own files, strict Content Security Policy, nothing inline, hook data as text
   only. Every text in English and German. Usable with fingers at 1920×720.
@@ -150,11 +151,11 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 ---
 
-## 0.9.0 – How it stands ✅
+## 0.7.0 – Open it where it is; the last decisions where the requests are ✅
 
-Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk setup` sets Stellwerk up in one go,
-`stellwerk status` shows what runs and what is set up, the status column says when a newer
-LibreHardwareMonitor is due, and a failing monitor opens in Uptime Kuma.
+Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): a tap opens a session in the Claude desktop app or in the
+Codex app and a pull request in the browser; the last decisions moved from the status column to the foot
+of the waiting column, show only the last 24 hours, and open over the requests without moving them.
 
 ---
 
@@ -167,11 +168,12 @@ opens, while the app takes its time; at night it stays readable.
 
 ---
 
-## 0.7.0 – Open it where it is; the last decisions where the requests are ✅
+## 0.9.0 – How it stands ✅
 
-Done in 0.7.0 (see [CHANGELOG](CHANGELOG.md)): a tap opens a session in the Claude desktop app or in the
-Codex app and a pull request in the browser; the last decisions moved from the status column to the foot
-of the waiting column, show only the last 24 hours, and open over the requests without moving them.
+Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk setup` sets Stellwerk up in one go and
+`stellwerk teardown` removes it, `stellwerk status` shows what runs and what is set up, the status column
+says when a newer LibreHardwareMonitor is due, a failing monitor opens in Uptime Kuma, and the tones are
+quieter at night.
 
 ---
 

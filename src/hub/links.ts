@@ -1,8 +1,10 @@
 // What the display may open with a tap: a session in its app (the Claude desktop app, the Codex app), and a
-// pull request or a failing monitor's page in Uptime Kuma in the default browser. The display only names what to open; the hub builds the link itself
-// from what it knows, checks it against three fixed forms and hands it to the Windows shell: explorer.exe
-// with the link as its only argument, no shell in between. That is the one program the hub starts (chosen
-// by Stefan on 2026-10-23: the display's Edge in kiosk mode cannot hand a link to another program).
+// pull request or a failing monitor's page in Uptime Kuma in the default browser. The display only names
+// what to open; the hub builds the link itself from what it knows, checks it against four fixed forms and
+// hands it to the Windows shell: explorer.exe with the link as its only argument, no shell in between
+// (chosen by Stefan on 2026-10-23: the display's Edge in kiosk mode cannot hand a link to another program).
+// Besides schtasks for the hardware task (HardwareKeeper in hardware.ts), it is the one program the hub
+// starts.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -62,7 +64,7 @@ export function pullLink(owner: string, repo: string, number: number): string | 
 
 /**
  * Hands a link to the Windows shell, which opens it with the program registered for it (the app, the
- * default browser). Only the three forms above; anything else throws. explorer.exe ends with 1 even when it
+ * default browser). Only the four forms above; anything else throws. explorer.exe ends with 1 even when it
  * opened the link, so its end tells nothing: it is not waited for.
  */
 export function openWithShell(link: string, log: (line: string) => void): void {

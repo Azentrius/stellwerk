@@ -49,7 +49,7 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   once more (`remindAfterSeconds`).
 - **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes
   darker than by day after a minute with nothing new, still readable in a dark room; what wakes it by day
-  wakes it at night too.
+  wakes it at night too. With sound on, its tones are quieter then, or none (`nightSound`).
 - **The last decisions.** At the foot of the waiting column one line folds the decisions on permission
   requests of the last 24 hours (at most ten): what, when, whose session, and how each ended. A tap opens
   them over the requests, which keep their place; the next tap closes them, and so do a minute without a
@@ -453,7 +453,7 @@ session appears with its first event, which in the desktop app is the first prom
 ```json
 {
   "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "remindAfterSeconds": 20,
-  "nightFrom": "23:00", "nightTo": "07:00", "scale": 1, "debugRawLog": false
+  "nightFrom": "23:00", "nightTo": "07:00", "nightSound": "quiet", "scale": 1, "debugRawLog": false
 }
 ```
 
@@ -463,6 +463,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `holdSeconds` | How long a request waits on the display before it goes back to the app: 10 to 80 (at least 10 s below the hook timeout of 90 s). |
 | `sound` | A soft chime for each new request. |
 | `nightFrom`, `nightTo` | The night by the display's clock, as "HH:MM" (e.g. "23:00" and "07:00", also over midnight); both or neither, none by default. At night the display rests after a minute with nothing new, also when `quietAfterMinutes` is 0, and goes darker than by day, still readable; what wakes it by day wakes it then too. |
+| `nightSound` | The tones at night, with `sound` on: `"quiet"` (by default) at a quarter of their loudness, `"off"` none, `"on"` as by day. The display shows a new request at night all the same. |
 | `remindAfterSeconds` | An open request reminds after this many seconds: its card pulses (a frame without motion), and with `sound` the tones come once more: 0 (never) to 300, 20 by default. |
 | `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request or failed checks wake it, and so does a tap, which presses nothing else. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |
@@ -527,13 +528,16 @@ Restart the hub after a change.
   creates the token file or writes the display's start file, so that only your Windows account can read
   them, and that a tap on the display can have it open a link with the Windows shell (`explorer.exe` with
   the link as its only argument, no shell). The display only names what to open; the hub builds the link
-  from what it shows and opens only three forms: `claude://claude.ai/epitaxy/local_…` (a session of the
-  desktop app), `codex://threads/<id>` (a Codex chat) and `https://github.com/<owner>/<repo>/pull/<n>`
-  (a pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
-  second. It connects to other machines only to `api.github.com`, for the list of
-  pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
-  up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
-  that it asks
+  from what it shows and opens only four forms: `claude://claude.ai/epitaxy/local_…` (a session of the
+  desktop app), `codex://threads/<id>` (a Codex chat), `https://github.com/<owner>/<repo>/pull/<n>` (a
+  pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
+  second. With LibreHardwareMonitor set up, the hub also runs and ends the task "Stellwerk hardware"
+  (`schtasks /Run` and `/End`, fixed arguments, no shell), so that LibreHardwareMonitor runs while the
+  hub runs; an administrator registered that task, and it starts only the program in its own folder in
+  Program Files.
+- It connects to other machines only to `api.github.com`, for the list of pull requests and the newest
+  release of Stellwerk, and only with a fine-grained read-only token you set up; and to Uptime Kuma at
+  the address you set up, only for `/metrics` and only with its API key. Besides that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
@@ -604,6 +608,21 @@ prompts and code, so turn it off and delete `debug-raw.jsonl` when you are done.
   35 s) before it goes to Codex.
 
 ## Uninstall
+
+In one go, the counterpart of `stellwerk setup`:
+
+```powershell
+stellwerk teardown
+```
+
+It stops Stellwerk, then removes the start with Windows and the hooks of Claude Code and Codex; each
+step shows what it changes and asks first (`--yes` answers yes to all of them). The GitHub token and the
+API key of Uptime Kuma go only if you say so, never with `--yes`. In a terminal opened as administrator
+it also removes LibreHardwareMonitor and the firewall rule; in any other it names the two commands for
+that. Your settings, the hook token, the audit log and the releases stay; it names the command that
+removes them.
+
+Or step by step:
 
 ```powershell
 stellwerk autostart uninstall

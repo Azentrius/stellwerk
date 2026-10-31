@@ -21,6 +21,7 @@ import type {
   Decision,
   DecisionResultMessage,
   HubView,
+  NightSound,
   OpenMessage,
   OpenResultMessage,
   OpenedIn,
@@ -115,6 +116,8 @@ export interface HubOptions {
   remindAfterMs?: number;
   /** The night in minutes of the day (config nightFrom, nightTo); null or none: no night. */
   night?: { from: number; to: number } | null;
+  /** The tones at night (config nightSound); none: quieter. */
+  nightSound?: NightSound;
   auditFile: string;
   /** ui/: index.html, styles, fonts. */
   uiRoot: string;
@@ -699,6 +702,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
         quietAfterMs: options.quietAfterMs ?? 0,
         remindAfterMs: options.remindAfterMs ?? 0,
         night: options.night ?? null,
+        nightSound: options.nightSound ?? 'quiet',
         build,
         rejected,
         rawLog: Boolean(options.rawLogFile),

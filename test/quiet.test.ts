@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { FailingMonitor, PermissionView, PullRequestView, SessionView, StateMessage } from '../src/shared/protocol.js';
-import { NIGHT_REST_MS, Rest, inNight, restAfter, watched } from '../ui/src/quiet.ts';
+import { NIGHT_LOUDNESS, NIGHT_REST_MS, Rest, chimeLoudness, inNight, restAfter, watched } from '../ui/src/quiet.ts';
 
 const AFTER = 10 * 60_000;
 
@@ -16,7 +16,7 @@ function stateWith(parts: { sessions?: Partial<SessionView>[]; permissions?: Par
     sessions: (parts.sessions ?? []) as SessionView[],
     permissions: (parts.permissions ?? []) as PermissionView[],
     pullRequests: (parts.pulls ?? []) as PullRequestView[],
-    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, remindAfterMs: 0, night: null, build: 'x', rejected: null, rawLog: false, newRelease: null },
+    hub: { startedAt: 0, lastEventAt: null, sound: false, quietAfterMs: AFTER, remindAfterMs: 0, night: null, nightSound: 'quiet', build: 'x', rejected: null, rawLog: false, newRelease: null },
     github: null,
     hardware: null,
     uptimeKuma: parts.failing ? { monitors: { failing: parts.failing, up: 3, maintenance: 0 }, updatedAt: 0, problem: null } : null,
@@ -116,5 +116,18 @@ describe('at night', () => {
     assert.equal(restAfter(10 * 60_000, true), NIGHT_REST_MS);
     assert.equal(restAfter(1500, true), 1500);
     assert.equal(restAfter(0, true), NIGHT_REST_MS);
+  });
+
+  test('at night the tones are quieter by default, as loud as by day or none as set up; without sound, none', () => {
+    assert.equal(chimeLoudness(true, 'quiet', false), 1, 'by day as loud as set up');
+    assert.equal(chimeLoudness(true, 'off', false), 1);
+    assert.equal(chimeLoudness(true, 'quiet', true), NIGHT_LOUDNESS);
+    assert.ok(NIGHT_LOUDNESS > 0 && NIGHT_LOUDNESS < 1);
+    assert.equal(chimeLoudness(true, 'on', true), 1);
+    assert.equal(chimeLoudness(true, 'off', true), 0);
+    for (const nightSound of ['on', 'quiet', 'off'] as const) {
+      assert.equal(chimeLoudness(false, nightSound, false), 0, `no sound by day (${nightSound})`);
+      assert.equal(chimeLoudness(false, nightSound, true), 0, `no sound at night (${nightSound})`);
+    }
   });
 });
