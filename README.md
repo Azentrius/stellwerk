@@ -528,13 +528,16 @@ Restart the hub after a change.
   creates the token file or writes the display's start file, so that only your Windows account can read
   them, and that a tap on the display can have it open a link with the Windows shell (`explorer.exe` with
   the link as its only argument, no shell). The display only names what to open; the hub builds the link
-  from what it shows and opens only three forms: `claude://claude.ai/epitaxy/local_…` (a session of the
-  desktop app), `codex://threads/<id>` (a Codex chat) and `https://github.com/<owner>/<repo>/pull/<n>`
-  (a pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
-  second. It connects to other machines only to `api.github.com`, for the list of
-  pull requests and the newest release of Stellwerk, and only with a fine-grained read-only token you set
-  up; and to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key. Besides
-  that it asks
+  from what it shows and opens only four forms: `claude://claude.ai/epitaxy/local_…` (a session of the
+  desktop app), `codex://threads/<id>` (a Codex chat), `https://github.com/<owner>/<repo>/pull/<n>` (a
+  pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
+  second. With LibreHardwareMonitor set up, the hub also runs and ends the task "Stellwerk hardware"
+  (`schtasks /Run` and `/End`, fixed arguments, no shell), so that LibreHardwareMonitor runs while the
+  hub runs; an administrator registered that task, and it starts only the program in its own folder in
+  Program Files.
+- It connects to other machines only to `api.github.com`, for the list of pull requests and the newest
+  release of Stellwerk, and only with a fine-grained read-only token you set up; and to Uptime Kuma at
+  the address you set up, only for `/metrics` and only with its API key. Besides that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
   data and pull request titles as text, never as HTML.
