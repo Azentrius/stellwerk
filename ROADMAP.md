@@ -170,9 +170,10 @@ opens, while the app takes its time; at night it stays readable.
 
 ## 0.9.0 – How it stands ✅
 
-Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk setup` sets Stellwerk up in one go,
-`stellwerk status` shows what runs and what is set up, the status column says when a newer
-LibreHardwareMonitor is due, a failing monitor opens in Uptime Kuma, and the tones are quieter at night.
+Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk setup` sets Stellwerk up in one go and
+`stellwerk teardown` removes it, `stellwerk status` shows what runs and what is set up, the status column
+says when a newer LibreHardwareMonitor is due, a failing monitor opens in Uptime Kuma, and the tones are
+quieter at night.
 
 ---
 

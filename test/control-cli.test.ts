@@ -21,7 +21,7 @@ const FAKE = pathToFileURL(path.join(import.meta.dirname, 'support', 'fake-windo
 
 /** Runs `stellwerk <command>` against the made-up Windows; what it printed, its status and the task actions. */
 async function control(
-  command: 'start' | 'stop' | 'restart' | 'status' | 'setup',
+  command: 'start' | 'stop' | 'restart' | 'status' | 'setup' | 'teardown',
   windows: {
     tasks: string[] | Record<string, string>;
     hub?: FakeWindows['hub'];
@@ -32,9 +32,11 @@ async function control(
     files?: Record<string, string>;
     screens?: FakeWindows['screens'];
     elevated?: boolean;
+    /** Files to read afterwards, by their path below the test's folder (null: gone). */
+    read?: string[];
   },
   ...extra: string[]
-): Promise<{ status: number | null; output: string; actions: string[]; tasks: string[] }> {
+): Promise<{ status: number | null; output: string; actions: string[]; tasks: string[]; calls: Call[]; files: Record<string, string | null> }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-control-cli-'));
   try {
     const fake: FakeWindows = {
@@ -84,7 +86,10 @@ async function control(
       .filter((c) => c.command === 'schtasks' && (c.args[0] === '/End' || c.args[0] === '/Run'))
       .map((c) => `${c.args[0]} ${c.args[c.args.indexOf('/TN') + 1]}`);
     const tasks = calls.filter((c) => c.command === 'schtasks' && c.args[0] === '/Create').map((c) => c.args[c.args.indexOf('/TN') + 1]!);
-    return { ...result, actions, tasks };
+    const files = Object.fromEntries(
+      (windows.read ?? []).map((file) => [file, fs.existsSync(path.join(dir, file)) ? fs.readFileSync(path.join(dir, file), 'utf8') : null]),
+    );
+    return { ...result, actions, tasks, calls, files };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -216,5 +221,48 @@ describe('stellwerk start | stop | restart | status', { concurrency: true }, () 
     assert.ok(outcome.actions.includes(`/Run ${DISPLAY_TASK}`), 'started');
     assert.match(outcome.output, /== 6\. How it stands[\s\S]*ok {2}Claude Code: \d+ hooks, with the app's session id[\s\S]*ok {2}Claude Code: STELLWERK_TOKEN is set/);
     assert.match(outcome.output, /ok {2}Codex: \d+ hooks/);
+  });
+
+  // ---------- stellwerk teardown ----------
+
+  test('teardown stops Stellwerk, removes its tasks and hooks, keeps tokens and folders, and names what needs an administrator', async () => {
+    const set = everything({ log: '9.9.9', task: '9.9.9', codex: '9.9.9' });
+    const outcome = await control(
+      'teardown',
+      {
+        ...set,
+        tasks: { ...set.tasks, [HARDWARE_TASK]: '<Task/>' },
+        hardwareMonitor: true,
+        files: { ...set.files, 'local/stellwerk/github-token': 'github_pat_made_up' },
+        read: ['home/.claude/settings.json', 'codex/hooks.json', 'local/stellwerk/github-token'],
+      },
+      '--yes',
+    );
+    assert.equal(outcome.status, 0, outcome.output);
+    assert.deepEqual(outcome.actions, [`/End ${DISPLAY_TASK}`, `/End ${HUB_TASK}`, `/End ${HARDWARE_TASK}`], 'stopped first');
+    const deleted = outcome.calls.filter((c) => c.command === 'schtasks' && c.args[0] === '/Delete').map((c) => c.args[c.args.indexOf('/TN') + 1]);
+    assert.deepEqual(deleted.sort(), [DISPLAY_TASK, HUB_TASK], 'the two logon tasks; the hardware task only as administrator');
+    assert.doesNotMatch(outcome.files['home/.claude/settings.json'] ?? '', /hooks\/claude-code/, "Claude Code's hooks gone");
+    assert.equal(outcome.files['codex/hooks.json'], null, "Codex' hooks.json held only Stellwerk's hooks");
+    assert.ok(outcome.calls.some((c) => c.args.includes('unset STELLWERK_TOKEN')), 'the token variable removed');
+    assert.equal(outcome.files['local/stellwerk/github-token'], 'github_pat_made_up', 'the GitHub token stays with --yes');
+    assert.match(outcome.output, /Kept the GitHub token \(--yes keeps tokens and keys\)\. Remove with:\n {2}stellwerk github remove/);
+    assert.match(outcome.output, /no administrator rights\. In one that has, run:\n {2}stellwerk hardware uninstall[\s\S]*\n {2}stellwerk uninstall /);
+    assert.match(outcome.output, /Remove-Item -Recurse "[^"]*local\\stellwerk", "[^"]*roaming\\stellwerk"/);
+    assert.ok(!outcome.calls.some((c) => c.command === 'netsh'), 'no firewall rule touched without administrator rights');
+  });
+
+  test('teardown as administrator removes the firewall rule, and leaves LibreHardwareMonitor alone when it is not set up', async () => {
+    const outcome = await control('teardown', { tasks: [], hub: { running: false }, elevated: true, read: ['home/.claude/settings.json'] }, '--yes');
+    assert.equal(outcome.status, 0, outcome.output);
+    assert.match(outcome.output, /Stellwerk does not run\./);
+    assert.match(outcome.output, /There are no Stellwerk tasks/);
+    assert.match(outcome.output, /There is neither\./);
+    assert.match(outcome.output, /LibreHardwareMonitor is not set up here\./);
+    const rules = outcome.calls.filter((c) => c.command === 'netsh').map((c) => c.args.join(' '));
+    assert.equal(rules.length, 1);
+    assert.match(rules[0]!, /^advfirewall firewall delete rule name=Stellwerk-block-inbound-\d+$/);
+    assert.deepEqual(outcome.actions, []);
+    assert.equal(outcome.files['home/.claude/settings.json'], null, 'no settings file written where there was none');
   });
 });

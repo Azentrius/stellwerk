@@ -2,13 +2,19 @@
 
 ## 0.9.0 – 2026-11-01
 
-Stellwerk sets itself up in one go, says how it stands and when a newer LibreHardwareMonitor is due, a
-failing monitor opens in Uptime Kuma, and the tones are quieter at night.
+Stellwerk sets itself up and removes itself in one go, says how it stands and when a newer
+LibreHardwareMonitor is due, a failing monitor opens in Uptime Kuma, and the tones are quieter at night.
 
 - **`stellwerk setup`:** everything in one go, each step showing what it changes and asking first
   (`--yes` for all): Claude Code's hooks, the start with Windows, Codex' hooks when Codex is used here,
   and in a terminal with administrator rights the firewall rule and LibreHardwareMonitor (in any other it
   names the two commands); then it starts Stellwerk and shows `stellwerk status`.
+- **`stellwerk teardown`:** the counterpart, each step asking first as well: it stops Stellwerk, removes
+  the start with Windows and the hooks of Claude Code and Codex, the GitHub token and the API key of
+  Uptime Kuma only when you say so (never with `--yes`), and with administrator rights LibreHardwareMonitor
+  and the firewall rule (in any other terminal it names the two commands). Settings, the hook token, the
+  audit log and the releases stay, with the command that removes them. `stellwerk hooks uninstall` no
+  longer writes a settings file where there was none.
 - **`stellwerk status`:** what runs and what is set up, without changing anything: whether the hub
   answers and which release it runs (from its log) and its task starts, the display, LibreHardwareMonitor
   and its version, and whether the hooks of Claude Code (with the app's session id, the token set) and of
@@ -26,6 +32,10 @@ failing monitor opens in Uptime Kuma, and the tones are quieter at night.
 - **Tests:**
   - `stellwerk setup` against a made-up Windows: the hooks, the two logon tasks, nothing as administrator
     without its rights, started, how it stands.
+  - `stellwerk teardown` against a made-up Windows: stopped first, the two logon tasks and the hooks gone,
+    the token variable removed, the GitHub token kept with `--yes`, what needs an administrator named;
+    as administrator the firewall rule removed and no LibreHardwareMonitor that is not there. The made-up
+    Windows now has its own Program Files, so no test can reach a LibreHardwareMonitor set up for real.
   - `stellwerk status` against a made-up Windows: all well; an old hub, old Codex hooks, hooks without the
     app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts at logon.
   - The due version from the hub to the display, its note in both languages.

@@ -2,7 +2,8 @@
 // touching the machine. Loaded with --import before the command line, it answers the screen list
 // (PowerShell), task queries (schtasks /Query) and Task Scheduler's error code for a task (PowerShell) from
 // STELLWERK_FAKE_WINDOWS, writes every program the command line starts to the file named there, lets
-// spawnSync end at once with success, and refuses everything else: nothing is run, no task is changed.
+// spawnSync end at once with success, and refuses everything else: nothing is run. Tasks, user environment
+// variables and firewall rules change only here, in the test's Windows; Program Files is a folder of the test.
 // A task that is not there fails schtasks with a German message, as on the machine this was made on.
 // The hub is played by a socket on a free port of 127.0.0.1, written to the configuration: ending its
 // task closes it, running the task opens it. A new version's `codex install` writes its forwarder into
@@ -90,6 +91,9 @@ const refuse = (what: string) => {
 };
 
 Object.defineProperty(process, 'platform', { value: 'win32' });
+// Never the machine's Program Files, where LibreHardwareMonitor may really be set up. Windows gives every
+// process its own ProgramFiles, so a test cannot pass another one in; it is set here, inside the process.
+process.env.ProgramFiles = path.join(path.dirname(fake.calls), 'Program Files');
 const childProcess = cp as unknown as Record<string, unknown>;
 
 // The hub: a socket on a free port, which the configuration names.
@@ -147,8 +151,10 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     }
     if (script.includes('SetEnvironmentVariable')) {
       const name = /SetEnvironmentVariable\('([^']+)'/.exec(script)?.[1] ?? '';
-      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…', `set ${name}`] });
+      const removed = script.includes('$null');
+      note({ via: 'execFileSync', command, args: ['-EncodedCommand', '…', `${removed ? 'unset' : 'set'} ${name}`] });
       fake.userEnv = { ...fake.userEnv, [name]: values(options.input)[0] ?? '' };
+      if (removed) delete fake.userEnv[name];
       return '';
     }
     if (script.includes('GetEnvironmentVariable')) {
@@ -187,6 +193,8 @@ childProcess.execFileSync = (command: string, args: string[] = [], options: { in
     return 'ERFOLGREICH';
   }
   // A file only the current user may read (the token, the display's start file): nothing to do here.
+  // Firewall rules may be added and deleted (as administrator): nothing to do here either.
+  if (command === 'netsh') return 'OK.';
   if (/icacls/i.test(command)) return '';
   // Stellwerk's tasks may be registered from their XML file (UTF-16 with a byte order mark).
   if (command === 'schtasks' && args[0] === '/Create') {

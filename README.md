@@ -609,6 +609,21 @@ prompts and code, so turn it off and delete `debug-raw.jsonl` when you are done.
 
 ## Uninstall
 
+In one go, the counterpart of `stellwerk setup`:
+
+```powershell
+stellwerk teardown
+```
+
+It stops Stellwerk, then removes the start with Windows and the hooks of Claude Code and Codex; each
+step shows what it changes and asks first (`--yes` answers yes to all of them). The GitHub token and the
+API key of Uptime Kuma go only if you say so, never with `--yes`. In a terminal opened as administrator
+it also removes LibreHardwareMonitor and the firewall rule; in any other it names the two commands for
+that. Your settings, the hook token, the audit log and the releases stay; it names the command that
+removes them.
+
+Or step by step:
+
 ```powershell
 stellwerk autostart uninstall
 stellwerk github remove
