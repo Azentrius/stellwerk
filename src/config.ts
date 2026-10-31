@@ -154,6 +154,8 @@ const configSchema = z.strictObject({
    */
   nightFrom: z.string().regex(CLOCK_TIME).optional(),
   nightTo: z.string().regex(CLOCK_TIME).optional(),
+  /** The tones at night, with sound on: as by day ("on"), at a quarter of their loudness ("quiet") or none ("off"). */
+  nightSound: z.enum(['on', 'quiet', 'off']).default('quiet'),
 }).refine((config) => (config.nightFrom === undefined) === (config.nightTo === undefined), {
   message: 'nightFrom and nightTo go together: set both or neither.',
 });

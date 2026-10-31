@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.9.0 – 2026-10-26
+## 0.9.0 – 2026-11-01
 
-Stellwerk sets itself up in one go, says how it stands and when a newer LibreHardwareMonitor is due, and a
-failing monitor opens in Uptime Kuma.
+Stellwerk sets itself up in one go, says how it stands and when a newer LibreHardwareMonitor is due, a
+failing monitor opens in Uptime Kuma, and the tones are quieter at night.
 
 - **`stellwerk setup`:** everything in one go, each step showing what it changes and asking first
   (`--yes` for all): Claude Code's hooks, the start with Windows, Codex' hooks when Codex is used here,
@@ -17,14 +17,21 @@ failing monitor opens in Uptime Kuma.
 - **A due LibreHardwareMonitor:** `stellwerk hardware install` notes the version it set up
   (`%LOCALAPPDATA%\stellwerk\hardware.json`). When a newer Stellwerk pins a newer one, the status column
   says so, with the command to run as administrator.
+- **Quieter at night:** with sound on, the tones for a new request and a reminder play at a quarter of
+  their loudness between `nightFrom` and `nightTo`. `nightSound` sets it: `"quiet"` (the default),
+  `"off"` for none, `"on"` as by day.
 - **A failing monitor opens in Uptime Kuma:** a tap on it opens its page there
   (`<uptimeKumaUrl>/dashboard/<id>`) in the default browser, the fourth form of link the hub opens. The
   hub builds it from the address set up and a monitor it shows as failing; the display names only its id.
-- **Tests:** `stellwerk setup` against a made-up Windows (the hooks, the two logon tasks, nothing as
-  administrator without its rights, started, how it stands); the monitor's link and what it refuses, the hub opening only a failing monitor it shows;
-  `stellwerk status` against a made-up Windows (all well; an old hub, old Codex hooks, hooks
-  without the app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts
-  at logon), the due version from the hub to the display, its note in both languages.
+- **Tests:**
+  - `stellwerk setup` against a made-up Windows: the hooks, the two logon tasks, nothing as administrator
+    without its rights, started, how it stands.
+  - `stellwerk status` against a made-up Windows: all well; an old hub, old Codex hooks, hooks without the
+    app's id, a closed display; missing tasks and an older LibreHardwareMonitor that still starts at logon.
+  - The due version from the hub to the display, its note in both languages.
+  - The tones: how loud by day and at night for each `nightSound`, none without sound; the setting and
+    what it refuses; the hub handing it to the display.
+  - The monitor's link and what it refuses; the hub opening only a failing monitor it shows.
 
 ## 0.8.0 – 2026-10-26
 

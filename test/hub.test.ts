@@ -1017,14 +1017,18 @@ describe('the display at rest', () => {
     other.close();
   });
 
-  test('the display gets the night; without one, none', async () => {
-    const dark = await startTestHub({ night: { from: 23 * 60, to: 7 * 60 } });
+  test('the display gets the night and its tones; without them, no night and quiet tones', async () => {
+    const dark = await startTestHub({ night: { from: 23 * 60, to: 7 * 60 }, nightSound: 'off' });
     const screen = await display(dark.port);
-    assert.deepEqual((await screen.state(() => true)).hub.night, { from: 23 * 60, to: 7 * 60 });
+    const hub = (await screen.state(() => true)).hub;
+    assert.deepEqual(hub.night, { from: 23 * 60, to: 7 * 60 });
+    assert.equal(hub.nightSound, 'off');
     screen.close();
     const day = await startTestHub();
     const other = await display(day.port);
-    assert.equal((await other.state(() => true)).hub.night, null);
+    const plain = (await other.state(() => true)).hub;
+    assert.equal(plain.night, null);
+    assert.equal(plain.nightSound, 'quiet');
     other.close();
   });
 

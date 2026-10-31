@@ -17,7 +17,7 @@ import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { pullKey, renderPulls } from './pulls.ts';
 import { QueueView } from './queue.ts';
-import { Rest, inNight, restAfter, watched } from './quiet.ts';
+import { Rest, chimeLoudness, inNight, restAfter, watched } from './quiet.ts';
 import { splitResting } from './resting.ts';
 import { TapList } from './taps.ts';
 import { shouldReload } from './reload.ts';
@@ -184,7 +184,7 @@ function onMessage(message: ServerMessage): void {
     clockOffset = message.now - Date.now();
     state = message;
     const added = render();
-    if (added.length > 0 && message.hub.sound) chime();
+    if (added.length > 0) chimeAt(Date.now() + clockOffset);
   } else if (message.type === 'decision-result' && !message.ok) {
     queue.release(message.id);
     toast(message.reason === 'already-decided' ? texts.alreadyDecided : texts.notOpen);
@@ -232,7 +232,7 @@ function tick(): void {
   const now = Date.now() + clockOffset;
   queue.tick(now, state?.hub.remindAfterMs ?? 0);
   // A request that waits long reminds once more with the tones, when sound is on.
-  if (newReminders(state?.permissions ?? [], state?.hub.remindAfterMs ?? 0, now, reminded).length > 0 && state?.hub.sound) chime();
+  if (newReminders(state?.permissions ?? [], state?.hub.remindAfterMs ?? 0, now, reminded).length > 0) chimeAt(now);
   const sessions = state?.sessions ?? [];
   renderAgents(agents, splitResting(sessions, now), { item: restingItem, button: restingButton, open: restingLine.isOpen(now) }, { items: agentItems, toggle: toggleDetails, open: (id) => openTarget({ session: id }) }, now, texts);
   // With the line's button in it, the browser no longer makes the list a tab stop by itself.
@@ -291,8 +291,7 @@ function tick(): void {
   if (kumaNote) show(monitorsState, kumaNote);
 
   // At rest after a while with nothing new and no open request: dimmed; at night sooner and darker (quiet.ts).
-  const local = new Date(now);
-  const atNight = inNight(state?.hub.night ?? null, local.getHours() * 60 + local.getMinutes());
+  const atNight = nightAt(now);
   const resting = rest.update(watched(state, connected), restAfter(state?.hub.quietAfterMs ?? 0, atNight), now);
   document.body.classList.toggle('quiet', resting);
   document.body.classList.toggle('night', resting && atNight);
@@ -346,8 +345,20 @@ function toast(text: string, ms = TOAST_MS): void {
   toastTimer = window.setTimeout(() => (toastNode.hidden = true), ms);
 }
 
-/** Two soft tones for a new request, only when the configuration turns sound on. */
-function chime(): void {
+/** Whether it is night by the display's clock, as the hub set it up. */
+function nightAt(now: number): boolean {
+  const local = new Date(now);
+  return inNight(state?.hub.night ?? null, local.getHours() * 60 + local.getMinutes());
+}
+
+/** The tones, when the configuration turns sound on; at night quieter or none, as set up (quiet.ts). */
+function chimeAt(now: number): void {
+  const loudness = chimeLoudness(state?.hub.sound ?? false, state?.hub.nightSound ?? 'quiet', nightAt(now));
+  if (loudness > 0) chime(loudness);
+}
+
+/** Two soft tones for a new request, at a share of their full loudness. */
+function chime(loudness: number): void {
   audio ??= new AudioContext();
   if (audio.state === 'suspended') void audio.resume();
   const start = audio.currentTime;
@@ -357,7 +368,7 @@ function chime(): void {
     const gain = audio!.createGain();
     tone.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.12, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.12 * loudness, at + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.35);
     tone.connect(gain).connect(audio!.destination);
     tone.start(at);

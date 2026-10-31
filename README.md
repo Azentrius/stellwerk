@@ -49,7 +49,7 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   once more (`remindAfterSeconds`).
 - **A night, if you like.** Between `nightFrom` and `nightTo` (e.g. 23:00 to 07:00) the display goes
   darker than by day after a minute with nothing new, still readable in a dark room; what wakes it by day
-  wakes it at night too.
+  wakes it at night too. With sound on, its tones are quieter then, or none (`nightSound`).
 - **The last decisions.** At the foot of the waiting column one line folds the decisions on permission
   requests of the last 24 hours (at most ten): what, when, whose session, and how each ended. A tap opens
   them over the requests, which keep their place; the next tap closes them, and so do a minute without a
@@ -453,7 +453,7 @@ session appears with its first event, which in the desktop app is the first prom
 ```json
 {
   "port": 4780, "holdSeconds": 60, "sound": false, "quietAfterMinutes": 10, "remindAfterSeconds": 20,
-  "nightFrom": "23:00", "nightTo": "07:00", "scale": 1, "debugRawLog": false
+  "nightFrom": "23:00", "nightTo": "07:00", "nightSound": "quiet", "scale": 1, "debugRawLog": false
 }
 ```
 
@@ -463,6 +463,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `holdSeconds` | How long a request waits on the display before it goes back to the app: 10 to 80 (at least 10 s below the hook timeout of 90 s). |
 | `sound` | A soft chime for each new request. |
 | `nightFrom`, `nightTo` | The night by the display's clock, as "HH:MM" (e.g. "23:00" and "07:00", also over midnight); both or neither, none by default. At night the display rests after a minute with nothing new, also when `quietAfterMinutes` is 0, and goes darker than by day, still readable; what wakes it by day wakes it then too. |
+| `nightSound` | The tones at night, with `sound` on: `"quiet"` (by default) at a quarter of their loudness, `"off"` none, `"on"` as by day. The display shows a new request at night all the same. |
 | `remindAfterSeconds` | An open request reminds after this many seconds: its card pulses (a frame without motion), and with `sound` the tones come once more: 0 (never) to 300, 20 by default. |
 | `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request or failed checks wake it, and so does a tap, which presses nothing else. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |

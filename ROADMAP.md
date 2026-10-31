@@ -154,7 +154,7 @@ when that folder's path has umlauts; values reach PowerShell unchanged whatever 
 
 Done in 0.9.0 (see [CHANGELOG](CHANGELOG.md)): `stellwerk setup` sets Stellwerk up in one go,
 `stellwerk status` shows what runs and what is set up, the status column says when a newer
-LibreHardwareMonitor is due, and a failing monitor opens in Uptime Kuma.
+LibreHardwareMonitor is due, a failing monitor opens in Uptime Kuma, and the tones are quieter at night.
 
 ---
 

@@ -3,11 +3,12 @@
 // Anything new wakes it: a request, an answer due in the app, a monitor that goes down, a pull request or
 // checks that failed, the hub gone away. So does a tap. The hub cannot dim the screen itself (it starts no
 // programs); the display dims its own page. At night (the hours set up) it rests after a minute already
-// and goes darker than by day, still readable; what wakes it by day wakes it at night too.
+// and goes darker than by day, still readable; what wakes it by day wakes it at night too. Its tones are
+// quieter then, or none, as set up.
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import type { StateMessage } from '../../src/shared/protocol.js';
+import type { NightSound, StateMessage } from '../../src/shared/protocol.js';
 import { waitingForAnswer } from './due.ts';
 
 /** What on the display can wake it. */
@@ -46,6 +47,16 @@ export function inNight(night: { from: number; to: number } | null, minute: numb
 export function restAfter(quietAfterMs: number, atNight: boolean): number {
   if (!atNight) return quietAfterMs;
   return quietAfterMs > 0 ? Math.min(quietAfterMs, NIGHT_REST_MS) : NIGHT_REST_MS;
+}
+
+/** At night the quiet tones have this share of their loudness by day. */
+export const NIGHT_LOUDNESS = 0.25;
+
+/** How loud the tones are, as a share of their loudness by day: none without sound, at night as set up. */
+export function chimeLoudness(sound: boolean, nightSound: NightSound, atNight: boolean): number {
+  if (!sound) return 0;
+  if (!atNight || nightSound === 'on') return 1;
+  return nightSound === 'quiet' ? NIGHT_LOUDNESS : 0;
 }
 
 export class Rest {
