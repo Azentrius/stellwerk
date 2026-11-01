@@ -36,7 +36,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
 - **Plan usage.** How much of your Claude and Codex plans' limits is used, from local sources only (see
   [Plan usage](#plan-usage)).
 - **Open pull requests, if you like.** With a read-only GitHub token, the open pull requests of one
-  owner (all repositories) are listed too, each with the state of its Actions runs.
+  owner (all repositories) are listed too, each with the state of its Actions runs, drafts and conflicts
+  marked; Dependabot's of a repository stand behind one line.
 - **A newer release.** With the same token, the status column says when a newer release of Stellwerk is
   out, with the command that sets it up (see [Updating](#updating)).
 - **Hardware, if you like.** Load and temperature of processor and graphics card and the memory in use,
@@ -84,10 +85,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.9.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.9.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.9.0.zip -DestinationPath .
-cd stellwerk-0.9.0
+(Get-FileHash stellwerk-0.10.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.10.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.10.0.zip -DestinationPath .
+cd stellwerk-0.10.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -141,7 +142,7 @@ Or step by step, without the start with Windows:
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.9.0.zip
+stellwerk update stellwerk-0.10.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -166,7 +167,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.9.0"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.0"
 npm link
 ```
 
@@ -231,7 +232,8 @@ by your Windows user only, in `%LOCALAPPDATA%\stellwerk\github-token`; the owner
 `config.json`. Only fine-grained tokens (`github_pat_…`) are accepted. Restart the hub afterwards.
 
 Every two minutes the hub then asks `api.github.com` for the owner's repositories (archived ones are
-left out), their open pull requests, and the Actions runs on each pull request's head commit. For a
+left out), their open pull requests, the Actions runs on each pull request's head commit, and each pull
+request on its own, which alone says whether it can be merged. For a
 personal account it adds the private repositories of that owner the token may see, which GitHub's list
 of a user's repositories leaves out. Lists longer than one page are read to the end, following GitHub's
 links only on `api.github.com`; more than 1000 entries in one list are reported as a problem instead of
@@ -245,6 +247,14 @@ have room:
 | red exclamation mark: failed | a run failed, timed out or was cancelled |
 | grey hourglass: running | runs still going, or waiting for approval |
 | none | no runs |
+
+A draft has "Draft" in front of its title, which is quieter. "Conflict" next to the time says that GitHub
+cannot merge a pull request for conflicts with its base; while GitHub is still working that out, what was
+known stays. Dependabot's pull requests of a repository stand behind one line, such as "4 dependency
+updates", with the worst checks among them, "Conflict" if one has a conflict, and the time of the newest;
+a tap opens the line and shows them below it, each opening in the browser with a tap, and it closes again
+a minute after the last touch. A repository with only one keeps it as a line of its own. GitHub's own
+inbox shows fewer: only the pull requests that involve you, so Dependabot's are not there.
 
 At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
 last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it.
@@ -465,7 +475,7 @@ session appears with its first event, which in the desktop app is the first prom
 | `nightFrom`, `nightTo` | The night by the display's clock, as "HH:MM" (e.g. "23:00" and "07:00", also over midnight); both or neither, none by default. At night the display rests after a minute with nothing new, also when `quietAfterMinutes` is 0, and goes darker than by day, still readable; what wakes it by day wakes it then too. |
 | `nightSound` | The tones at night, with `sound` on: `"quiet"` (by default) at a quarter of their loudness, `"off"` none, `"on"` as by day. The display shows a new request at night all the same. |
 | `remindAfterSeconds` | An open request reminds after this many seconds: its card pulses (a frame without motion), and with `sound` the tones come once more: 0 (never) to 300, 20 by default. |
-| `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request or failed checks wake it, and so does a tap, which presses nothing else. |
+| `quietAfterMinutes` | The display rests, dimmed with the clock still readable, after this many minutes with nothing new and no open request: 0 (never) to 1440, 10 by default. A new request, a new answer due in the app, a monitor going down, a new pull request, failed checks or a conflict wake it, and so does a tap, which presses nothing else. |
 | `scale` | Scales every size of the display (0.5 to 3). At 1, no text is smaller than 20 px and no button lower than 64 px. |
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code; `stellwerk raw-log delete` deletes it. |
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |

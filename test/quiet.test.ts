@@ -26,7 +26,7 @@ function stateWith(parts: { sessions?: Partial<SessionView>[]; permissions?: Par
 }
 
 describe('what wakes the display', () => {
-  test('answers due in the app, monitors down, pull requests and failed checks; open requests are counted', () => {
+  test('answers due in the app, monitors down, pull requests, failed checks and conflicts; open requests are counted', () => {
     const seen = watched(
       stateWith({
         sessions: [
@@ -38,6 +38,7 @@ describe('what wakes the display', () => {
         pulls: [
           { repo: 'shop-api', number: 1, checks: 'passing' },
           { repo: 'shop-api', number: 2, checks: 'failing' },
+          { repo: 'shop-api', number: 3, checks: 'passing', conflict: true },
         ],
         failing: [
           { id: '1', name: 'Server', status: 'down', since: null },
@@ -47,7 +48,7 @@ describe('what wakes the display', () => {
       true,
     );
     assert.equal(seen.open, 1, 'a settled request does not keep it awake');
-    assert.deepEqual(seen.keys, ['answer a 5', 'down Server', 'pull shop-api#1', 'pull shop-api#2', 'failing shop-api#2']);
+    assert.deepEqual(seen.keys, ['answer a 5', 'down Server', 'pull shop-api#1', 'pull shop-api#2', 'failing shop-api#2', 'pull shop-api#3', 'conflict shop-api#3']);
   });
 
   test('without the hub, that is what wakes it', () => {

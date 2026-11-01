@@ -9,7 +9,8 @@
 // foot of the waiting column, a click or Enter opens and closes them, open they lie over the requests without
 // moving them, and a new request folds them; a press held over a render on the button in a session's
 // details, on a session waiting for an answer and on a pull request has the hub open it, once, and the
-// display says where (the hubs here only write down what they would open). Isolated hubs with made-up tokens;
+// display says where (the hubs here only write down what they would open); Dependabot's pull requests of a
+// repository stand behind one line, which a press, Enter and Space open and close, and one of them opens. Isolated hubs with made-up tokens;
 // sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
 // answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
 // (npm run build) and Edge.
@@ -56,7 +57,8 @@ const WAITING: ListSpec = {
 };
 
 // ---------- GitHub, made up ----------
-function gitHub(pulls: number): typeof fetch {
+/** `updates`: how many of Dependabot's there are in shop-api besides the `pulls`, at each question. */
+function gitHub(pulls: number, updates: () => number): typeof fetch {
   const repos = ['shop-api', 'customer-portal'];
   const answers: Record<string, unknown> = { '/orgs/example/repos': repos.map((name) => ({ name })) };
   for (const [r, repo] of repos.entries()) {
@@ -68,9 +70,24 @@ function gitHub(pulls: number): typeof fetch {
       head: { sha: String(r * 10 + i).padStart(40, '0') },
     }));
   }
+  // Dependabot's, older than the others: one line below them.
+  const dependabot = () =>
+    Array.from({ length: updates() }, (_, i) => ({
+      number: 300 + i,
+      title: `Bump package ${i + 1}`,
+      updated_at: new Date(Date.now() - (24 + i) * 3_600_000).toISOString(),
+      user: { login: 'dependabot[bot]' },
+      head: { sha: String(300 + i).padStart(40, '0') },
+    }));
   return (async (input: string | URL | Request) => {
     const url = new URL(String(input));
-    const body = url.pathname.endsWith('/actions/runs') ? { workflow_runs: [{ status: 'completed', conclusion: 'success' }] } : answers[url.pathname];
+    const body = url.pathname.endsWith('/actions/runs')
+      ? { workflow_runs: [{ status: 'completed', conclusion: 'success' }] }
+      : /\/pulls\/\d+$/.test(url.pathname)
+        ? { mergeable: true }
+        : url.pathname === '/repos/example/shop-api/pulls'
+          ? [...(answers[url.pathname] as unknown[]), ...dependabot()]
+          : answers[url.pathname];
     return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 });
   }) as typeof fetch;
 }
@@ -156,9 +173,17 @@ function earlierDecisions(file: string, count: number): void {
  * A hub of its own with its start file, as `serve` writes it; with `alerts`, the raw log is on and a
  * request with a wrong token is turned away, so the status column shows two alerts above its gauges;
  * with `decisions`, that many decisions of an earlier run are in its audit log; with `remindAfterMs`, an open
- * request reminds after that long.
+ * request reminds after that long; with `updates`, it asks GitHub every half second, and that many of
+ * Dependabot's pull requests are there besides the `pulls`.
  */
-async function testHub(dir: string, pulls: number, alerts = false, decisions = 0, remindAfterMs = 0): Promise<{ hub: Hub; token: string; startFile: string }> {
+async function testHub(
+  dir: string,
+  pulls: number,
+  alerts = false,
+  decisions = 0,
+  remindAfterMs = 0,
+  updates?: () => number,
+): Promise<{ hub: Hub; token: string; startFile: string }> {
   fs.mkdirSync(dir, { recursive: true });
   if (decisions > 0) earlierDecisions(path.join(dir, 'audit.jsonl'), decisions);
   const token = randomBytes(32).toString('hex');
@@ -175,7 +200,7 @@ async function testHub(dir: string, pulls: number, alerts = false, decisions = 0
     uiRoot: path.join(ROOT, 'ui'),
     webRoot: path.join(ROOT, 'dist', 'ui'),
     log: () => {},
-    github: { owner: 'example', token: `github_pat_${'check'.repeat(8)}`, intervalMs: 3_600_000, fetch: gitHub(pulls) },
+    github: { owner: 'example', token: `github_pat_${'check'.repeat(8)}`, intervalMs: updates ? 500 : 3_600_000, fetch: gitHub(pulls, updates ?? (() => 0)) },
     hardware: { settingsFile: path.join(dir, 'LibreHardwareMonitor.config'), intervalMs: 500, fetch: hardwareFetch },
     rawLogFile: alerts ? path.join(dir, 'debug-raw.jsonl') : null,
     sessionsFile: alerts ? restingSessions(dir) : null,
@@ -217,6 +242,8 @@ async function fill(hub: Hub, token: string, counts: { working: number; answers:
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-columns-'));
 const many = await testHub(path.join(dir, 'many'), 8, true);
 let few: Awaited<ReturnType<typeof testHub>> | null = null;
+/** Dependabot's pull requests of the few's hub. */
+let fewUpdates = 0;
 let edge: Edge | null = null;
 try {
   const COUNTS = { working: 26, answers: 4, cards: 5 };
@@ -608,7 +635,8 @@ try {
   check(g.scrollTop >= g.max - 1 && lastReadable(g), 'a finger moves them to the last, which can be read');
 
   // ---------- only a few: they fit, nothing scrolls, nothing moves ----------
-  few = await testHub(path.join(dir, 'few'), 1, false, 12, 1500);
+  // Dependabot's two come only for the taps at the end: with them, the few would no longer fit.
+  few = await testHub(path.join(dir, 'few'), 1, false, 12, 1500, () => fewUpdates);
   await fill(few.hub, few.token, { working: 2, answers: 1, cards: 1 });
   await openDisplay(browser, few.startFile);
   await until('the display shows the few', async () => {
@@ -834,6 +862,44 @@ try {
   });
   check(/^(Opening in the browser …|Öffnet im Browser …)$/.test(browserSaid), `for a pull request: "${browserSaid}"`);
   check(/^https:\/\/github\.com\/example\/[a-z-]+\/pull\/\d+$/.test(opened[2]!), `a press on a pull request opens it in the browser (${opened[2]})`);
+
+  // ---------- Dependabot's updates: one line, which a press opens in place, and one of them opens ----------
+  const updates = () =>
+    browser.call<{ text: string; expanded: string | null; nested: string[]; focused: boolean } | null>(
+      `() => {
+      const line = document.querySelector('#pulls .pull--updates');
+      if (!line) return null;
+      return {
+        text: line.querySelector('.entry__name').textContent,
+        expanded: line.getAttribute('aria-expanded'),
+        nested: [...document.querySelectorAll('#pulls .pull--nested')].map((n) => n.querySelector('.entry__name').textContent),
+        focused: document.activeElement === line,
+      };
+    }`,
+    );
+  fewUpdates = 2;
+  let updatesLine = await until('the updates line is there', updates);
+  check(
+    /^(2 dependency updates|2 Abhängigkeits-Updates)$/.test(updatesLine.text) && updatesLine.expanded === 'false' && updatesLine.nested.length === 0,
+    `Dependabot's two stand behind one line, closed ("${updatesLine.text}")`,
+  );
+  await pressOverRender((await boxOf('#pulls .pull--updates'))!, '#pulls');
+  updatesLine = await until('a press opens it', async () => {
+    const now = await updates();
+    return now?.expanded === 'true' && now.nested.length === 2 ? now : null;
+  });
+  check(updatesLine.nested.join(', ') === 'Bump package 1, Bump package 2' && updatesLine.focused, `a press held over a render opens it once: ${updatesLine.nested.join(', ')} below it, the focus on the line`);
+  await press(browser, 'Enter', 13, '\r');
+  await until('Enter closes it', async () => (await updates())?.nested.length === 0);
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', ...SPACE, text: ' ', unmodifiedText: ' ' });
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyUp', ...SPACE });
+  await until('Space opens it again', async () => (await updates())?.nested.length === 2);
+  check(true, 'Enter and Space close and open it as well');
+  await pause(1100);
+  await pressOverRender((await boxOf('#pulls .pull--nested'))!, '#pulls');
+  await until('the update is opened', async () => opened.length === 4);
+  check(opened[3] === 'https://github.com/example/shop-api/pull/300', `a press on one of them opens it in the browser (${opened[3]})`);
+  check((await updates())?.expanded === 'true', 'the line stays open');
 } finally {
   await edge?.close();
   await many.hub.close();

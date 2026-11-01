@@ -27,6 +27,7 @@ const fakeGitHub: Record<string, unknown> = {
   '/repos/example/shop-api/pulls': [
     { number: 41, title: 'Release 2.3', updated_at: hoursAgo(0.2), user: { login: 'dev' }, head: { sha: 'a'.repeat(40) } },
     { number: 39, title: 'Bump zod from 4.1 to 4.2', updated_at: hoursAgo(5), user: { login: 'dependabot[bot]' }, head: { sha: 'b'.repeat(40) } },
+    { number: 38, title: 'Bump ws from 8.18 to 8.19', updated_at: hoursAgo(6), user: { login: 'dependabot[bot]' }, head: { sha: 'd'.repeat(40) } },
   ],
   '/repos/example/customer-portal-frontend/pulls': [
     { number: 12, title: 'New landing page', draft: true, updated_at: hoursAgo(1), user: { login: 'dev' }, head: { sha: 'c'.repeat(40) } },
@@ -36,12 +37,17 @@ const runsFor: Record<string, unknown> = {
   ['a'.repeat(40)]: [{ status: 'in_progress', conclusion: null }],
   ['b'.repeat(40)]: [{ status: 'completed', conclusion: 'success' }],
   ['c'.repeat(40)]: [{ status: 'completed', conclusion: 'failure' }],
+  ['d'.repeat(40)]: [{ status: 'completed', conclusion: 'success' }],
 };
+/** Pull requests with a conflict with their base; the others can be merged. */
+const conflicts = new Set(['/repos/example/shop-api/pulls/41']);
 const demoFetch = (async (input: string | URL | Request) => {
   const url = new URL(String(input));
   const body = url.pathname.endsWith('/actions/runs')
     ? { workflow_runs: runsFor[url.searchParams.get('head_sha') ?? ''] ?? [] }
-    : fakeGitHub[url.pathname];
+    : /\/pulls\/\d+$/.test(url.pathname)
+      ? { mergeable: !conflicts.has(url.pathname) }
+      : fakeGitHub[url.pathname];
   return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 });
 }) as typeof fetch;
 // And one for LibreHardwareMonitor on 127.0.0.1:8085, with values that move a little.

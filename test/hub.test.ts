@@ -563,6 +563,7 @@ describe('open pull requests', () => {
           { number: 7, title: 'Bump zod', updated_at: '2026-10-15T10:00:00Z', user: { login: 'dependabot[bot]' }, head: { sha: 'a'.repeat(40) } },
         ],
         '/repos/acme/api/actions/runs': { workflow_runs: [{ status: 'completed', conclusion: 'failure' }] },
+        '/repos/acme/api/pulls/7': { number: 7, mergeable: false },
       };
       return new Response(JSON.stringify(body[url.pathname]), { status: 200 });
     }) as typeof fetch;
@@ -570,7 +571,7 @@ describe('open pull requests', () => {
     const screen = await display(port);
     const state = await screen.state((s) => s.pullRequests.length === 1);
     assert.deepEqual(state.pullRequests[0], {
-      repo: 'api', number: 7, title: 'Bump zod', author: 'dependabot[bot]', draft: false, updatedAt: Date.parse('2026-10-15T10:00:00Z'), checks: 'failing',
+      repo: 'api', number: 7, title: 'Bump zod', author: 'dependabot[bot]', draft: false, updatedAt: Date.parse('2026-10-15T10:00:00Z'), checks: 'failing', conflict: true,
     });
     assert.equal(state.github?.owner, 'acme');
     assert.equal(state.github?.problem, null);

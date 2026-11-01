@@ -33,6 +33,8 @@ const gitHubFetch = (async (input: string | URL | Request) => {
   if (url.pathname === '/orgs/example/repos') body = [{ name: 'shop-api' }];
   else if (url.pathname === '/repos/example/shop-api/pulls') {
     body = pulls.map((p) => ({ number: p.number, title: `Pull request ${p.number}`, updated_at: new Date().toISOString(), user: { login: 'dev' }, head: { sha: sha(p.number) } }));
+  } else if (/^\/repos\/example\/shop-api\/pulls\/\d+$/.test(url.pathname)) {
+    body = { mergeable: true };
   } else if (url.pathname.endsWith('/actions/runs')) {
     const pull = pulls.find((p) => sha(p.number) === url.searchParams.get('head_sha'));
     body = { workflow_runs: [{ status: 'completed', conclusion: pull?.failing ? 'failure' : 'success' }] };

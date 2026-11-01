@@ -1,8 +1,8 @@
 // The list of open pull requests. Every few minutes the hub asks api.github.com, and nothing else, with
 // a read-only fine-grained token: the owner's repositories, their open pull requests, and for each the
-// Actions runs on its head commit. Lists come in pages; the hub follows GitHub's "next" links, but only to
-// api.github.com and only up to a limit, so a list is complete or the round fails. Every answer is
-// checked before it is used; a failed round keeps the last list and says why. Every few hours the same
+// Actions runs on its head commit and whether it can be merged. Lists come in pages; the hub follows
+// GitHub's "next" links, but only to api.github.com and only up to a limit, so a list is complete or the
+// round fails. Every answer is checked before it is used; a failed round keeps the last list and says why. Every few hours the same
 // way: the newest release of Stellwerk itself, so the display can say when there is a newer one (nothing is
 // downloaded).
 //
@@ -40,6 +40,8 @@ const pulls = z.array(
 const runs = z.object({
   workflow_runs: z.array(z.object({ status: z.string().nullable(), conclusion: z.string().nullable() })),
 });
+/** One pull request on its own, which alone says whether it can be merged: null while GitHub works it out. */
+const pullAlone = z.object({ mergeable: z.boolean().nullable().optional() });
 const release = z.object({
   tag_name: z.string().regex(/^v\d{1,4}\.\d{1,5}\.\d{1,6}$/),
   draft: z.boolean().optional(),
@@ -144,6 +146,7 @@ export class GitHubWatcher {
     const before = this.problem;
     await this.releaseRound();
     try {
+      const conflicts = new Map(this.pullRequests.map((pr) => [`${pr.repo}#${pr.number}`, pr.conflict]));
       const found: Array<{ view: PullRequestView; sha: string }> = [];
       for (const repo of await this.repositories()) {
         const list = await this.getAll(`/repos/${this.owner}/${encodeURIComponent(repo)}/pulls?state=open&per_page=${PER_PAGE}`, pulls, (page) => page);
@@ -158,6 +161,7 @@ export class GitHubWatcher {
               draft: pr.draft ?? false,
               updatedAt: Date.parse(pr.updated_at) || 0,
               checks: 'none',
+              conflict: false,
             },
           });
         }
@@ -165,8 +169,15 @@ export class GitHubWatcher {
       for (let i = 0; i < found.length; i += PARALLEL) {
         await Promise.all(
           found.slice(i, i + PARALLEL).map(async (item) => {
-            const path = `/repos/${this.owner}/${encodeURIComponent(item.view.repo)}/actions/runs?head_sha=${item.sha}&per_page=${PER_PAGE}`;
-            item.view.checks = summarizeRuns(await this.getAll(path, runs, (page) => page.workflow_runs));
+            const repo = `/repos/${this.owner}/${encodeURIComponent(item.view.repo)}`;
+            const [list, alone] = await Promise.all([
+              this.getAll(`${repo}/actions/runs?head_sha=${item.sha}&per_page=${PER_PAGE}`, runs, (page) => page.workflow_runs),
+              this.get(`${GITHUB_API}${repo}/pulls/${item.view.number}`, pullAlone),
+            ]);
+            item.view.checks = summarizeRuns(list);
+            // Null while GitHub works it out, which asking starts: what was known stays until the next round.
+            const mergeable = alone.data.mergeable ?? null;
+            item.view.conflict = mergeable === null ? (conflicts.get(`${item.view.repo}#${item.view.number}`) ?? false) : !mergeable;
           }),
         );
       }

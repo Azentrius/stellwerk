@@ -30,7 +30,15 @@ export interface Texts {
   waitingFor: Record<Exclude<WaitingFor, 'idle'>, string>;
   since: (duration: string) => string;
   pullsTitle: string;
+  /** In front of a draft's title. */
   draft: string;
+  /** After a pull request that cannot be merged for conflicts with its base. */
+  conflict: string;
+  /** The line behind which Dependabot's pull requests of a repository stand (two or more). */
+  updates: (n: number) => string;
+  /** Its tooltip, closed and open. */
+  showUpdates: string;
+  hideUpdates: string;
   checks: Record<ChecksState, string>;
   /** A problem says what happened; its fix says how to fix it, commands in backticks. */
   github: {
@@ -171,7 +179,11 @@ const en: Texts = {
   },
   since: (d) => `for ${d}`,
   pullsTitle: 'Open pull requests',
-  draft: 'draft',
+  draft: 'Draft',
+  conflict: 'Conflict',
+  updates: (n) => `${n} dependency updates`,
+  showUpdates: 'Show the updates',
+  hideUpdates: 'Hide the updates',
   checks: { passing: 'Checks passed', failing: 'Checks failed', pending: 'Checks running', none: 'No checks' },
   github: {
     asking: 'GitHub: asking',
@@ -351,6 +363,10 @@ const de: Texts = {
   since: (d) => `seit ${d}`,
   pullsTitle: 'Offene Pull Requests',
   draft: 'Entwurf',
+  conflict: 'Konflikt',
+  updates: (n) => `${n} Abhängigkeits-Updates`,
+  showUpdates: 'Updates zeigen',
+  hideUpdates: 'Updates ausblenden',
   checks: { passing: 'Checks bestanden', failing: 'Checks fehlgeschlagen', pending: 'Checks laufen', none: 'Keine Checks' },
   github: {
     asking: 'GitHub: wird abgefragt',
