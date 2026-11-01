@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.1 – 2026-11-01
+
+Drafts and conflicts are small icons in front of the title, so the title keeps its room.
+
+- **Marks in front of the title:** a conflict with its base is an attention triangle and a draft a
+  pencil, both in front of the title, a conflict first. Before, "Draft" stood in front of the title and
+  "Conflict" next to the time, both as labels with their word, which left less of the title and the
+  repository. The word stays as the icon's name for screen readers; a draft's title is still quieter.
+  Dependabot's line shows a conflict among its pull requests the same way, after its arrow.
+- **Tests:** in Edge (`tools/check-columns.ts`), a draft with a conflict among Dependabot's has both marks
+  as icons in front of its title and no label, and so has the line in front of its text.
+
 ## 0.10.0 – 2026-11-01
 
 Dependabot's pull requests of a repository stand behind one line, and drafts and conflicts can be seen.

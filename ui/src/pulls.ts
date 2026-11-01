@@ -1,15 +1,16 @@
 // Open pull requests of the configured owner, one line each: the state of its Actions runs as an icon
-// (passed, failed, running; none leaves the place empty), "Draft" in front of the title of a draft, which is
-// quieter, the repository, number and author, a conflict with its base, and how long ago it was updated.
-// Most recently updated first (the hub sorts them). A tap opens it in the default browser. Dependabot's of
-// one repository stand behind one line, which a tap opens (updates.ts).
+// (passed, failed, running; none leaves the place empty), marks in front of the title (a conflict with its
+// base, a draft, whose title is quieter), the repository, number and author, and how long ago it was
+// updated. Most recently updated first (the hub sorts them). A tap opens it in the default browser.
+// Dependabot's of one repository stand behind one line, which a tap opens (updates.ts).
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { PullRequestView } from '../../src/shared/protocol.js';
-import { entry, icon, label } from './dom.ts';
+import { el, entry, icon } from './dom.ts';
 import type { Texts } from './i18n.ts';
-import { checksState, state } from './states.ts';
+import type { IconName } from './icons.ts';
+import { checksState } from './states.ts';
 import type { TapEntry, TapList } from './taps.ts';
 import { ago } from './time.ts';
 import { pullLines } from './updates.ts';
@@ -43,8 +44,9 @@ export function renderPulls(
     const fresh = entry('pull pull--updates entry--short', texts.updates(updates.length), ago(now - updatedAt, texts), `${repo} · dependabot`, checksState(checks, texts), {
       iconOnly: true,
     });
-    fresh.querySelector('.entry__name')!.prepend(icon(open ? 'angle-down' : 'angle-right'));
-    if (conflict) fresh.lastElementChild!.append(label(state('warning', texts.conflict)));
+    const name = fresh.querySelector('.entry__name')!;
+    if (conflict) name.prepend(mark('exclamation-triangle', 'warning', texts.conflict));
+    name.prepend(icon(open ? 'angle-down' : 'angle-right'));
     entries.push({ key: updatesKey(repo), fresh, tappable: true, hint: open ? texts.hideUpdates : texts.showUpdates, expanded: open });
     if (open) entries.push(...updates.map((pr) => pullEntry(pr, true, now, texts)));
   }
@@ -58,11 +60,17 @@ function pullEntry(pr: PullRequestView, nested: boolean, now: number, texts: Tex
   const fresh = entry(className, pr.title, ago(now - pr.updatedAt, texts), `${pr.repo} #${pr.number} · ${author}`, checksState(pr.checks, texts), {
     iconOnly: true,
   });
-  if (pr.draft) {
-    const draft = label(state('neutral', texts.draft));
-    draft.classList.add('pull__draft');
-    fresh.querySelector('.entry__name')!.before(draft);
-  }
-  if (pr.conflict) fresh.lastElementChild!.append(label(state('warning', texts.conflict)));
+  const name = fresh.querySelector('.entry__name')!;
+  if (pr.draft) name.prepend(mark('pencil-alt', 'neutral', texts.draft));
+  if (pr.conflict) name.prepend(mark('exclamation-triangle', 'warning', texts.conflict));
   return { key: pullKey(pr), fresh, tappable: true, hint: texts.openPull };
+}
+
+/** A mark in front of a title, an icon alone; its word is its name for screen readers. */
+function mark(name: IconName, tone: 'neutral' | 'warning', text: string): HTMLSpanElement {
+  const node = el('span', `pull__mark pull__mark--${tone}`);
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', text);
+  node.append(icon(name));
+  return node;
 }

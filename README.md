@@ -85,10 +85,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.10.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.10.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.10.0.zip -DestinationPath .
-cd stellwerk-0.10.0
+(Get-FileHash stellwerk-0.10.1.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.10.1.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.10.1.zip -DestinationPath .
+cd stellwerk-0.10.1
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -142,7 +142,7 @@ Or step by step, without the start with Windows:
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.10.0.zip
+stellwerk update stellwerk-0.10.1.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -167,7 +167,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.0"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.1"
 npm link
 ```
 
@@ -248,13 +248,14 @@ have room:
 | grey hourglass: running | runs still going, or waiting for approval |
 | none | no runs |
 
-A draft has "Draft" in front of its title, which is quieter. "Conflict" next to the time says that GitHub
-cannot merge a pull request for conflicts with its base; while GitHub is still working that out, what was
-known stays. Dependabot's pull requests of a repository stand behind one line, such as "4 dependency
-updates", with the worst checks among them, "Conflict" if one has a conflict, and the time of the newest;
-a tap opens the line and shows them below it, each opening in the browser with a tap, and it closes again
-a minute after the last touch. A repository with only one keeps it as a line of its own. GitHub's own
-inbox shows fewer: only the pull requests that involve you, so Dependabot's are not there.
+Two marks can stand in front of the title, as icons: an attention triangle says that GitHub cannot merge
+a pull request for conflicts with its base (while GitHub is still working that out, what was known
+stays), a pencil marks a draft, whose title is quieter. Dependabot's pull requests of a repository stand
+behind one line, such as "4 dependency updates", with the worst checks among them, the triangle if one
+has a conflict, and the time of the newest; a tap opens the line and shows them below it, each opening in
+the browser with a tap, and it closes again a minute after the last touch. A repository with only one
+keeps it as a line of its own. GitHub's own inbox shows fewer: only the pull requests that involve you,
+so Dependabot's are not there.
 
 At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
 last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it.
