@@ -10,7 +10,8 @@
 // moving them, and a new request folds them; a press held over a render on the button in a session's
 // details, on a session waiting for an answer and on a pull request has the hub open it, once, and the
 // display says where (the hubs here only write down what they would open); Dependabot's pull requests of a
-// repository stand behind one line, which a press, Enter and Space open and close, and one of them opens. Isolated hubs with made-up tokens;
+// repository stand behind one line, which a press, Enter and Space open and close, and one of them opens;
+// a conflict and a draft are icons in front of the title. Isolated hubs with made-up tokens;
 // sessions, requests and the plans' usage come as hook events, earlier decisions from the audit log, the
 // answers of GitHub and LibreHardwareMonitor are made up here, nothing goes online. Needs the display built
 // (npm run build) and Edge.
@@ -70,11 +71,12 @@ function gitHub(pulls: number, updates: () => number): typeof fetch {
       head: { sha: String(r * 10 + i).padStart(40, '0') },
     }));
   }
-  // Dependabot's, older than the others: one line below them.
+  // Dependabot's, older than the others: one line below them. The second is a draft with a conflict.
   const dependabot = () =>
     Array.from({ length: updates() }, (_, i) => ({
       number: 300 + i,
       title: `Bump package ${i + 1}`,
+      draft: i === 1,
       updated_at: new Date(Date.now() - (24 + i) * 3_600_000).toISOString(),
       user: { login: 'dependabot[bot]' },
       head: { sha: String(300 + i).padStart(40, '0') },
@@ -84,7 +86,7 @@ function gitHub(pulls: number, updates: () => number): typeof fetch {
     const body = url.pathname.endsWith('/actions/runs')
       ? { workflow_runs: [{ status: 'completed', conclusion: 'success' }] }
       : /\/pulls\/\d+$/.test(url.pathname)
-        ? { mergeable: true }
+        ? { mergeable: url.pathname !== '/repos/example/shop-api/pulls/301' }
         : url.pathname === '/repos/example/shop-api/pulls'
           ? [...(answers[url.pathname] as unknown[]), ...dependabot()]
           : answers[url.pathname];
@@ -864,31 +866,53 @@ try {
   check(/^https:\/\/github\.com\/example\/[a-z-]+\/pull\/\d+$/.test(opened[2]!), `a press on a pull request opens it in the browser (${opened[2]})`);
 
   // ---------- Dependabot's updates: one line, which a press opens in place, and one of them opens ----------
+  // A line's marks: their names, whether they stand in front of the title's text, and how many labels it has.
+  type Marks = { names: string; inFront: boolean; labels: number };
   const updates = () =>
-    browser.call<{ text: string; expanded: string | null; nested: string[]; focused: boolean } | null>(
+    browser.call<{ text: string; marks: Marks; expanded: string | null; nested: string[]; nestedMarks: Marks[]; focused: boolean } | null>(
       `() => {
       const line = document.querySelector('#pulls .pull--updates');
       if (!line) return null;
+      const marks = (entry) => {
+        const name = entry.querySelector('.entry__name');
+        const text = document.createRange();
+        text.selectNodeContents([...name.childNodes].find((n) => n.nodeType === Node.TEXT_NODE));
+        const shown = [...name.querySelectorAll(':scope > .pull__mark')];
+        return {
+          names: shown.map((m) => m.getAttribute('aria-label')).join(' '),
+          inFront: shown.every((m) => m.getBoundingClientRect().right <= text.getBoundingClientRect().left),
+          labels: entry.querySelectorAll('.az-label').length,
+        };
+      };
+      const nested = [...document.querySelectorAll('#pulls .pull--nested')];
       return {
         text: line.querySelector('.entry__name').textContent,
+        marks: marks(line),
         expanded: line.getAttribute('aria-expanded'),
-        nested: [...document.querySelectorAll('#pulls .pull--nested')].map((n) => n.querySelector('.entry__name').textContent),
+        nested: nested.map((n) => n.querySelector('.entry__name').textContent),
+        nestedMarks: nested.map(marks),
         focused: document.activeElement === line,
       };
     }`,
     );
+  const marked = (marks: Marks | undefined, names: RegExp) => !!marks && names.test(marks.names) && marks.inFront && marks.labels === 0;
   fewUpdates = 2;
   let updatesLine = await until('the updates line is there', updates);
   check(
     /^(2 dependency updates|2 Abhängigkeits-Updates)$/.test(updatesLine.text) && updatesLine.expanded === 'false' && updatesLine.nested.length === 0,
     `Dependabot's two stand behind one line, closed ("${updatesLine.text}")`,
   );
+  check(marked(updatesLine.marks, /^(Conflict|Konflikt)$/), `the line's conflict is an icon in front of its text, no label (${JSON.stringify(updatesLine.marks)})`);
   await pressOverRender((await boxOf('#pulls .pull--updates'))!, '#pulls');
   updatesLine = await until('a press opens it', async () => {
     const now = await updates();
     return now?.expanded === 'true' && now.nested.length === 2 ? now : null;
   });
   check(updatesLine.nested.join(', ') === 'Bump package 1, Bump package 2' && updatesLine.focused, `a press held over a render opens it once: ${updatesLine.nested.join(', ')} below it, the focus on the line`);
+  check(
+    marked(updatesLine.nestedMarks[0], /^$/) && marked(updatesLine.nestedMarks[1], /^(Conflict Draft|Konflikt Entwurf)$/),
+    `a draft with a conflict has both marks as icons in front of its title, the others none (${JSON.stringify(updatesLine.nestedMarks)})`,
+  );
   await press(browser, 'Enter', 13, '\r');
   await until('Enter closes it', async () => (await updates())?.nested.length === 0);
   await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', ...SPACE, text: ' ', unmodifiedText: ' ' });

@@ -185,6 +185,13 @@ base is shown.
 
 ---
 
+## 0.10.1 – Marks as icons ✅
+
+Done in 0.10.1 (see [CHANGELOG](CHANGELOG.md)): a conflict and a draft are small icons in front of a pull
+request's title, so the title keeps its room.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

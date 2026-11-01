@@ -30,9 +30,9 @@ export interface Texts {
   waitingFor: Record<Exclude<WaitingFor, 'idle'>, string>;
   since: (duration: string) => string;
   pullsTitle: string;
-  /** In front of a draft's title. */
+  /** The name of the mark in front of a draft's title. */
   draft: string;
-  /** After a pull request that cannot be merged for conflicts with its base. */
+  /** The name of the mark in front of a pull request that cannot be merged for conflicts with its base. */
   conflict: string;
   /** The line behind which Dependabot's pull requests of a repository stand (two or more). */
   updates: (n: number) => string;
