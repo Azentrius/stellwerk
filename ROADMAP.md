@@ -177,6 +177,14 @@ quieter at night.
 
 ---
 
+## 0.10.0 – Fewer lines for Dependabot ✅
+
+Done in 0.10.0 (see [CHANGELOG](CHANGELOG.md)): Dependabot's pull requests of a repository stand behind
+one line, which a tap opens in place; drafts are marked in front of their title, and a conflict with the
+base is shown.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime

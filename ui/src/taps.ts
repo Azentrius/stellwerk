@@ -1,7 +1,7 @@
-// List entries a tap opens (a session waiting for an answer in its app, a pull request): each keeps its
-// element over the renders, by key, while only its content is drawn anew; that content takes no pointer
-// events (.entry--tappable > *), so a tap that meets a render still reaches the entry. Enter and Space work
-// as a tap. Entries a tap does not open stay plain.
+// List entries a tap opens (a session waiting for an answer in its app, a pull request, Dependabot's
+// updates of a repository in place): each keeps its element over the renders, by key, while only its
+// content is drawn anew; that content takes no pointer events (.entry--tappable > *), so a tap that meets a
+// render still reaches the entry. Enter and Space work as a tap. Entries a tap does not open stay plain.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -15,6 +15,8 @@ export interface TapEntry {
   tappable: boolean;
   /** Its tooltip while a tap opens it. */
   hint?: string;
+  /** For a line a tap opens in place (Dependabot's updates): whether it is open. */
+  expanded?: boolean;
 }
 
 export class TapList {
@@ -42,7 +44,7 @@ export class TapList {
     }
   }
 
-  private fill({ key, fresh, tappable, hint }: TapEntry): HTMLLIElement {
+  private fill({ key, fresh, tappable, hint, expanded }: TapEntry): HTMLLIElement {
     let item = this.items.get(key);
     if (!item) {
       const node = el('li');
@@ -68,6 +70,8 @@ export class TapList {
       item.removeAttribute('tabindex');
       item.removeAttribute('role');
     }
+    if (expanded === undefined) item.removeAttribute('aria-expanded');
+    else item.setAttribute('aria-expanded', String(expanded));
     item.replaceChildren(...fresh.childNodes);
     return item;
   }

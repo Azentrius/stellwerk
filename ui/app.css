@@ -205,6 +205,12 @@ button { font: inherit; }
 .entry__icon { flex: none; align-self: center; display: inline-flex; justify-content: center; inline-size: 1.2rem; color: var(--text-subtle); }
 .entry__icon--success { color: var(--status-success); }
 .entry__icon--danger { color: var(--status-danger); }
+/* A draft: "Draft" in front of its title, which is quieter. A conflict's label stands with the time. */
+.entry--short .pull__draft { order: 0; }
+.pull--draft .entry__name { color: var(--text-subtle); font-weight: 400; }
+/* Dependabot's updates of a repository: one line, opened by a tap; its pull requests below it, indented. */
+.pull--updates .entry__name .az-icon { margin-inline-end: var(--sp-xs); color: var(--text-subtle); }
+.pull--nested { padding-inline-start: calc(var(--sp-xs) + 1.2rem + var(--sp-md)); }
 .agent--ended .entry__name { color: var(--text-disabled); font-weight: 400; }
 /* Shown since a restart of the hub, until its next event: grey, as nothing is known of it yet. */
 .agent--unknown .entry__name { color: var(--text-subtle); }

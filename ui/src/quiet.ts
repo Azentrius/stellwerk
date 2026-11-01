@@ -1,8 +1,8 @@
 // The display at rest: dimmed after a while with nothing new, so that it does not glow on the desk all
 // day and night. An open request keeps it awake, since it goes back to the app when its hold time is up.
-// Anything new wakes it: a request, an answer due in the app, a monitor that goes down, a pull request or
-// checks that failed, the hub gone away. So does a tap. The hub cannot dim the screen itself (it starts no
-// programs); the display dims its own page. At night (the hours set up) it rests after a minute already
+// Anything new wakes it: a request, an answer due in the app, a monitor that goes down, a pull request,
+// checks that failed or a conflict, the hub gone away. So does a tap. The hub cannot dim the screen
+// itself (it starts no programs); the display dims its own page. At night (the hours set up) it rests after a minute already
 // and goes darker than by day, still readable; what wakes it by day wakes it at night too. Its tones are
 // quieter then, or none, as set up.
 //
@@ -30,6 +30,7 @@ export function watched(state: StateMessage | null, connected: boolean): Watched
   for (const pull of state.pullRequests) {
     keys.push(`pull ${pull.repo}#${pull.number}`);
     if (pull.checks === 'failing') keys.push(`failing ${pull.repo}#${pull.number}`);
+    if (pull.conflict) keys.push(`conflict ${pull.repo}#${pull.number}`);
   }
   return { open: state.permissions.filter((p) => p.outcome === null).length, keys };
 }

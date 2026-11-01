@@ -15,7 +15,7 @@ import { TimedFold } from './fold.ts';
 import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
-import { pullKey, renderPulls } from './pulls.ts';
+import { pullKey, renderPulls, updatesRepo } from './pulls.ts';
 import { QueueView } from './queue.ts';
 import { Rest, chimeLoudness, inNight, restAfter, watched } from './quiet.ts';
 import { splitResting } from './resting.ts';
@@ -94,8 +94,21 @@ const monitorTaps = {
   down: new TapList((id) => openTarget({ monitor: id })),
   pending: new TapList((id) => openTarget({ monitor: id })),
 };
-/** A tap on a pull request opens it in the default browser. */
+/**
+ * The lines of Dependabot's updates, by repository (updates.ts): open after a tap, closed again a while
+ * after the last touch.
+ */
+const updatesLines = new Map<string, TimedFold>();
+/** A tap on a pull request opens it in the default browser; one on an updates line opens or closes it. */
 const pullTaps = new TapList((key) => {
+  const repo = updatesRepo(key);
+  if (repo !== null) {
+    const line = updatesLines.get(repo) ?? new TimedFold();
+    updatesLines.set(repo, line);
+    line.toggle(Date.now() + clockOffset);
+    tick();
+    return;
+  }
   const pr = state?.pullRequests.find((p) => pullKey(p) === key);
   if (pr) openTarget({ repo: pr.repo, number: pr.number });
 });
@@ -244,7 +257,7 @@ function tick(): void {
   renderAnswers(answers, answerTaps, due, now, texts);
   answersSection.hidden = due.length === 0;
   const open = state?.pullRequests ?? [];
-  renderPulls(pulls, pullTaps, open, now, texts);
+  renderPulls(pulls, pullTaps, open, (repo) => updatesLines.get(repo)?.isOpen(now) ?? false, now, texts);
   pullsSection.hidden = open.length === 0;
   const waiting = queue.openCount() + due.length + open.length;
   waitingCount.textContent = waiting > 0 ? `(${waiting})` : '';
@@ -395,8 +408,15 @@ restingButton.addEventListener('click', () => {
   restingLine.toggle(Date.now() + clockOffset);
   tick();
 });
-// Touching the agents column keeps an open line open.
+// Touching the agents column keeps an open line open; the pull requests the same for their updates lines.
 agents.addEventListener('pointerdown', () => restingLine.touched(Date.now() + clockOffset), { passive: true });
+pulls.addEventListener(
+  'pointerdown',
+  () => {
+    for (const line of updatesLines.values()) line.touched(Date.now() + clockOffset);
+  },
+  { passive: true },
+);
 statusDetails.addEventListener('scroll', () => markScrolling(statusDetails, 'status-details--more'), { passive: true });
 // A tap on the resting display wakes it and does nothing else: the click that follows goes nowhere.
 document.addEventListener(

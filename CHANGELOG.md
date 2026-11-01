@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.10.0 – 2026-11-01
+
+Dependabot's pull requests of a repository stand behind one line, and drafts and conflicts can be seen.
+
+- **Dependabot's updates in one line:** the pull requests of `dependabot[bot]` in one repository stand
+  behind one line, such as "4 dependency updates", where the newest of them stands, with the worst checks
+  among them and the time of the newest. A tap opens it in place and shows them below it, each opening in
+  the browser with a tap as before; it closes again a minute after the last touch, like the sessions at
+  rest. A repository with only one keeps it as a line of its own. No new kind of link: the hub opens
+  nothing more than before.
+- **Drafts:** "Draft" stands in front of a draft's title, which is quieter. It used to stand at the end
+  of the details, where a long author cut it off.
+- **Conflicts:** "Conflict" next to the time when GitHub cannot merge a pull request for conflicts with
+  its base, also on Dependabot's line when one of them has one. For this the hub asks each open pull
+  request on its own (`/repos/{owner}/{repo}/pulls/{number}`, which alone says whether it can be merged),
+  with the same token and permissions; while GitHub is still working that out, what was known stays. A
+  new conflict wakes the display at rest.
+- **Tests:**
+  - The lines of the list: Dependabot's of a repository together where the newest stands, one alone on
+    its own, other bots and people never together; the worst checks, any conflict, the newest time.
+  - The hub asks each pull request on its own and reads a conflict; one GitHub is still working out
+    keeps what was known; a failed or odd answer fails the round and keeps the last list.
+  - In Edge (`tools/check-columns.ts`): two of Dependabot behind one line, which a press held over a
+    render, Enter and Space open and close, and a press on one of them opens it in the browser.
+
 ## 0.9.0 – 2026-11-01
 
 Stellwerk sets itself up and removes itself in one go, says how it stands and when a newer

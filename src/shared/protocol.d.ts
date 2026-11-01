@@ -149,6 +149,8 @@ export interface PullRequestView {
   draft: boolean;
   updatedAt: number;
   checks: ChecksState;
+  /** GitHub cannot merge it for conflicts with its base; false while that is not known. */
+  conflict: boolean;
 }
 
 /** Why the last question to GitHub failed. */

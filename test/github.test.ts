@@ -48,6 +48,8 @@ function standardRoutes(): Record<string, unknown> {
     '/repos/acme/old/pulls': [pull(9, SHA(9), '2026-10-15T13:00:00Z')],
     '/repos/acme/api/actions/runs': { workflow_runs: [{ status: 'completed', conclusion: 'success' }] },
     '/repos/acme/web/actions/runs': { workflow_runs: [{ status: 'in_progress', conclusion: null }] },
+    '/repos/acme/api/pulls/1': { number: 1, mergeable: true },
+    '/repos/acme/web/pulls/2': { number: 2, mergeable: false },
   };
 }
 
@@ -63,8 +65,8 @@ describe('the pull request list', () => {
     assert.equal(w.problem, null);
     assert.equal(w.syncedAt, 1000);
     assert.deepEqual(w.pullRequests, [
-      { repo: 'web', number: 2, title: 'Change 2', author: 'dependabot[bot]', draft: true, updatedAt: Date.parse('2026-10-15T12:00:00Z'), checks: 'pending' },
-      { repo: 'api', number: 1, title: 'Change 1', author: 'stefan-azentrius', draft: false, updatedAt: Date.parse('2026-10-15T10:00:00Z'), checks: 'passing' },
+      { repo: 'web', number: 2, title: 'Change 2', author: 'dependabot[bot]', draft: true, updatedAt: Date.parse('2026-10-15T12:00:00Z'), checks: 'pending', conflict: true },
+      { repo: 'api', number: 1, title: 'Change 1', author: 'stefan-azentrius', draft: false, updatedAt: Date.parse('2026-10-15T10:00:00Z'), checks: 'passing', conflict: false },
     ]);
     assert.ok(!fake.calls.some((c) => c.url.includes('/repos/acme/old/')), 'archived repositories are not asked');
   });
@@ -80,6 +82,35 @@ describe('the pull request list', () => {
       assert.equal(call.init?.redirect, 'error');
     }
     assert.ok(fake.calls.some((c) => c.url.endsWith(`/repos/acme/api/actions/runs?head_sha=${SHA(1)}&per_page=100`)));
+    assert.ok(fake.calls.some((c) => c.url === 'https://api.github.com/repos/acme/api/pulls/1'));
+  });
+
+  test('a conflict GitHub is still working out keeps what was known; a failed question fails the round', async () => {
+    const fake = fakeGitHub(standardRoutes());
+    const w = watcher(fake);
+    await w.poll();
+    assert.equal(w.pullRequests.find((p) => p.number === 2)?.conflict, true);
+    fake.routes['/repos/acme/web/pulls/2'] = { number: 2, mergeable: null };
+    fake.routes['/repos/acme/api/pulls/1'] = { number: 1 };
+    await w.poll();
+    assert.equal(w.pullRequests.find((p) => p.number === 2)?.conflict, true, 'null: still the conflict known');
+    assert.equal(w.pullRequests.find((p) => p.number === 1)?.conflict, false);
+    fake.routes['/repos/acme/web/pulls/2'] = { number: 2, mergeable: true };
+    await w.poll();
+    assert.equal(w.pullRequests.find((p) => p.number === 2)?.conflict, false, 'resolved');
+
+    const fresh = fakeGitHub({ ...standardRoutes(), '/repos/acme/web/pulls/2': { number: 2, mergeable: null } });
+    const first = watcher(fresh);
+    await first.poll();
+    assert.equal(first.pullRequests.find((p) => p.number === 2)?.conflict, false, 'not known yet: none shown');
+
+    fake.routes['/repos/acme/web/pulls/2'] = 404;
+    await w.poll();
+    assert.equal(w.problem, 'not-found');
+    fake.routes['/repos/acme/web/pulls/2'] = { number: 2, mergeable: 'no' };
+    await w.poll();
+    assert.equal(w.problem, 'unexpected', 'an answer that is no yes, no or not yet');
+    assert.equal(w.pullRequests.length, 2, 'the last list stays');
   });
 
   test("falls back to a user, with the private repositories the token may see, kept to that owner", async () => {
@@ -200,6 +231,9 @@ describe('lists over several pages', () => {
         { workflow_runs: [{ status: 'completed', conclusion: 'failure' }] },
       ],
       '/repos/acme/web/actions/runs': [{ workflow_runs: [{ status: 'completed', conclusion: 'success' }] }],
+      '/repos/acme/api/pulls/1': [{ mergeable: true }],
+      '/repos/acme/api/pulls/3': [{ mergeable: true }],
+      '/repos/acme/web/pulls/2': [{ mergeable: true }],
     });
     const w = watch(fake);
     await w.poll();
@@ -225,6 +259,8 @@ describe('lists over several pages', () => {
       '/orgs/acme/repos': [[{ name: 'api' }]],
       '/repos/acme/api/pulls': [[pull(1, SHA(1), '2026-10-15T10:00:00Z')], [pull(3, SHA(3), '2026-10-15T11:00:00Z')]],
       '/repos/acme/api/actions/runs': [{ workflow_runs: [] }],
+      '/repos/acme/api/pulls/1': [{ mergeable: true }],
+      '/repos/acme/api/pulls/3': [{ mergeable: true }],
     };
     const good = pagedGitHub(routes);
     const w = new GitHubWatcher({ owner: 'acme', token: TOKEN, intervalMs: 60_000, fetch: good.fetch, now: () => 1000 });
