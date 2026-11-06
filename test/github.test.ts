@@ -14,16 +14,21 @@ interface Call {
   init: RequestInit | undefined;
 }
 
-/** A stand-in for GitHub: answers by path (without the query) and records every call. */
+/**
+ * A stand-in for GitHub: answers by path (without the query) and records every call. A route is the JSON
+ * to answer, a status, or a function that makes the answer (or throws, as fetch does without one).
+ */
 function fakeGitHub(routes: Record<string, unknown>) {
   const calls: Call[] = [];
   let down = false;
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     calls.push({ url, init });
-    if (down) throw new TypeError('fetch failed');
+    // As Node's fetch fails when the connection breaks: the cause carries the error code.
+    if (down) throw new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) });
     const route = routes[new URL(url).pathname];
     if (route === undefined) return new Response('{}', { status: 404 });
+    if (typeof route === 'function') return (route as () => Response)();
     if (typeof route === 'number') return new Response('{}', { status: route });
     return new Response(JSON.stringify(route), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }) as typeof globalThis.fetch;
@@ -151,6 +156,43 @@ describe('the pull request list', () => {
     await w.poll();
     assert.equal(w.problem, null);
     assert.match(log.at(-1) ?? '', /reachable again/);
+  });
+
+  test('the log names the question that failed: its status, an odd answer, or why it got none', async () => {
+    const fake = fakeGitHub(standardRoutes());
+    const log: string[] = [];
+    const w = watcher(fake, log);
+    const failed = async (path: string, route: unknown) => {
+      fake.routes[path] = route;
+      await w.poll();
+      const line = log.at(-1) ?? '';
+      fake.routes[path] = standardRoutes()[path];
+      await w.poll();
+      assert.equal(w.problem, null, `${path} answers again`);
+      return line;
+    };
+    assert.equal(
+      await failed('/repos/acme/web/pulls/2', 502),
+      'GitHub: unexpected answer from api.github.com. GET /repos/acme/web/pulls/2 answered 502.',
+    );
+    assert.equal(
+      await failed('/repos/acme/api/pulls', [pull(1, 'not-a-sha', '2026-10-15T10:00:00Z')]),
+      'GitHub: unexpected answer from api.github.com. GET /repos/acme/api/pulls answered 200, but not in the expected form.',
+    );
+    const timedOut = () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    };
+    assert.equal(await failed('/orgs/acme/repos', timedOut), 'GitHub: api.github.com is not reachable. GET /orgs/acme/repos timed out after 15 s.');
+    const usedUp = () => new Response('{}', { status: 403, headers: { 'x-ratelimit-remaining': '0' } });
+    assert.match(await failed('/orgs/acme/repos', usedUp), /\(403\)\. .*GET \/orgs\/acme\/repos answered 403 \(rate limit used up\)\.$/);
+    const tooFast = () => new Response('{}', { status: 429, headers: { 'retry-after': '60' } });
+    assert.match(await failed('/repos/acme/api/actions/runs', tooFast), /GET \/repos\/acme\/api\/actions\/runs answered 429 \(retry after 60 s\)\.$/);
+
+    fake.setDown(true);
+    await w.poll();
+    assert.equal(log.at(-1), 'GitHub: api.github.com is not reachable. GET /orgs/acme/repos got no answer (ECONNRESET).');
+    assert.doesNotMatch(log.join('\n'), new RegExp(TOKEN), 'never the token');
+    assert.doesNotMatch(log.join('\n'), /head_sha|per_page/, 'the path only, not the query');
   });
 
   test('names the problem: rejected, forbidden, not found, unreachable, unexpected', async () => {
@@ -352,6 +394,10 @@ describe("Stellwerk's newest release", () => {
     await w.poll();
     assert.equal(asked().length, 3, 'after a failure again after an hour');
     assert.equal(log.filter((l) => /could not be asked/.test(l)).length, 1, 'logged once');
+    assert.ok(
+      log.includes('GitHub: the newest release of Stellwerk could not be asked (unexpected). GET /repos/Azentrius/stellwerk/releases/latest answered 500.'),
+      log.join('\n'),
+    );
   });
 
   test('drafts and pre-releases are no release; an answer that is not a version is not taken', async () => {

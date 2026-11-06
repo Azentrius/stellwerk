@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.2 – 2026-11-06
+
+The log says which question to GitHub failed and how, so a failing list of pull requests can be traced.
+
+- **GitHub's answer in the log:** when a round fails, `hub.log` names the question that failed and its
+  status, such as `GET /repos/Azentrius/sanctum/pulls/38 answered 502.`, or an answer in an unexpected
+  form; when there was no answer, whether it timed out (15 s) or the connection's error code
+  (`ECONNRESET`, `ENOTFOUND` …); after a refusal whether the rate limit is used up or when to ask again.
+  Before, it said only "unexpected answer" or "not reachable". The question for Stellwerk's newest
+  release says the same. Still once per new problem, with the path only (no query) and never the token.
+- **Tests:** the log line for a status, an answer in an unexpected form, a timeout, a broken connection,
+  a used-up rate limit and a request to wait; the token and the query are never in it.
+
 ## 0.10.1 – 2026-11-01
 
 Drafts and conflicts are small icons in front of the title, so the title keeps its room.
