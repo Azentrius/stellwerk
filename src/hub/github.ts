@@ -3,14 +3,15 @@
 // Actions runs on its head commit and whether it can be merged. Lists come in pages; the hub follows
 // GitHub's "next" links, but only to api.github.com and only up to a limit, so a list is complete or the
 // round fails. Every answer is checked before it is used; a failed round keeps the last list and says why in
-// the log, naming the question that failed and its status, or why it got no answer. Every few hours the same
-// way: the newest release of Stellwerk itself, so the display can say when there is a newer one (nothing is
-// downloaded).
+// the log, naming the question that failed and its status, or why it got no answer. With githubIssues it
+// also asks for the open issues assigned to the token's user, of the owner's repositories only. Every few
+// hours the same way: the newest release of Stellwerk itself, so the display can say when there is a newer
+// one (nothing is downloaded).
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import { z } from 'zod';
-import type { ChecksState, GitHubProblem, GitHubView, PullRequestView } from '../shared/protocol.js';
+import type { ChecksState, GitHubProblem, GitHubView, IssueView, PullRequestView } from '../shared/protocol.js';
 
 export const GITHUB_API = 'https://api.github.com';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -43,6 +44,18 @@ const runs = z.object({
 });
 /** One pull request on its own, which alone says whether it can be merged: null while GitHub works it out. */
 const pullAlone = z.object({ mergeable: z.boolean().nullable().optional() });
+/** The issues assigned to the token's user; GitHub lists pull requests among them too. */
+const assigned = z.array(
+  z.object({
+    number: z.number().int().positive(),
+    title: z.string(),
+    updated_at: z.string(),
+    pull_request: z.unknown().optional(),
+    repository: z.object({ name: repository.shape.name, owner: z.object({ login: z.string().max(100) }) }).optional(),
+  }),
+);
+/** At most this many issues go to the display. */
+const MAX_ISSUES = 100;
 const release = z.object({
   tag_name: z.string().regex(/^v\d{1,4}\.\d{1,5}\.\d{1,6}$/),
   draft: z.boolean().optional(),
@@ -113,6 +126,8 @@ export interface GitHubWatcherOptions {
   owner: string;
   token: string;
   intervalMs: number;
+  /** Also ask for the open issues of the owner's repositories assigned to the token's user. */
+  issues?: boolean;
   /** For tests; the global fetch otherwise. */
   fetch?: typeof fetch;
   now?: () => number;
@@ -126,6 +141,9 @@ export class GitHubWatcher {
   problem: GitHubProblem | null = null;
   /** The version of Stellwerk's newest release (no draft, no pre-release); null while not known. */
   latestRelease: string | null = null;
+  /** The open issues assigned to me, most recently updated first; null when they are not asked for. */
+  issues: IssueView[] | null = null;
+  issuesProblem: GitHubProblem | null = null;
   private readonly options: GitHubWatcherOptions;
   private readonly fetch: typeof fetch;
   private readonly now: () => number;
@@ -139,6 +157,7 @@ export class GitHubWatcher {
     this.options = options;
     this.fetch = options.fetch ?? fetch;
     this.now = options.now ?? Date.now;
+    if (options.issues) this.issues = [];
   }
 
   start(): void {
@@ -152,7 +171,7 @@ export class GitHubWatcher {
   }
 
   view(): GitHubView {
-    return { owner: this.options.owner, syncedAt: this.syncedAt, problem: this.problem };
+    return { owner: this.options.owner, syncedAt: this.syncedAt, problem: this.problem, ...(this.options.issues ? { issuesProblem: this.issuesProblem } : {}) };
   }
 
   /** One round; a round still running is not started twice. */
@@ -166,6 +185,7 @@ export class GitHubWatcher {
   private async round(): Promise<void> {
     const before = this.problem;
     await this.releaseRound();
+    if (this.options.issues) await this.issuesRound();
     try {
       const conflicts = new Map(this.pullRequests.map((pr) => [`${pr.repo}#${pr.number}`, pr.conflict]));
       const found: Array<{ view: PullRequestView; sha: string }> = [];
@@ -213,6 +233,35 @@ export class GitHubWatcher {
       if (this.problem !== before) this.options.log?.(`GitHub: ${describeProblem(this.problem)}${detail}`);
     } finally {
       this.options.onChange?.();
+    }
+  }
+
+  /**
+   * The open issues assigned to the token's user, only those of the owner's repositories; GitHub's pull
+   * requests among them are left out. A failure keeps the last list, does not touch the pull requests, and
+   * is logged once.
+   */
+  private async issuesRound(): Promise<void> {
+    const before = this.issuesProblem;
+    try {
+      const list = await this.getAll(`/issues?filter=assigned&state=open&per_page=${PER_PAGE}`, assigned, (page) => page);
+      const owner = this.options.owner.toLowerCase();
+      this.issues = list
+        .filter((issue) => issue.pull_request === undefined && issue.repository?.owner.login.toLowerCase() === owner)
+        .map((issue) => ({
+          repo: issue.repository!.name,
+          number: issue.number,
+          title: issue.title.length > MAX_TITLE ? `${issue.title.slice(0, MAX_TITLE)}…` : issue.title,
+          updatedAt: Date.parse(issue.updated_at) || 0,
+        }))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_ISSUES);
+      this.issuesProblem = null;
+      if (before !== null) this.options.log?.('GitHub: the issues assigned to you can be asked again.');
+    } catch (err) {
+      this.issuesProblem = err instanceof GitHubFailure ? err.problem : 'unreachable';
+      const detail = err instanceof GitHubFailure && err.detail ? ` ${err.detail}` : '';
+      if (this.issuesProblem !== before) this.options.log?.(`GitHub: the issues assigned to you could not be asked (${this.issuesProblem}).${detail}`);
     }
   }
 

@@ -161,6 +161,52 @@ export interface GitHubView {
   /** When the list was last brought up to date; null before the first success. */
   syncedAt: number | null;
   problem: GitHubProblem | null;
+  /** Why the last question for the issues assigned to me failed; absent when they are not asked for. */
+  issuesProblem?: GitHubProblem | null;
+}
+
+/** An open issue of the owner's repositories that is assigned to the token's user. */
+export interface IssueView {
+  repo: string;
+  number: number;
+  title: string;
+  updatedAt: number;
+}
+
+/** An event of a calendar set up with `stellwerk calendar add`. */
+export interface EventView {
+  /** The name the calendar was given. */
+  source: string;
+  title: string;
+  start: number;
+  /** As start for an event without length. An all-day one runs from midnight to midnight, the end not included. */
+  end: number;
+  allDay: boolean;
+}
+
+/** An open task of a task list set up with `stellwerk calendar add` (a Nextcloud list's export). */
+export interface TaskView {
+  source: string;
+  title: string;
+  /** An all-day due date at midnight; null without one. */
+  due: number | null;
+  dueAllDay: boolean;
+  /** 1 (highest) to 9; null without one. */
+  priority: number | null;
+}
+
+/** Why the last question for a calendar failed. */
+export type CalendarProblem = 'rejected' | 'not-found' | 'unreachable' | 'unexpected';
+
+export interface CalendarView {
+  /** Today and the next six days, by start: what each calendar gave at its last answer. */
+  events: EventView[];
+  /** Overdue first, then by due date, those without one last. */
+  tasks: TaskView[];
+  /** When the last calendar was last asked with success; null before. */
+  updatedAt: number | null;
+  /** The calendars whose last question failed; their events and tasks are those of before. */
+  problems: { source: string; problem: CalendarProblem }[];
 }
 
 /** Load in percent and temperature in °C of a processor; null where the sensor gives nothing. */
@@ -264,6 +310,10 @@ export interface StateMessage {
   plans: PlanView[];
   /** The last decisions on permission requests, newest first, also those of before a restart. */
   decisions: DecisionView[];
+  /** Events and tasks of the calendars set up; null when none is. */
+  calendar: CalendarView | null;
+  /** The open issues assigned to me, most recently updated first; null when they are not asked for. */
+  issues: IssueView[] | null;
 }
 
 export interface DecisionResultMessage {
@@ -298,10 +348,10 @@ export interface DecideMessage {
   decision: Decision;
 }
 
-/** Open a session in its app, or a pull request in the default browser; the hub builds the link. */
+/** Open a session in its app, or a pull request, an issue or a monitor in the default browser; the hub builds the link. */
 export interface OpenMessage {
   type: 'open';
-  target: { session: string } | { repo: string; number: number } | { monitor: string };
+  target: { session: string } | { repo: string; number: number } | { repo: string; issue: number } | { monitor: string };
 }
 
 export type ClientMessage = DecideMessage | OpenMessage;

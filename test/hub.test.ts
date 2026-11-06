@@ -1531,6 +1531,43 @@ describe('opening from the display', () => {
     screen.close();
   });
 
+  test('an issue assigned to me opens on github.com, only one the hub shows; the calendars reach the display without their links', async () => {
+    const opened: string[] = [];
+    let at = new Date(2026, 10, 6, 12).getTime();
+    const fakeFetch = (async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.hostname === 'calendar.example') {
+        const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'SUMMARY:Standup', 'DTSTART:20261106T150000', 'DTEND:20261106T151500', 'LOCATION:Room 4', 'END:VEVENT', 'BEGIN:VTODO', 'SUMMARY:Pay', 'END:VTODO', 'END:VCALENDAR'];
+        return new Response(ics.join('\r\n'), { status: 200 });
+      }
+      const body: Record<string, unknown> = {
+        '/orgs/acme/repos': [],
+        '/issues': [{ number: 12, title: 'Fix the docs', updated_at: '2026-10-15T10:00:00Z', repository: { name: 'api', owner: { login: 'acme' } } }],
+      };
+      return new Response(JSON.stringify(body[url.pathname] ?? {}), { status: 200 });
+    }) as typeof fetch;
+    const { port } = await startTestHub({
+      open: (link) => opened.push(link),
+      now: () => at,
+      github: { owner: 'acme', token: `github_pat_${'t'.repeat(30)}`, intervalMs: 60_000, issues: true, fetch: fakeFetch },
+      calendar: { sources: [{ name: 'Work', url: 'https://calendar.example/private-s3cret/basic.ics', user: 'me', password: 'pa55word' }], intervalMs: 300_000, fetch: fakeFetch },
+    });
+    const screen = await display(port);
+    const state = await screen.state((s) => (s.issues?.length ?? 0) === 1 && (s.calendar?.events.length ?? 0) === 1);
+    assert.deepEqual(state.issues, [{ repo: 'api', number: 12, title: 'Fix the docs', updatedAt: Date.parse('2026-10-15T10:00:00Z') }]);
+    assert.deepEqual(state.calendar?.events, [{ source: 'Work', title: 'Standup', start: new Date(2026, 10, 6, 15).getTime(), end: new Date(2026, 10, 6, 15, 15).getTime(), allDay: false }]);
+    assert.deepEqual(state.calendar?.tasks.map((t) => t.title), ['Pay']);
+    assert.doesNotMatch(JSON.stringify(state), /s3cret|pa55word|calendar\.example|Room 4/, 'no link, no password, no place');
+    const inBrowser = answer(screen);
+    await open(screen, { repo: 'api', issue: 12 });
+    assert.deepEqual(await inBrowser, { type: 'open-result', ok: true, opened: 'browser' });
+    at += 2000;
+    await open(screen, { repo: 'api', issue: 13 });
+    await open(screen, { repo: 'api', number: 12 });
+    assert.deepEqual(opened, ['https://github.com/acme/api/issues/12'], 'an issue it does not show, or one named as a pull request, opens nothing');
+    screen.close();
+  });
+
   test('when the shell fails, the display hears so', async () => {
     const { port } = await startTestHub({
       open: () => {

@@ -37,6 +37,8 @@ test('without a file every setting has its default', () => {
     scale: 1,
     debugRawLog: false,
     githubIntervalSeconds: 120,
+    githubIssues: false,
+    calendarIntervalSeconds: 300,
     uptimeKumaIntervalSeconds: 60,
     hardwareMonitor: false,
     codexHoldSeconds: 30,

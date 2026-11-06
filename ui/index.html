@@ -16,6 +16,8 @@
   </head>
   <body>
     <main class="board">
+      <div class="pages" id="pages">
+      <div class="page page--agents" id="page-agents" role="region">
       <section class="col col--agents" aria-labelledby="agents-title">
         <h2 class="col__title" id="agents-title"><span data-text="agentsTitle"></span> <span class="count" id="agents-count"></span></h2>
         <ul class="entries agents" id="agents"></ul>
@@ -55,6 +57,30 @@
           <div class="monitors__state" id="monitors-state"></div>
         </div>
       </section>
+      </div>
+      <div class="page page--calendar" id="page-calendar" role="region" hidden>
+      <section class="col col--calendar" aria-labelledby="calendar-title">
+        <h2 class="col__title" id="calendar-title"><span data-text="calendarTitle"></span></h2>
+        <div class="now-next" id="now-next" hidden></div>
+        <ol class="agenda" id="agenda"></ol>
+        <p class="agenda-empty" id="agenda-empty" data-text="noEvents" hidden></p>
+        <div class="calendar-state" id="calendar-state" hidden></div>
+      </section>
+      <section class="col col--tasks" aria-labelledby="tasks-title">
+        <h2 class="col__title" id="tasks-title"><span data-text="tasksTitle"></span> <span class="count" id="tasks-count"></span></h2>
+        <div class="tasks" id="tasks">
+          <section class="task-list" id="issues-section" aria-labelledby="issues-title" hidden>
+            <h3 class="section-title" id="issues-title" data-text="issuesTitle"></h3>
+            <ul class="entries" id="issues"></ul>
+          </section>
+          <div class="task-lists" id="task-lists"></div>
+        </div>
+        <p class="tasks-empty" id="tasks-empty" data-text="noTasks" hidden></p>
+        <div class="tasks-state" id="tasks-state" hidden></div>
+      </section>
+      </div>
+      </div>
+      <div class="page-dots" id="page-dots" aria-hidden="true" hidden></div>
       <aside class="col col--status">
         <h1 class="wordmark">Stellwerk</h1>
         <p class="clock" id="clock"></p>

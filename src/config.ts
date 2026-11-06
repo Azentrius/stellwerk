@@ -37,6 +37,8 @@ export interface Paths {
   githubTokenFile: string;
   /** The API key of Uptime Kuma, for its monitors. */
   uptimeKumaKeyFile: string;
+  /** The links of the calendars and task lists (`stellwerk calendar add`), with app passwords: secrets. */
+  calendarsFile: string;
   /** Since when monitors of Uptime Kuma fail, so the display keeps that over a restart. */
   uptimeKumaStateFile: string;
   /** The last usage of the plans' limits, so the display has it again after a restart. */
@@ -71,6 +73,7 @@ export function defaultPaths(env: NodeJS.ProcessEnv = process.env): Paths {
     displayProfileDir: path.join(dataDir, 'edge-display'),
     githubTokenFile: path.join(dataDir, 'github-token'),
     uptimeKumaKeyFile: path.join(dataDir, 'uptime-kuma-key'),
+    calendarsFile: path.join(dataDir, 'calendars.json'),
     uptimeKumaStateFile: path.join(dataDir, 'uptime-kuma.json'),
     plansFile: path.join(dataDir, 'plans.json'),
     sessionsFile: path.join(dataDir, 'sessions.json'),
@@ -128,6 +131,10 @@ const configSchema = z.strictObject({
   /** Whose open pull requests to show (with a token from `stellwerk github token`). */
   githubOwner: z.string().regex(GITHUB_OWNER).optional(),
   githubIntervalSeconds: z.number().int().min(60).max(3600).default(120),
+  /** Also the open issues of githubOwner's repositories assigned to me (the token needs "Issues: Read"). */
+  githubIssues: z.boolean().default(false),
+  /** How often the calendars set up with `stellwerk calendar add` are asked. */
+  calendarIntervalSeconds: z.number().int().min(60).max(3600).default(300),
   /** Uptime Kuma's address, e.g. "http://192.0.2.10:3001" (with an API key from `stellwerk kuma key`). */
   uptimeKumaUrl: z
     .string()

@@ -32,6 +32,10 @@ const fakeGitHub: Record<string, unknown> = {
   '/repos/example/customer-portal-frontend/pulls': [
     { number: 12, title: 'New landing page', draft: true, updated_at: hoursAgo(1), user: { login: 'dev' }, head: { sha: 'c'.repeat(40) } },
   ],
+  '/issues': [
+    { number: 57, title: 'Retry webhooks after a timeout', updated_at: hoursAgo(3), repository: { name: 'shop-api', owner: { login: 'example' } } },
+    { number: 21, title: 'Cookie banner covers the footer on small screens', updated_at: hoursAgo(26), repository: { name: 'customer-portal-frontend', owner: { login: 'example' } } },
+  ],
 };
 const runsFor: Record<string, unknown> = {
   ['a'.repeat(40)]: [{ status: 'in_progress', conclusion: null }],
@@ -94,6 +98,41 @@ const demoKumaFetch = (async () => {
   return new Response(`# HELP monitor_status Monitor Status (1 = UP, 0= DOWN, 2= PENDING, 3= MAINTENANCE)\n# TYPE monitor_status gauge\n${lines.join('\n')}\n`, {
     status: 200,
   });
+}) as typeof fetch;
+// And two calendars and a task list, as their links would give them: times here and now.
+const at = (days: number, hours: number, minutes = 0) => {
+  const d = new Date();
+  const local = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, hours, minutes);
+  return local.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+};
+/** A date here, as iCalendar writes it (noon here is the same date in UTC). */
+const date = (days: number) => at(days, 12).slice(0, 8);
+const ics = (...items: string[][]) => ['BEGIN:VCALENDAR', 'VERSION:2.0', ...items.flat(), 'END:VCALENDAR', ''].join('\r\n');
+const meeting = (title: string, start: string, end: string) => ['BEGIN:VEVENT', `SUMMARY:${title}`, `DTSTART:${start}`, `DTEND:${end}`, 'END:VEVENT'];
+const nowHour = new Date().getHours();
+const fakeCalendars: Record<string, string> = {
+  'https://calendar.example/work.ics': ics(
+    meeting('Standup', at(0, 9), at(0, 9, 15)),
+    meeting('Review: payment provider', at(0, nowHour, 0), at(0, nowHour + 1, 0)),
+    meeting('Release planning 2.4', at(0, nowHour + 1, 30), at(0, nowHour + 2, 30)),
+    ['BEGIN:VEVENT', 'SUMMARY:Standup', `DTSTART:${at(1, 9)}`, `DTEND:${at(1, 9, 15)}`, 'RRULE:FREQ=DAILY;COUNT=5', 'END:VEVENT'],
+    meeting('Customer workshop', at(2, 13), at(2, 16)),
+    ['BEGIN:VEVENT', 'SUMMARY:Trade fair', `DTSTART;VALUE=DATE:${date(3)}`, `DTEND;VALUE=DATE:${date(5)}`, 'END:VEVENT'],
+  ),
+  'https://calendar.example/home.ics': ics(
+    meeting('Dentist', at(1, 16, 30), at(1, 17, 15)),
+    ['BEGIN:VEVENT', 'SUMMARY:Birthday Anna', `DTSTART;VALUE=DATE:${date(4)}`, `DTEND;VALUE=DATE:${date(5)}`, 'END:VEVENT'],
+  ),
+  'https://cloud.example/tasks/?export': ics(
+    ['BEGIN:VTODO', 'SUMMARY:Send the invoice for October', `DUE;VALUE=DATE:${date(-2)}`, 'PRIORITY:1', 'END:VTODO'],
+    ['BEGIN:VTODO', 'SUMMARY:Renew the certificate of the mail server', `DUE;VALUE=DATE:${date(0)}`, 'END:VTODO'],
+    ['BEGIN:VTODO', 'SUMMARY:Book the train to the workshop', `DUE;VALUE=DATE:${date(1)}`, 'END:VTODO'],
+    ['BEGIN:VTODO', 'SUMMARY:Order a new desk lamp', 'END:VTODO'],
+  ),
+};
+const demoCalendarFetch = (async (input: string | URL | Request) => {
+  const body = fakeCalendars[String(input)];
+  return new Response(body ?? '', { status: body ? 200 : 404 });
 }) as typeof fetch;
 const demoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellwerk-demo-'));
 // Made-up transcripts with nothing but the token counts of one answer, for the context rings.
@@ -199,7 +238,16 @@ const hub = await startHub({
   auditFile: path.join(demoDir, 'audit.jsonl'),
   uiRoot: path.join(ROOT, 'ui'),
   webRoot: path.join(ROOT, 'dist', 'ui'),
-  github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, fetch: demoFetch },
+  github: { owner: 'example', token: `github_pat_${'demo'.repeat(8)}`, intervalMs: 3_600_000, issues: true, fetch: demoFetch },
+  calendar: {
+    sources: [
+      { name: 'Work', url: 'https://calendar.example/work.ics' },
+      { name: 'Home', url: 'https://calendar.example/home.ics' },
+      { name: 'Tasks', url: 'https://cloud.example/tasks/?export', user: 'demo', password: 'demo' },
+    ],
+    intervalMs: 3_600_000,
+    fetch: demoCalendarFetch,
+  },
   hardware: { settingsFile: path.join(demoDir, 'LibreHardwareMonitor.config'), intervalMs: 5000, fetch: demoHardwareFetch },
   uptimeKuma: { url: 'http://192.0.2.10:3001', key: `uk1_${'demo'.repeat(10)}`, intervalMs: 2000, fetch: demoKumaFetch },
   context: { root: transcripts, codexRoot: codexSessions, codexIndex, intervalMs: 300 },
