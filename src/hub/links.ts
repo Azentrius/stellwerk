@@ -1,6 +1,6 @@
 // What the display may open with a tap: a session in its app (the Claude desktop app, the Codex app), and a
-// pull request or a failing monitor's page in Uptime Kuma in the default browser. The display only names
-// what to open; the hub builds the link itself from what it knows, checks it against four fixed forms and
+// pull request, an issue or a failing monitor's page in Uptime Kuma in the default browser. The display only
+// names what to open; the hub builds the link itself from what it knows, checks it against five fixed forms and
 // hands it to the Windows shell: explorer.exe with the link as its only argument, no shell in between
 // (chosen by Stefan on 2026-10-23: the display's Edge in kiosk mode cannot hand a link to another program).
 // Besides schtasks for the hardware task (HardwareKeeper in hardware.ts), it is the one program the hub
@@ -23,7 +23,7 @@ const GITHUB_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 const LINKS = [
   /^claude:\/\/claude\.ai\/epitaxy\/local_[A-Za-z0-9-]{1,64}$/,
   /^codex:\/\/threads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-  /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/pull\/[1-9][0-9]{0,9}$/,
+  /^https:\/\/github\.com\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/(?:pull|issues)\/[1-9][0-9]{0,9}$/,
   /^https?:\/\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?\/dashboard\/[1-9][0-9]{0,9}$/,
 ];
 
@@ -58,13 +58,22 @@ export function monitorLink(origin: string, id: string): string | null {
 
 /** A pull request on github.com. */
 export function pullLink(owner: string, repo: string, number: number): string | null {
+  return githubLink(owner, repo, 'pull', number);
+}
+
+/** An issue on github.com. */
+export function issueLink(owner: string, repo: string, number: number): string | null {
+  return githubLink(owner, repo, 'issues', number);
+}
+
+function githubLink(owner: string, repo: string, kind: 'pull' | 'issues', number: number): string | null {
   if (!GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo) || !Number.isInteger(number) || number < 1 || number > 9_999_999_999) return null;
-  return `https://github.com/${owner}/${repo}/pull/${number}`;
+  return `https://github.com/${owner}/${repo}/${kind}/${number}`;
 }
 
 /**
  * Hands a link to the Windows shell, which opens it with the program registered for it (the app, the
- * default browser). Only the four forms above; anything else throws. explorer.exe ends with 1 even when it
+ * default browser). Only the forms above; anything else throws. explorer.exe ends with 1 even when it
  * opened the link, so its end tells nothing: it is not waited for.
  */
 export function openWithShell(link: string, log: (line: string) => void): void {

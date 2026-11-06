@@ -44,6 +44,11 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   from LibreHardwareMonitor, which Stellwerk sets up for you.
 - **Monitors, if you like.** The monitors of your Uptime Kuma in their own column: what is down stands
   out, what works is only a number (see [Uptime Kuma](#uptime-kuma)).
+- **Calendar and tasks, a swipe away, if you like.** A second page left of the status column: today's
+  and the next six days' events of your calendars with the one running now and the next one, the open
+  tasks of your task lists and the GitHub issues assigned to you. Swipe sideways or press the arrow keys
+  to get there and back; a new request takes the display back to the first page at once (see
+  [Calendar and tasks](#calendar-and-tasks)).
 - **A session's details.** A tap on a session opens its folder, model, context in tokens, subagents, the
   tool it used last and the first eight characters of its session id below it; the next tap closes them.
 - **A reminder.** A request that waits longer than 20 seconds pulses, and with sound on the tones come
@@ -57,8 +62,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   touch and a new request. A restart of the hub keeps them (they come from the audit log).
 - **Open it where it is.** In a session's details a button opens it in its app: a session of the Claude
   desktop app in the app, a chat of the Codex app in Codex. A session waiting for an answer opens there
-  with a tap, a pull request and a failing monitor's page in Uptime Kuma in your default browser. The display says at once where it opens ("Opening
-  in Codex …"), as an app may take a few seconds to show it. The hub opens only these four kinds of links,
+  with a tap, a pull request, an issue and a failing monitor's page in Uptime Kuma in your default browser. The display says at once where it opens ("Opening
+  in Codex …"), as an app may take a few seconds to show it. The hub opens only these five kinds of links,
   which it builds itself (see Security). Claude Code in a terminal and Codex' command line have no app to open.
   The desktop app's sessions need the hooks of 0.7.0 or later (`stellwerk hooks install`), which send the
   app's own id of the session along.
@@ -67,7 +72,8 @@ requests right there. Like a dispatcher who sees every train on the track diagra
   [Configuration](#configuration)).
 - **Local only.** The hub listens on `127.0.0.1` and nowhere else and needs a token for every hook
   request. The display loads nothing from the internet. The hub opens connections to other machines only
-  to `api.github.com` and to your Uptime Kuma, each only once you set it up.
+  to `api.github.com`, to your Uptime Kuma and to the links of the calendars you set up, each only once
+  you set it up.
 - English and German, following the system language (`?lang=en` or `?lang=de` in the address picks
   one). One factor scales every size.
 
@@ -85,10 +91,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.10.2.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.10.2.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.10.2.zip -DestinationPath .
-cd stellwerk-0.10.2
+(Get-FileHash stellwerk-0.11.0.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.11.0.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.11.0.zip -DestinationPath .
+cd stellwerk-0.11.0
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -142,7 +148,7 @@ Or step by step, without the start with Windows:
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.10.2.zip
+stellwerk update stellwerk-0.11.0.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -167,7 +173,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.2"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.11.0"
 npm link
 ```
 
@@ -219,7 +225,8 @@ Fine-grained tokens):
 
 - Resource owner: the user or organisation whose pull requests you want to see
 - Repository access: All repositories
-- Permissions: **Pull requests: Read** and **Actions: Read**, nothing else
+- Permissions: **Pull requests: Read** and **Actions: Read**, nothing else; **Issues: Read** as well
+  for the issues assigned to you on the calendar page (see [Calendar and tasks](#calendar-and-tasks))
 
 Then:
 
@@ -354,6 +361,53 @@ monitor. On a plain `http://` address the key and the metrics go over your netwo
 only within your own network, or give an `https://` address. The key is never logged and never sent to
 the display. `stellwerk kuma remove` deletes it; the hub then opens no connection to Uptime Kuma.
 
+## Calendar and tasks
+
+Optional. With a calendar or the GitHub issues set up, the display has a second page left of the status
+column. Swipe sideways, or press the arrow keys, to get there and back; dots at the foot say which page
+shows. On the left the event running now and the next one, then today and the next six days with their
+events; on the right the open tasks: the GitHub issues assigned to you first (a tap opens one in the
+browser), then each task list, overdue ones first. A new request, or a new answer due in the app, takes
+the display back to the first page at once; swiped away while something waits, the first page's dot
+carries how much. Going to rest takes it back too, and a swipe that wakes it turns no page.
+
+![The calendar page at 1920×720: the event running now and the next one, then today and the next days on the left, the GitHub issues assigned to you and a task list on the right, the status column as on the first page](docs/calendar.png)
+
+A calendar comes from its link for subscribing (iCalendar), which Outlook ("Publish calendar", the ICS
+link), Google (the "secret address in iCal format"), Nextcloud and iCloud give:
+
+```powershell
+stellwerk calendar add Work
+```
+
+It asks for the link without showing it (a `webcal://` link counts as `https://`), tries it once and
+keeps it, readable by your Windows user only, in `%LOCALAPPDATA%\stellwerk\calendars.json`. Anyone with
+such a link can read the calendar, so it is kept like a token: never logged, never sent to the display.
+A Nextcloud task list, or a calendar that needs a password, comes from its export link, with your user
+and an app password you make for Stellwerk in Nextcloud (Settings › Security, "Create new app password"):
+
+```powershell
+stellwerk calendar add Tasks --user stefan
+```
+
+The export link of a list is its address in Nextcloud with `?export` at its end, such as
+`https://cloud.example/remote.php/dav/calendars/stefan/tasks/?export`. `stellwerk calendar list` names
+the calendars set up, with their host and never their link; `stellwerk calendar remove <name>` forgets
+one. Restart the hub after a change.
+
+Every five minutes (`calendarIntervalSeconds`) the hub asks each link: GET only, https only, without
+following redirects, at most 2 MB. Of each event it keeps the title, the times and whether it lasts all
+day; of each open task its title, due date and priority. Places, descriptions, people and links in them
+stay out. It reads time zones (also the Windows names Outlook writes), repetitions from daily to yearly
+with their days, counts and ends, and their exceptions and moved occurrences. A time zone or a
+repetition it does not know it names once in `hub.log`, and takes the event in this computer's zone,
+or once at its start. When a calendar cannot be asked, its events of before stay, and the foot of its
+column says why.
+
+For the open GitHub issues assigned to you, set `"githubIssues": true` in `config.json` and give the
+GitHub token **Issues: Read** as well (see [Open pull requests](#open-pull-requests)). The hub then also
+asks `api.github.com` for the open issues assigned to the token's user, of the owner's repositories only.
+
 ## Codex
 
 Optional. Stellwerk shows the sessions of the Codex app and of Codex' command line too, marked "Codex"
@@ -484,6 +538,8 @@ session appears with its first event, which in the desktop app is the first prom
 | `debugRawLog` | Writes every hook request as received to `debug-raw.jsonl`, like `stellwerk serve --debug-raw`. It holds prompts and code; `stellwerk raw-log delete` deletes it. |
 | `githubOwner` | Whose open pull requests to list; set by `stellwerk github token --owner`. Needs the GitHub token. |
 | `githubIntervalSeconds` | How often to ask GitHub: 60 to 3600, 120 by default. |
+| `githubIssues` | Also list the open issues of `githubOwner`'s repositories assigned to you, on the calendar page: false by default. The token needs "Issues: Read". |
+| `calendarIntervalSeconds` | How often to ask the calendars set up with `stellwerk calendar add`: 60 to 3600, 300 by default. |
 | `hardwareMonitor` | Show the hardware values; set by `stellwerk hardware install` and `uninstall`. |
 | `uptimeKumaUrl` | Uptime Kuma's address, such as `http://192.0.2.10:3001` (no path); set by `stellwerk kuma key --url`. Needs the API key. |
 | `uptimeKumaIntervalSeconds` | How often to ask Uptime Kuma: 30 to 3600, 60 by default. |
@@ -505,6 +561,7 @@ Restart the hub after a change.
 | `%LOCALAPPDATA%\stellwerk\edge-display\` | Edge profile of the display started at logon |
 | `%LOCALAPPDATA%\stellwerk\github-token` | The read-only GitHub token, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma-key` | The API key of Uptime Kuma, if set up; only your Windows user can read it |
+| `%LOCALAPPDATA%\stellwerk\calendars.json` | The calendars' names and links, with the user and app password of a Nextcloud list, if set up; only your Windows user can read it |
 | `%LOCALAPPDATA%\stellwerk\plans.json` | The latest usage of your plans' limits, for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\sessions.json` | The sessions on the display (id, folder, title, project, context, last activity), for the display after a restart |
 | `%LOCALAPPDATA%\stellwerk\uptime-kuma.json` | Since when monitors of Uptime Kuma fail (ids and times only), for the display after a restart |
@@ -542,19 +599,20 @@ Restart the hub after a change.
   creates the token file or writes the display's start file, so that only your Windows account can read
   them, and that a tap on the display can have it open a link with the Windows shell (`explorer.exe` with
   the link as its only argument, no shell). The display only names what to open; the hub builds the link
-  from what it shows and opens only four forms: `claude://claude.ai/epitaxy/local_…` (a session of the
+  from what it shows and opens only five forms: `claude://claude.ai/epitaxy/local_…` (a session of the
   desktop app), `codex://threads/<id>` (a Codex chat), `https://github.com/<owner>/<repo>/pull/<n>` (a
-  pull request it lists) and `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a
-  second. With LibreHardwareMonitor set up, the hub also runs and ends the task "Stellwerk hardware"
+  pull request it lists), `https://github.com/<owner>/<repo>/issues/<n>` (an issue it lists) and
+  `<uptimeKumaUrl>/dashboard/<id>` (a failing monitor it shows), at most one a second. With LibreHardwareMonitor set up, the hub also runs and ends the task "Stellwerk hardware"
   (`schtasks /Run` and `/End`, fixed arguments, no shell), so that LibreHardwareMonitor runs while the
   hub runs; an administrator registered that task, and it starts only the program in its own folder in
   Program Files.
-- It connects to other machines only to `api.github.com`, for the list of pull requests and the newest
-  release of Stellwerk, and only with a fine-grained read-only token you set up; and to Uptime Kuma at
-  the address you set up, only for `/metrics` and only with its API key. Besides that it asks
+- It connects to other machines only to `api.github.com`, for the list of pull requests, the issues
+  assigned to you and the newest release of Stellwerk, and only with a fine-grained read-only token you
+  set up; to Uptime Kuma at the address you set up, only for `/metrics` and only with its API key; and
+  to the links of the calendars you set up, GET only, https only, without redirects. Besides that it asks
   LibreHardwareMonitor on `127.0.0.1:8085` for the sensor values, if you set it up, and nothing else of
   it. The display loads only the hub's own files under a strict Content Security Policy and shows hook
-  data and pull request titles as text, never as HTML.
+  data, pull request and issue titles and the titles of events and tasks as text, never as HTML.
 - For the context meters the hub reads session transcripts, only under `%USERPROFILE%\.claude\projects`
   and `%USERPROFILE%\.codex\sessions` (a path elsewhere in a hook event is ignored), only from their end,
   and only the token counts, the model, the context window, the session's title and, for Codex, who
@@ -630,8 +688,8 @@ stellwerk teardown
 ```
 
 It stops Stellwerk, then removes the start with Windows and the hooks of Claude Code and Codex; each
-step shows what it changes and asks first (`--yes` answers yes to all of them). The GitHub token and the
-API key of Uptime Kuma go only if you say so, never with `--yes`. In a terminal opened as administrator
+step shows what it changes and asks first (`--yes` answers yes to all of them). The GitHub token, the
+API key of Uptime Kuma and the calendars go only if you say so, never with `--yes`. In a terminal opened as administrator
 it also removes LibreHardwareMonitor and the firewall rule; in any other it names the two commands for
 that. Your settings, the hook token, the audit log and the releases stay; it names the command that
 removes them.
@@ -642,6 +700,7 @@ Or step by step:
 stellwerk autostart uninstall
 stellwerk github remove
 stellwerk kuma remove
+stellwerk calendar remove <name>   # each calendar
 stellwerk hooks uninstall
 stellwerk codex uninstall
 stellwerk hardware uninstall # as administrator: LibreHardwareMonitor, its task and firewall rule
@@ -667,6 +726,7 @@ node tools/check-browser.ts    # in a real Edge (after the build): the display's
 node tools/check-monitors.ts   # many failing monitors scroll to the last one
 node tools/check-columns.ts    # the agents and the waiting column, a card far down
 node tools/check-quiet.ts      # the display at rest: dims, what wakes it
+node tools/check-screens.ts    # the pages: swipe, arrow keys, back to the first for a new request
 node dist/cli.js serve --debug-raw --simulate-hang
 ```
 

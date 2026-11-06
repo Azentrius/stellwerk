@@ -22,6 +22,8 @@ function stateWith(parts: { sessions?: Partial<SessionView>[]; permissions?: Par
     uptimeKuma: parts.failing ? { monitors: { failing: parts.failing, up: 3, maintenance: 0 }, updatedAt: 0, problem: null } : null,
     plans: [],
     decisions: [],
+    calendar: null,
+    issues: null,
   } as StateMessage;
 }
 

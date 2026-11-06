@@ -35,6 +35,8 @@ jobs:
         run: node tools/check-columns.ts
       - name: The display at rest in a real Edge (dims, what wakes it, a tap presses nothing)
         run: node tools/check-quiet.ts
+      - name: The pages in a real Edge (swipe, arrow keys, back to the first for a new request)
+        run: node tools/check-screens.ts
       - name: Known vulnerabilities in dependencies
         run: npm audit
       # Every pull request that raises the version dates its section, so a release can follow the merge.

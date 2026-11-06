@@ -2,8 +2,8 @@
 // time decides, and keeps the display current over a WebSocket. It listens on 127.0.0.1 only and starts
 // no programs. The display signs in with a start file only the user can read; only the answer to it
 // carries the page token the WebSocket needs, so the address alone gives nobody the decisions. It asks
-// only api.github.com (with a token set up), LibreHardwareMonitor on 127.0.0.1 and Uptime Kuma's
-// /metrics at the address set up (each only when set up). Besides its own files it reads only
+// only api.github.com (with a token set up), LibreHardwareMonitor on 127.0.0.1, Uptime Kuma's /metrics at
+// the address set up and the links of the calendars set up (each only when set up). Besides its own files it reads only
 // transcripts named in hook events. The usage of the
 // plans' limits comes from the same local sources: Codex' transcripts and the desktop app's answer to a
 // session that asked for it (plans.ts).
@@ -37,11 +37,12 @@ import { parseCodexInput } from './codex-input.ts';
 import { CodexProjects } from './codex-projects.ts';
 import { ContextReader } from './context.ts';
 import { Decisions, decisionWhat } from './decisions.ts';
+import { CalendarWatcher, type CalendarSource } from './calendar.ts';
 import { GitHubWatcher, newerRelease } from './github.ts';
 import { HardwareWatcher, type HardwareTask } from './hardware.ts';
 import { UptimeKumaWatcher } from './kuma.ts';
 import { isOther, parseHookInput, type HookEvent, type PermissionRequestEvent } from './hook-input.ts';
-import { isOpenableLink, monitorLink, openWithShell, pullLink, sessionLink } from './links.ts';
+import { isOpenableLink, issueLink, monitorLink, openWithShell, pullLink, sessionLink } from './links.ts';
 import { PlanBook, claudePlanOfHook } from './plans.ts';
 import { SessionFile } from './sessions.ts';
 import { displayBuild, loadIndexTemplate, loadStaticFiles, renderIndex } from './static-files.ts';
@@ -133,7 +134,9 @@ export interface HubOptions {
    */
   open?: (link: string) => void;
   /** Open pull requests from GitHub; the only outgoing connection, and only with a token. */
-  github?: { owner: string; token: string; intervalMs: number; fetch?: typeof fetch } | null;
+  github?: { owner: string; token: string; intervalMs: number; issues?: boolean; fetch?: typeof fetch } | null;
+  /** The calendars and task lists set up with `stellwerk calendar add`: their links, nothing else. */
+  calendar?: { sources: CalendarSource[]; intervalMs: number; fetch?: typeof fetch } | null;
   /** Hardware values from LibreHardwareMonitor on 127.0.0.1, with the password from its settings file. */
   /** With `task`, the hub keeps LibreHardwareMonitor running while it runs (HardwareKeeper). */
   hardware?: { settingsFile: string; intervalMs: number; fetch?: typeof fetch; task?: HardwareTask } | null;
@@ -207,6 +210,7 @@ const openMessage = z.object({
   target: z.union([
     z.object({ session: z.string().max(200) }).strict(),
     z.object({ repo: z.string().max(100), number: z.number().int().positive() }).strict(),
+    z.object({ repo: z.string().max(100), issue: z.number().int().positive() }).strict(),
     z.object({ monitor: z.string().regex(/^[1-9][0-9]{0,9}$/) }).strict(),
   ]),
 });
@@ -302,6 +306,11 @@ export async function startHub(options: HubOptions): Promise<Hub> {
     ? new UptimeKumaWatcher({ ...options.uptimeKuma, now, onChange: () => scheduleBroadcast(), log })
     : null;
   uptimeKuma?.start();
+  const calendar =
+    options.calendar && options.calendar.sources.length > 0
+      ? new CalendarWatcher({ ...options.calendar, now, onChange: () => scheduleBroadcast(), log })
+      : null;
+  calendar?.start();
   const plans = new PlanBook(options.plansFile ?? null, log);
   plans.load();
   const codexProjects = options.codexStateFile ? new CodexProjects(options.codexStateFile, now) : null;
@@ -651,9 +660,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
   }
 
   /**
-   * Opens a session in its app or a pull request in the default browser. The display names it; the link is
-   * built here from what the hub shows (a session it knows, a pull request of the owner it watches) and must
-   * be one of the three forms of links.ts.
+   * Opens a session in its app, or a pull request, an issue or a monitor in the default browser. The display
+   * names it; the link is built here from what the hub shows (a session it knows, a pull request or issue of
+   * the owner it watches, a failing monitor) and must be one of the forms of links.ts.
    */
   function open(target: OpenMessage['target']): OpenResultMessage {
     let link: string | null = null;
@@ -662,7 +671,9 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       const session = board.session(target.session);
       link = session ? sessionLink(session) : null;
       if (session) opened = session.provider;
-    } else if ('repo' in target && options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
+    } else if ('issue' in target && options.github && github?.issues?.some((i) => i.repo === target.repo && i.number === target.issue)) {
+      link = issueLink(options.github.owner, target.repo, target.issue);
+    } else if ('number' in target && options.github && github?.pullRequests.some((pr) => pr.repo === target.repo && pr.number === target.number)) {
       link = pullLink(options.github.owner, target.repo, target.number);
     } else if ('monitor' in target && options.uptimeKuma && uptimeKuma?.view().monitors?.failing.some((m) => m.id === target.monitor)) {
       link = monitorLink(options.uptimeKuma.url, target.monitor);
@@ -714,6 +725,8 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       uptimeKuma: uptimeKuma?.view() ?? null,
       plans: plans.view(),
       decisions: decisions.view(),
+      calendar: calendar?.view() ?? null,
+      issues: github?.issues ?? null,
     };
   }
 
@@ -785,6 +798,7 @@ export async function startHub(options: HubOptions): Promise<Hub> {
       github?.stop();
       hardware?.stop();
       uptimeKuma?.stop();
+      calendar?.stop();
       context?.stop();
       if (broadcastTimer) clearTimeout(broadcastTimer);
       // Whatever is still held goes back to the app's own card.

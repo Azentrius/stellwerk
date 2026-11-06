@@ -199,6 +199,15 @@ date, the log names the question that failed with GitHub's status, or why it got
 
 ---
 
+## 0.11.0 – A second page: calendar and tasks ✅
+
+Done in 0.11.0 (see [CHANGELOG](CHANGELOG.md)): a swipe goes from the agents to a page with the
+calendars' events and the open tasks, with the GitHub issues assigned to you; a new request takes the
+display back at once. Next: a page of shortcuts that open links and apps and send key presses, after a
+security review of its own (stage 4).
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime
@@ -220,8 +229,10 @@ ChatGPT, and Claude's limits for Claude Code in a terminal without the desktop a
 
 ## Stage 4 – Shortcuts
 
-Buttons for local scripts and Home Assistant webhooks. The hub would then start things itself, so this
-stage begins with its own security review.
+A page of buttons, a swipe away like the calendar, that open links and apps and send key presses (chosen
+on 2026-11-06: no scripts, no Home Assistant). The hub would then do things itself, so this stage begins
+with its own security review, and with a probe of how a key press reaches the app it is meant for while
+the display's window has the focus.
 
 ---
 

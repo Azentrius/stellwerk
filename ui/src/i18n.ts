@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  CalendarProblem,
   ChecksState,
   GitHubProblem,
   HardwareProblem,
@@ -156,6 +157,37 @@ export interface Texts {
   moreParameters: string;
   address: string;
   query: string;
+  /** The pages one swipes between, by name (for screen readers), and how much waits on the first. */
+  pages: { agents: string; calendar: string; waiting: (n: number) => string };
+  calendarTitle: string;
+  tasksTitle: string;
+  issuesTitle: string;
+  /** The event running now, and the next one. */
+  nowTitle: string;
+  nextTitle: string;
+  /** When the next one starts, within the hour. */
+  inMinutes: (n: number) => string;
+  /** When the one running now ends. */
+  until: (time: string) => string;
+  allDay: string;
+  today: string;
+  tomorrow: string;
+  /** A day of the agenda: "Mon 9 Nov". */
+  day: (ms: number) => string;
+  noEvents: string;
+  noTasks: string;
+  /** A task's due date: overdue for some days, due today, tomorrow or on a day. */
+  due: { overdue: (days: number) => string; today: (time: string | null) => string; tomorrow: (time: string | null) => string; on: (day: string) => string };
+  /** A task of high priority (1 to 4): the name of its mark. */
+  highPriority: string;
+  /** A tap on an issue opens it in the browser: its tooltip. */
+  openIssue: string;
+  calendar: {
+    problem: Record<CalendarProblem, (source: string) => string>;
+    fix: Record<CalendarProblem, string>;
+  };
+  /** The issues assigned to me could not be asked. */
+  issues: { problem: string; fix: string };
 }
 
 const en: Texts = {
@@ -339,6 +371,38 @@ const en: Texts = {
   moreParameters: 'More parameters',
   address: 'Address',
   query: 'Search',
+  pages: { agents: 'Agents and approvals', calendar: 'Calendar and tasks', waiting: (n) => (n === 1 ? '1 waits for you' : `${n} wait for you`) },
+  calendarTitle: 'Calendar',
+  tasksTitle: 'Tasks',
+  issuesTitle: 'GitHub issues',
+  nowTitle: 'Now',
+  nextTitle: 'Next',
+  inMinutes: (n) => `in ${n} min`,
+  until: (time) => `until ${time}`,
+  allDay: 'All day',
+  today: 'Today',
+  tomorrow: 'Tomorrow',
+  day: (ms) => new Date(ms).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+  noEvents: 'No events in the next seven days.',
+  noTasks: 'No open tasks.',
+  due: { overdue: (days) => (days === 1 ? 'overdue since yesterday' : `overdue for ${days} days`), today: (t) => (t ? `due today ${t}` : 'due today'), tomorrow: (t) => (t ? `due tomorrow ${t}` : 'due tomorrow'), on: (d) => `due ${d}` },
+  highPriority: 'High priority',
+  openIssue: 'Open in the browser',
+  calendar: {
+    problem: {
+      rejected: (source) => `${source}: link or password turned down`,
+      'not-found': (source) => `${source}: the link leads nowhere`,
+      unreachable: (source) => `${source}: not reachable`,
+      unexpected: (source) => `${source}: unreadable answer`,
+    },
+    fix: {
+      rejected: 'Set it up again: `stellwerk calendar add NAME`.',
+      'not-found': 'Set it up again with its new link: `stellwerk calendar add NAME`.',
+      unreachable: 'The hub asks again by itself; until then the events of before stay.',
+      unexpected: 'Is it an iCalendar link? More in `hub.log`.',
+    },
+  },
+  issues: { problem: 'GitHub: issues not readable', fix: 'The token needs "Issues: Read" as well. More in `hub.log`.' },
 };
 
 const de: Texts = {
@@ -522,6 +586,38 @@ const de: Texts = {
   moreParameters: 'Weitere Parameter',
   address: 'Adresse',
   query: 'Suche',
+  pages: { agents: 'Agenten und Freigaben', calendar: 'Kalender und Aufgaben', waiting: (n) => (n === 1 ? '1 wartet auf dich' : `${n} warten auf dich`) },
+  calendarTitle: 'Kalender',
+  tasksTitle: 'Aufgaben',
+  issuesTitle: 'GitHub-Issues',
+  nowTitle: 'Jetzt',
+  nextTitle: 'Als Nächstes',
+  inMinutes: (n) => `in ${n} min`,
+  until: (time) => `bis ${time}`,
+  allDay: 'Ganztägig',
+  today: 'Heute',
+  tomorrow: 'Morgen',
+  day: (ms) => new Date(ms).toLocaleDateString('de', { weekday: 'short', day: 'numeric', month: 'short' }),
+  noEvents: 'Keine Termine in den nächsten sieben Tagen.',
+  noTasks: 'Keine offenen Aufgaben.',
+  due: { overdue: (days) => (days === 1 ? 'seit gestern überfällig' : `seit ${days} Tagen überfällig`), today: (t) => (t ? `heute ${t} fällig` : 'heute fällig'), tomorrow: (t) => (t ? `morgen ${t} fällig` : 'morgen fällig'), on: (d) => `fällig ${d}` },
+  highPriority: 'Hohe Priorität',
+  openIssue: 'Im Browser öffnen',
+  calendar: {
+    problem: {
+      rejected: (source) => `${source}: Link oder Passwort abgelehnt`,
+      'not-found': (source) => `${source}: Link führt ins Leere`,
+      unreachable: (source) => `${source}: nicht erreichbar`,
+      unexpected: (source) => `${source}: unlesbare Antwort`,
+    },
+    fix: {
+      rejected: 'Richte ihn neu ein: `stellwerk calendar add NAME`.',
+      'not-found': 'Richte ihn mit seinem neuen Link neu ein: `stellwerk calendar add NAME`.',
+      unreachable: 'Der Hub fragt von selbst wieder; bis dahin bleiben die Termine von vorher.',
+      unexpected: 'Ist es ein iCalendar-Link? Mehr in `hub.log`.',
+    },
+  },
+  issues: { problem: 'GitHub: Issues nicht lesbar', fix: 'Der Token braucht zusätzlich „Issues: Read“. Mehr in `hub.log`.' },
 };
 
 export function pickTexts(languages: readonly string[]): { lang: Lang; texts: Texts } {

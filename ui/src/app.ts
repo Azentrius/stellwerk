@@ -1,12 +1,15 @@
 // Stellwerk's display: connects to the hub, shows the sessions, what waits for the user (permission
 // requests, answers due in the app, open pull requests), Uptime Kuma's monitors, the hub's state, the
-// hardware values and the usage of the plans' limits, and sends decisions. Everything goes over the one WebSocket to the hub that served the page. When that hub
-// serves a newer display after an update, the page loads itself again.
+// hardware values and the usage of the plans' limits, and sends decisions. A second page, a swipe away, shows
+// the calendars and the tasks; something new that waits takes the display back to the first. Everything goes
+// over the one WebSocket to the hub that served the page. When that hub serves a newer display after an
+// update, the page loads itself again.
 //
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Decision, OpenMessage, ServerMessage, StateMessage } from '../../src/shared/protocol.js';
 import { AgentItems, renderAgents } from './agents.ts';
+import { issueKey, renderCalendar } from './calendar.ts';
 import { renderDecisions } from './decisions.ts';
 import { renderAnswers } from './answers.ts';
 import { newReminders, waitingForAnswer } from './due.ts';
@@ -16,6 +19,8 @@ import { renderHardware, renderPlans } from './hardware.ts';
 import { pickTexts } from './i18n.ts';
 import { renderMonitors } from './monitors.ts';
 import { pullKey, renderPulls, updatesRepo } from './pulls.ts';
+import { Pages } from './pages.ts';
+import { Home, pagesOf, waitingKeys } from './paging.ts';
 import { QueueView } from './queue.ts';
 import { Rest, chimeLoudness, inNight, restAfter, watched } from './quiet.ts';
 import { splitResting } from './resting.ts';
@@ -113,6 +118,27 @@ const pullTaps = new TapList((key) => {
   if (pr) openTarget({ repo: pr.repo, number: pr.number });
 });
 const pullsSection = byId('pulls-section');
+/** The pages a swipe goes between; something new that waits takes the display back to the first. */
+const pages = new Pages(byId('pages'), byId('page-dots'), { agents: byId('page-agents'), calendar: byId('page-calendar') });
+const home = new Home();
+/** A tap on an issue assigned to me opens it in the default browser. */
+const issueTaps = new TapList((key) => {
+  const issue = state?.issues?.find((i) => issueKey(i) === key);
+  if (issue) openTarget({ repo: issue.repo, issue: issue.number });
+});
+const calendarParts = {
+  nowNext: byId('now-next'),
+  agenda: byId('agenda'),
+  agendaEmpty: byId('agenda-empty'),
+  calendarState: byId('calendar-state'),
+  tasksCount: byId('tasks-count'),
+  issuesSection: byId('issues-section'),
+  issues: byId<HTMLUListElement>('issues'),
+  lists: byId('task-lists'),
+  tasksEmpty: byId('tasks-empty'),
+  tasksState: byId('tasks-state'),
+};
+const tasksNode = byId('tasks');
 const githubState = byId('github-state');
 const hardwareSection = byId('hardware');
 const gauges = byId('gauges');
@@ -147,6 +173,8 @@ let audio: AudioContext | null = null;
 const rest = new Rest(Date.now());
 /** The tap that woke the resting display: its click does nothing. */
 let swallowClick = false;
+/** Whether the display rested at the last tick: going to rest takes it back to the first page. */
+let wasResting = false;
 
 byId('all-clear-icon').append(icon('check-circle'));
 
@@ -266,6 +294,13 @@ function tick(): void {
   waitingList.hidden = nothing;
   fadeWhileMore(waitingList, 'waiting--more');
   renderDecisions(decisionsParts, state?.decisions ?? [], decisionsLine.isOpen(now), now, texts);
+
+  // The pages: the first one's dot carries how much waits there; something new that waits goes back to it.
+  pages.show(pagesOf(state), texts.pages, queue.openCount() + due.length, texts.pages.waiting);
+  if (home.update(waitingKeys(state))) pages.home();
+  renderCalendar(calendarParts, state?.calendar ?? null, state?.issues ?? null, state?.github?.issuesProblem ?? null, issueTaps, now, texts);
+  markScrolling(calendarParts.agenda, 'agenda--more');
+  markScrolling(tasksNode, 'tasks--more');
   clockNode.textContent = clock(now);
   show(hubNode, hubState(connected, texts, sessionToken !== ''));
   const last = state?.hub.lastEventAt ?? null;
@@ -308,6 +343,8 @@ function tick(): void {
   const resting = rest.update(watched(state, connected), restAfter(state?.hub.quietAfterMs ?? 0, atNight), now);
   document.body.classList.toggle('quiet', resting);
   document.body.classList.toggle('night', resting && atNight);
+  if (resting && !wasResting) pages.home();
+  wasResting = resting;
 }
 
 /**
@@ -418,6 +455,8 @@ pulls.addEventListener(
   { passive: true },
 );
 statusDetails.addEventListener('scroll', () => markScrolling(statusDetails, 'status-details--more'), { passive: true });
+calendarParts.agenda.addEventListener('scroll', () => markScrolling(calendarParts.agenda, 'agenda--more'), { passive: true });
+tasksNode.addEventListener('scroll', () => markScrolling(tasksNode, 'tasks--more'), { passive: true });
 // A tap on the resting display wakes it and does nothing else: the click that follows goes nowhere.
 document.addEventListener(
   'pointerdown',
@@ -425,13 +464,31 @@ document.addEventListener(
     if (!document.body.classList.contains('quiet')) return;
     rest.wake(Date.now() + clockOffset);
     document.body.classList.remove('quiet', 'night');
-    swallowClick = true;
-    window.setTimeout(() => (swallowClick = false), 1000);
+    // Until the finger lifts, a swipe does not turn the page either.
+    document.body.classList.add('waking');
+    window.setTimeout(() => document.body.classList.remove('waking'), 3000);
+    // A finger's touch is cancelled below, so it makes no click; a mouse's or pen's click is swallowed.
+    if (event.pointerType !== 'touch') {
+      swallowClick = true;
+      window.setTimeout(() => (swallowClick = false), 1000);
+    }
     event.preventDefault();
     event.stopPropagation();
   },
   { capture: true },
 );
+// The finger that woke it turns no page and scrolls nothing: its touch is cancelled before the browser
+// scrolls with it (a pointer event cannot do that).
+document.addEventListener(
+  'touchstart',
+  (event) => {
+    if (document.body.classList.contains('waking')) event.preventDefault();
+  },
+  { capture: true, passive: false },
+);
+for (const end of ['touchend', 'touchcancel', 'pointerup']) {
+  document.addEventListener(end, () => window.setTimeout(() => document.body.classList.remove('waking'), 0), { capture: true });
+}
 document.addEventListener(
   'click',
   (event) => {

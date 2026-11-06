@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stellwerk's command line: start the hub; add and remove the hooks, the firewall rule, the start with
-// Windows, the GitHub token, the hardware monitor and Uptime Kuma's API key.
+// Windows, the GitHub token, the hardware monitor, Uptime Kuma's API key and the calendars.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,6 +13,7 @@ import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { format, parseArgs } from 'node:util';
 import { GITHUB_OWNER, HOST, defaultPaths, deleteRawLog, loadConfig, nightOf, readJsonFile, setConfigValue, uptimeKumaAddress } from './config.ts';
+import { CALENDAR_NAME, CalendarWatcher, calendarAddress, calendarSource, describeCalendarProblem } from './hub/calendar.ts';
 import { GitHubWatcher, describeProblem } from './hub/github.ts';
 import { UptimeKumaWatcher, describeUptimeKumaProblem } from './hub/kuma.ts';
 import {
@@ -89,10 +90,13 @@ import {
   ensureToken,
   isGitHubToken,
   isUptimeKumaKey,
+  readCalendarSources,
   readGitHubToken,
   readUptimeKumaKey,
+  removeCalendarSource,
   removeGitHubToken,
   removeUptimeKumaKey,
+  saveCalendarSource,
   saveGitHubToken,
   saveUptimeKumaKey,
   writeDisplayStart,
@@ -120,8 +124,8 @@ Usage:
       Stellwerk and says how it stands.
   stellwerk teardown [--yes]
       Remove Stellwerk in one go, each step asking first: it stops Stellwerk, removes the start with
-      Windows and the hooks of Claude Code and Codex, the GitHub token and the API key of Uptime Kuma
-      only if you say so (never with --yes), and as administrator LibreHardwareMonitor and the firewall
+      Windows and the hooks of Claude Code and Codex, the GitHub token, the API key of Uptime Kuma and
+      the calendars only if you say so (never with --yes), and as administrator LibreHardwareMonitor and the firewall
       rule (without administrator rights it names those commands). Settings, the hook token, the audit
       log and the releases stay; it names the command that removes them.
   stellwerk status
@@ -157,6 +161,14 @@ Usage:
       once against the address's /metrics and keeps both for the hub.
   stellwerk kuma remove
       Forget the API key; the hub then opens no connection to Uptime Kuma.
+  stellwerk calendar add <name> [--user <user>]
+      Show a calendar or task list on the display's second page: asks for its link for subscribing
+      (iCalendar, https or webcal; input hidden), with --user also for an app password (a Nextcloud
+      list), tries it once and keeps it for the hub, readable by you only.
+  stellwerk calendar remove <name>
+      Forget that calendar.
+  stellwerk calendar list
+      The calendars set up, by name and host; never their links.
   stellwerk hardware install [--yes]
       Show processor, graphics card and memory: set up LibreHardwareMonitor ${LHM_VERSION} from its
       official release (checked by SHA-256) with a password, a firewall rule and a logon task
@@ -196,6 +208,7 @@ async function main(): Promise<void> {
       'exit-with-parent': { type: 'boolean', default: false },
       owner: { type: 'string' },
       url: { type: 'string' },
+      user: { type: 'string' },
       screen: { type: 'string' },
       'keep-previous': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
@@ -218,6 +231,7 @@ async function main(): Promise<void> {
   }
   if (command === 'github' && (action === 'token' || action === 'remove')) return githubToken(action, values.owner);
   if (command === 'kuma' && (action === 'key' || action === 'remove')) return uptimeKumaKey(action, values.url);
+  if (command === 'calendar' && (action === 'add' || action === 'remove' || action === 'list')) return calendar(action, positionals[2], values.user);
   if (command === 'hardware' && (action === 'install' || action === 'uninstall')) return hardware(action, values.yes);
   if (command === 'codex' && (action === 'install' || action === 'uninstall')) return codex(action, values.yes);
   if (command === 'raw-log' && action === 'delete') return rawLogDelete();
@@ -244,8 +258,9 @@ async function serve(
   const githubToken = config.githubOwner ? readGitHubToken(paths.githubTokenFile) : null;
   const github =
     config.githubOwner && githubToken
-      ? { owner: config.githubOwner, token: githubToken, intervalMs: config.githubIntervalSeconds * 1000 }
+      ? { owner: config.githubOwner, token: githubToken, intervalMs: config.githubIntervalSeconds * 1000, issues: config.githubIssues }
       : null;
+  const calendars = readCalendarSources(paths.calendarsFile);
   // LibreHardwareMonitor runs while the hub runs: its task (registered by `hardware install`, with administrator
   // rights) is run and ended here, with fixed arguments.
   const hardware = config.hardwareMonitor
@@ -283,6 +298,7 @@ async function serve(
       github,
       hardware,
       uptimeKuma,
+      calendar: calendars.length > 0 ? { sources: calendars, intervalMs: config.calendarIntervalSeconds * 1000 } : null,
       context: {
         root: defaultTranscriptsRoot(),
         codexRoot: codexTranscriptsRoot(paths.codexHome),
@@ -314,7 +330,7 @@ async function serve(
   if (rawLog) console.log(`Debug: raw hook data goes to ${paths.rawLogFile}. It holds prompts and code, delete it afterwards.`);
   if (simulateHang) console.log('Debug: status hooks are not answered (simulated hang).');
   if (github) {
-    console.log(`Open pull requests of ${github.owner} from api.github.com, every ${config.githubIntervalSeconds} s.`);
+    console.log(`Open pull requests${github.issues ? ' and the issues assigned to you' : ''} of ${github.owner} from api.github.com, every ${config.githubIntervalSeconds} s.`);
   } else if (config.githubOwner) {
     console.log(`githubOwner is set, but there is no GitHub token. Run "stellwerk github token".`);
   }
@@ -325,6 +341,9 @@ async function serve(
     console.log(`Monitors of Uptime Kuma from ${uptimeKuma.url}/metrics, every ${config.uptimeKumaIntervalSeconds} s.`);
   } else if (config.uptimeKumaUrl) {
     console.log(`uptimeKumaUrl is set, but there is no API key. Run "stellwerk kuma key".`);
+  }
+  if (calendars.length > 0) {
+    console.log(`Calendars ${calendars.map((c) => `"${c.name}"`).join(', ')} from their links, every ${config.calendarIntervalSeconds} s.`);
   }
   console.log('Ctrl+C stops the hub.\n');
 
@@ -519,6 +538,40 @@ async function uptimeKumaKey(action: 'key' | 'remove', url: string | undefined):
   console.log(`Saved to ${paths.uptimeKumaKeyFile} (readable by you only). Restart the hub to show the monitors.`);
 }
 
+async function calendar(action: 'add' | 'remove' | 'list', name: string | undefined, user: string | undefined): Promise<void> {
+  const paths = defaultPaths();
+  if (action === 'list') {
+    const sources = readCalendarSources(paths.calendarsFile);
+    if (sources.length === 0) return void console.log('No calendars. Add one with: stellwerk calendar add <name>');
+    for (const source of sources) console.log(`  ${source.name}: ${new URL(source.url).host}${source.user ? `, as ${source.user}` : ''}`);
+    return;
+  }
+  if (name === undefined || !CALENDAR_NAME.test(name)) throw new Error('Give the calendar a name: up to 40 letters, digits and spaces, e.g. stellwerk calendar add Work');
+  if (action === 'remove') {
+    console.log(removeCalendarSource(paths.calendarsFile, name) ? `Calendar "${name}" removed. Restart the hub.` : `There is no calendar "${name}".`);
+    return;
+  }
+  if (user !== undefined && (user.length === 0 || user.length > 200)) throw new Error('--user needs a user name.');
+  console.log('The link for subscribing to the calendar (iCalendar): in Outlook "Publish calendar", the ICS link; in Google');
+  console.log('the "secret address in iCal format"; in Nextcloud the link of a calendar or task list with ?export at');
+  console.log('its end, with --user and an app password. Anyone with the link can read the calendar: it is kept like a token.');
+  const url = calendarAddress(await readSecret('Paste the link (input stays hidden): '));
+  if (url === null) throw new Error('That is no https link (webcal links count as https). Nothing saved.');
+  const password = user === undefined ? undefined : (await readSecret(`The app password of ${user} (input stays hidden): `)).trim();
+  if (password === '') throw new Error('No app password given. Nothing saved.');
+  const source = calendarSource.parse({ name, url, ...(user === undefined ? {} : { user, password }) });
+
+  // One question before saving, so a wrong link or password shows now, not on the display.
+  const trial = new CalendarWatcher({ sources: [source], intervalMs: 0, log: (line) => console.log(line) });
+  await trial.poll();
+  const problem = trial.problemOf(name);
+  if (problem) throw new Error(`${describeCalendarProblem(problem)} Nothing saved.`);
+  const { events, tasks } = trial.view();
+  console.log(`Works: ${events.length} event(s) today and in the next six days, ${tasks.length} open task(s).`);
+  saveCalendarSource(paths.calendarsFile, source);
+  console.log(`Saved to ${paths.calendarsFile} (readable by you only). Restart the hub to show it.`);
+}
+
 async function codex(action: 'install' | 'uninstall', yes: boolean): Promise<void> {
   const paths = defaultPaths();
   const file = codexHooksFile(paths.codexHome);
@@ -634,13 +687,19 @@ async function hardware(action: 'install' | 'uninstall', yes: boolean, hubRuns =
   restartHub();
 }
 
+/** Without a terminal, the lines of standard input, read once: each secret asked for takes the next. */
+let pipedLines: string[] | null = null;
+
 /** Reads a secret from the terminal without showing it; from standard input when there is no terminal. */
 async function readSecret(prompt: string): Promise<string> {
   const stdin = process.stdin;
   if (!stdin.isTTY) {
-    let text = '';
-    for await (const chunk of stdin) text += String(chunk);
-    return text.split(/\r?\n/)[0] ?? '';
+    if (pipedLines === null) {
+      let text = '';
+      for await (const chunk of stdin) text += String(chunk);
+      pipedLines = text.split(/\r?\n/);
+    }
+    return pipedLines.shift() ?? '';
   }
   process.stdout.write(prompt);
   stdin.setRawMode(true);
@@ -906,19 +965,26 @@ async function teardown(yes: boolean): Promise<void> {
   else console.log(`Codex is not used here (no ${paths.codexHome}).`);
 
   // Tokens and keys go only when asked here, never with --yes: making them again takes their sites.
-  step('The GitHub token and the API key of Uptime Kuma');
+  step('The GitHub token, the API key of Uptime Kuma and the calendars');
+  const calendars = fs.existsSync(paths.calendarsFile) ? readCalendarSources(paths.calendarsFile).map((c) => c.name) : [];
   const secrets = [
-    { name: 'the GitHub token', command: 'stellwerk github remove', remove: () => removeGitHubToken(paths.githubTokenFile), file: paths.githubTokenFile },
-    { name: 'the API key of Uptime Kuma', command: 'stellwerk kuma remove', remove: () => removeUptimeKumaKey(paths.uptimeKumaKeyFile), file: paths.uptimeKumaKeyFile },
+    { name: 'the GitHub token', commands: ['stellwerk github remove'], remove: () => removeGitHubToken(paths.githubTokenFile), file: paths.githubTokenFile },
+    { name: 'the API key of Uptime Kuma', commands: ['stellwerk kuma remove'], remove: () => removeUptimeKumaKey(paths.uptimeKumaKeyFile), file: paths.uptimeKumaKeyFile },
+    {
+      name: 'the calendars',
+      commands: calendars.map((c) => `stellwerk calendar remove "${c}"`),
+      remove: () => calendars.forEach((c) => removeCalendarSource(paths.calendarsFile, c)),
+      file: paths.calendarsFile,
+    },
   ].filter((secret) => fs.existsSync(secret.file));
-  const names = secrets.map((secret) => secret.name).join(' and ');
-  if (secrets.length === 0) console.log('There is neither.');
+  const names = secrets.map((secret) => secret.name).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  if (secrets.length === 0) console.log('There is none of them.');
   else if (!yes && process.stdin.isTTY && (await confirm(false, `Remove ${names} as well? [y/N] `))) {
     for (const secret of secrets) secret.remove();
     console.log(`Removed ${names}.`);
   } else {
     console.log(`Kept ${names}${yes ? ' (--yes keeps tokens and keys)' : ''}. Remove with:`);
-    for (const secret of secrets) console.log(`  ${secret.command}`);
+    for (const command of secrets.flatMap((secret) => secret.commands)) console.log(`  ${command}`);
   }
 
   step('As administrator: LibreHardwareMonitor and the firewall rule');
@@ -1009,6 +1075,11 @@ async function status(): Promise<void> {
     const forwarder = releaseOf(commands[0]!);
     const same = target === null || forwarder === target;
     note(same, same ? `Codex: ${commands.length} hooks${forwarder ? ` run the forwarder of ${forwarder}` : ''}` : `Codex: the hooks run the forwarder of ${forwarder ?? 'another build'}, the hub's task starts ${target}. Run stellwerk codex install from ${target}`);
+  });
+
+  await part('Calendars', () => {
+    const sources = readCalendarSources(paths.calendarsFile);
+    note(true, sources.length === 0 ? 'Calendars: none (stellwerk calendar add, if you want them on the second page)' : `Calendars: ${sources.map((s) => s.name).join(', ')}`);
   });
 
   for (const line of lines) console.log(`${line.ok ? 'ok' : '!!'}  ${line.text}`);

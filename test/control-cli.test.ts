@@ -257,7 +257,7 @@ describe('stellwerk start | stop | restart | status', { concurrency: true }, () 
     assert.equal(outcome.status, 0, outcome.output);
     assert.match(outcome.output, /Stellwerk does not run\./);
     assert.match(outcome.output, /There are no Stellwerk tasks/);
-    assert.match(outcome.output, /There is neither\./);
+    assert.match(outcome.output, /There is none of them\./);
     assert.match(outcome.output, /LibreHardwareMonitor is not set up here\./);
     const rules = outcome.calls.filter((c) => c.command === 'netsh').map((c) => c.args.join(' '));
     assert.equal(rules.length, 1);

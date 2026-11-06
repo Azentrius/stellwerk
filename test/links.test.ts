@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { APP_SESSION, isOpenableLink, monitorLink, pullLink, sessionLink } from '../src/hub/links.ts';
+import { APP_SESSION, isOpenableLink, issueLink, monitorLink, pullLink, sessionLink } from '../src/hub/links.ts';
 
 const CODEX = '01a16862-8f6e-75f1-bd2e-ebb5eba616ff';
 const APP = 'local_a50b48e9-658d-487b-b484-a0fec652f2bf';
@@ -38,7 +38,16 @@ test('a pull request opens on github.com, only with plain names and a number', (
   assert.equal(pullLink('example', 'shop', 1.5), null);
 });
 
-test('the shell gets only the three forms, whole', () => {
+test('an issue opens on github.com the same way', () => {
+  assert.equal(issueLink('Azentrius', 'stellwerk', 12), 'https://github.com/Azentrius/stellwerk/issues/12');
+  assert.equal(issueLink('example', '../evil', 1), null);
+  assert.equal(issueLink('example', 'shop', 0), null);
+  assert.equal(isOpenableLink('https://github.com/Azentrius/stellwerk/issues/12'), true);
+  assert.equal(isOpenableLink('https://github.com/Azentrius/stellwerk/issues/12#comment'), false);
+  assert.equal(isOpenableLink('https://github.com/Azentrius/stellwerk/issues'), false);
+});
+
+test('the shell gets only these forms, whole', () => {
   for (const link of [`claude://claude.ai/epitaxy/${APP}`, `codex://threads/${CODEX}`, 'https://github.com/Azentrius/stellwerk/pull/57']) {
     assert.equal(isOpenableLink(link), true, link);
   }

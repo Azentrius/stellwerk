@@ -1,7 +1,8 @@
 // The secrets Stellwerk keeps: the token Claude Code sends with every hook request, the display's start
 // file with the key that signs the display in, and (optionally) a read-only GitHub token for the list of
-// open pull requests and an API key of Uptime Kuma for its monitors. All live in files only the current
-// user can read, and none is ever logged.
+// open pull requests, an API key of Uptime Kuma for its monitors, and the links of calendars and task
+// lists (with an app password for a Nextcloud list). All live in files only the current user can read,
+// and none is ever logged.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,6 +11,8 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { z } from 'zod';
+import { calendarSource, type CalendarSource } from './hub/calendar.ts';
 
 const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 /**
@@ -96,6 +99,37 @@ export function saveUptimeKumaKey(file: string, key: string): void {
 /** Deletes the API key of Uptime Kuma. Returns false if there was none. */
 export function removeUptimeKumaKey(file: string): boolean {
   return removeSecret(file);
+}
+
+const calendarSources = z.array(calendarSource).max(20);
+
+/** The calendars and task lists set up, in their order; none without the file. */
+export function readCalendarSources(file: string): CalendarSource[] {
+  if (!fs.existsSync(file)) return [];
+  const parsed = calendarSources.safeParse(JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '') || '[]'));
+  if (!parsed.success) throw new Error(`${file} does not hold Stellwerk's calendars. Remove it and add them again with "stellwerk calendar add".`);
+  const names = parsed.data.map((source) => source.name.toLowerCase());
+  if (new Set(names).size !== names.length) throw new Error(`${file} names a calendar twice.`);
+  return parsed.data;
+}
+
+/** Keeps a calendar, in place of one of the same name (any case), or after the others. */
+export function saveCalendarSource(file: string, source: CalendarSource): void {
+  const sources = readCalendarSources(file);
+  const at = sources.findIndex((s) => s.name.toLowerCase() === source.name.toLowerCase());
+  if (at >= 0) sources[at] = source;
+  else sources.push(source);
+  writeSecret(file, JSON.stringify(calendarSources.parse(sources)), { onlyIfNew: false });
+}
+
+/** Forgets a calendar by its name (any case); the file goes with the last one. False when there is none. */
+export function removeCalendarSource(file: string, name: string): boolean {
+  const sources = readCalendarSources(file);
+  const rest = sources.filter((s) => s.name.toLowerCase() !== name.toLowerCase());
+  if (rest.length === sources.length) return false;
+  if (rest.length === 0) removeSecret(file);
+  else writeSecret(file, JSON.stringify(rest), { onlyIfNew: false });
+  return true;
 }
 
 function removeSecret(file: string): boolean {

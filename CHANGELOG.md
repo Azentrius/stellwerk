@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.11.0 – 2026-11-06
+
+A second page, a swipe away: the calendars' events and the open tasks, with the GitHub issues assigned to
+you.
+
+- **Pages to swipe between:** left of the status column, which stays, the display has a second page when a
+  calendar or the issues are set up. A finger drawn sideways goes there and back, and the page snaps in
+  place; the arrow keys do the same. It is the browser's own scrolling, so up and down still scroll the
+  lists, also over a list that scrolls itself. Dots at the foot say which page shows. The first page is
+  the one of before, to the pixel.
+- **Requests first:** a new request or a new answer due in the app takes the display back to the first
+  page at once. Swiped away while something waits, the first page's dot carries how much. Going to rest
+  takes it back too, and a swipe that wakes the display turns no page. A page out of view takes no taps
+  and no focus.
+- **Calendar:** `stellwerk calendar add <name>` takes a calendar's link for subscribing (iCalendar from
+  Outlook, Google, Nextcloud or iCloud; `webcal://` counts as `https://`), with `--user` an app password
+  as well, tries it once and keeps it like a token in `calendars.json`, readable by you only; `list` and
+  `remove` too. The page shows the event running now and the next one, then today and the next six days.
+  The hub asks each link every five minutes (`calendarIntervalSeconds`): GET only, https only, no
+  redirects, at most 2 MB, and keeps of each event its title, times and whether it lasts all day. Places,
+  descriptions and people stay out; the link is never logged and never sent to the display. Its own
+  strict reader of iCalendar (no new dependency) takes time zones, also Windows' names as Outlook writes
+  them, repetitions from daily to yearly with their days, counts and ends, exceptions and moved
+  occurrences, and the clock's changes as RFC 5545 says; what it does not know it names once in the log.
+- **Tasks:** the open tasks of a Nextcloud task list (its export link with `?export`, with an app
+  password), overdue ones first, with their due date and a mark for a high priority; and with
+  `githubIssues` the open issues assigned to you in the owner's repositories (the token needs "Issues:
+  Read"), which a tap opens in the browser: a fifth form of link the hub opens,
+  `https://github.com/<owner>/<repo>/issues/<n>`, only for an issue it lists.
+- **`stellwerk status`** names the calendars set up; **`stellwerk teardown`** asks about them with the
+  tokens and keys.
+- **Tests:**
+  - The reader of iCalendar: whole files only, folded lines and escapes, zones by name, Windows name,
+    Outlook's city names and a file's own definition, a zone it does not know, the clock's changes,
+    repetitions weekly, every other day until a day, on the last Friday, on the last working day, on the
+    31st, yearly, an excluded, a moved and a cancelled occurrence, additional dates, open tasks; under the
+    computer's zone and under UTC.
+  - The calendars: what is kept and in which order, GET without redirects, the app password only to its
+    own list, a failed question that keeps what was there and says why once, every kind of failure, the
+    link never in the log or the state; the store readable by you only.
+  - The issues: only when asked for, only the owner's, no pull requests; a refusal that keeps the list and
+    leaves the pull requests alone. The hub end to end: both on the display without link or password, an
+    issue opened by a tap, one it does not list not.
+  - The calendar page's order of things and when the display goes back to the first page.
+  - In Edge (`tools/check-screens.ts`, also in CI): swipes both ways, also over lists that scroll
+    themselves, up and down that turn no page, the arrow keys, a tap on an issue, back to the first page
+    for a new request, the dot that says what waits, at rest, a waking swipe, one page without a
+    calendar.
+
 ## 0.10.2 – 2026-11-06
 
 The log says which question to GitHub failed and how, so a failing list of pull requests can be traced.

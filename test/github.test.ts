@@ -230,6 +230,55 @@ describe('the pull request list', () => {
     assert.equal(w.pullRequests.find((pr) => pr.number === 1)?.title.length, 201);
   });
 
+  test('the issues assigned to me: only when asked for, only the owner\'s repositories, no pull requests', async () => {
+    const off = fakeGitHub(standardRoutes());
+    const plain = watcher(off);
+    await plain.poll();
+    assert.equal(plain.issues, null);
+    assert.equal('issuesProblem' in plain.view(), false);
+    assert.ok(!off.calls.some((c) => new URL(c.url).pathname === '/issues'), 'not asked for: not asked');
+
+    const issue = (number: number, repo: string, owner: string, updated: string, extra: Record<string, unknown> = {}) => ({
+      number,
+      title: `Issue ${number}`,
+      updated_at: updated,
+      repository: { name: repo, owner: { login: owner } },
+      ...extra,
+    });
+    const routes = {
+      ...standardRoutes(),
+      '/issues': [
+        issue(3, 'api', 'acme', '2026-10-15T09:00:00Z'),
+        issue(4, 'web', 'Acme', '2026-10-15T11:00:00Z'),
+        issue(5, 'theirs', 'someone-else', '2026-10-15T12:00:00Z'),
+        issue(6, 'api', 'acme', '2026-10-15T13:00:00Z', { pull_request: { url: 'x' } }),
+      ],
+    };
+    const fake = fakeGitHub(routes);
+    const log: string[] = [];
+    const w = new GitHubWatcher({ owner: 'acme', token: TOKEN, intervalMs: 60_000, issues: true, fetch: fake.fetch, now: () => 1000, log: (l) => log.push(l) });
+    await w.poll();
+    assert.deepEqual(w.issues, [
+      { repo: 'web', number: 4, title: 'Issue 4', updatedAt: Date.parse('2026-10-15T11:00:00Z') },
+      { repo: 'api', number: 3, title: 'Issue 3', updatedAt: Date.parse('2026-10-15T09:00:00Z') },
+    ]);
+    assert.equal(w.view().issuesProblem, null);
+    assert.ok(fake.calls.some((c) => c.url === 'https://api.github.com/issues?filter=assigned&state=open&per_page=100'));
+
+    fake.routes['/issues'] = 403;
+    await w.poll();
+    await w.poll();
+    assert.equal(w.view().issuesProblem, 'forbidden');
+    assert.equal(w.issues?.length, 2, 'the last list stays');
+    assert.equal(w.problem, null, 'the pull requests are not touched');
+    assert.equal(w.pullRequests.length, 2);
+    assert.deepEqual(log.filter((l) => l.includes('issues')), ['GitHub: the issues assigned to you could not be asked (forbidden). GET /issues answered 403.']);
+    fake.routes['/issues'] = [];
+    await w.poll();
+    assert.deepEqual(w.issues, []);
+    assert.match(log.at(-1) ?? '', /issues assigned to you can be asked again/);
+  });
+
   test('a round still running is not started twice', async () => {
     const fake = fakeGitHub(standardRoutes());
     const w = watcher(fake);
