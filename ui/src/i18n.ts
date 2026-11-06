@@ -183,7 +183,8 @@ export interface Texts {
   /** A tap on an issue opens it in the browser: its tooltip. */
   openIssue: string;
   calendar: {
-    problem: Record<CalendarProblem, (source: string) => string>;
+    /** After the calendar's name and a colon. */
+    problem: Record<CalendarProblem, string>;
     fix: Record<CalendarProblem, string>;
   };
   /** The issues assigned to me could not be asked. */
@@ -390,10 +391,10 @@ const en: Texts = {
   openIssue: 'Open in the browser',
   calendar: {
     problem: {
-      rejected: (source) => `${source}: link or password turned down`,
-      'not-found': (source) => `${source}: the link leads nowhere`,
-      unreachable: (source) => `${source}: not reachable`,
-      unexpected: (source) => `${source}: unreadable answer`,
+      rejected: 'link or password turned down',
+      'not-found': 'the link leads nowhere',
+      unreachable: 'not reachable',
+      unexpected: 'unreadable answer',
     },
     fix: {
       rejected: 'Set it up again: `stellwerk calendar add NAME`.',
@@ -605,10 +606,10 @@ const de: Texts = {
   openIssue: 'Im Browser öffnen',
   calendar: {
     problem: {
-      rejected: (source) => `${source}: Link oder Passwort abgelehnt`,
-      'not-found': (source) => `${source}: Link führt ins Leere`,
-      unreachable: (source) => `${source}: nicht erreichbar`,
-      unexpected: (source) => `${source}: unlesbare Antwort`,
+      rejected: 'Link oder Passwort abgelehnt',
+      'not-found': 'Link führt ins Leere',
+      unreachable: 'nicht erreichbar',
+      unexpected: 'unlesbare Antwort',
     },
     fix: {
       rejected: 'Richte ihn neu ein: `stellwerk calendar add NAME`.',

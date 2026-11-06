@@ -48,7 +48,7 @@ export function renderCalendar(
   const problem = calendar?.problems[0];
   parts.calendarState.hidden = problem === undefined;
   redraw(parts.calendarState, [problem], () =>
-    problem ? [alert({ tone: 'warning', title: texts.calendar.problem[problem.problem](problem.source), fix: texts.calendar.fix[problem.problem] })] : [],
+    problem ? [alert({ tone: 'warning', title: `${problem.source}: ${texts.calendar.problem[problem.problem]}`, fix: texts.calendar.fix[problem.problem] })] : [],
   );
 
   const open = issues ?? [];
