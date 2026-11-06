@@ -78,7 +78,9 @@ async function testHub(name: string, extra: Partial<HubOptions> = {}, pages = tr
 }
 
 const main = await testHub('main');
-const resting = await testHub('resting', { quietAfterMs: 1500 });
+// Long enough that a swipe after the waking one, and its snapping, end before it rests again: the display
+// looks once a second, so it rests between 4 and 5 s after the last news or the waking touch.
+const resting = await testHub('resting', { quietAfterMs: 4000 });
 const single = await testHub('single', {}, false);
 
 let edge: Edge | null = null;
@@ -100,7 +102,12 @@ try {
       '(selector) => { const n = document.querySelector(selector); if (!n) return null; const r = n.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }',
       selector,
     );
-  /** A finger drawn sideways from one x to another at a height: right to left goes to the next page. */
+  /**
+   * A finger drawn sideways from one x to another at a height: right to left goes to the next page. Always
+   * more than half a page (768 px): the pages snap to the nearest one when the browser sees no fling at the
+   * lift, which a short drag of a finger that stops should do, and which a lift a few milliseconds late
+   * (Edge busy drawing) turned into: 700 px snapped back now and then.
+   */
   const sideways = async (fromX: number, toX: number, y: number) => {
     await browser.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fromX, y }] });
     for (let step = 1; step <= 10; step++) {
@@ -109,9 +116,33 @@ try {
     }
     await browser.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
+  /** Waits like until(); one that times out says what it saw last, and where the pages stood on the way. */
+  const seeing = async <T>(why: string, probe: () => Promise<T | null | undefined | false>): Promise<T> => {
+    let seen: unknown = null;
+    const trail: string[] = [];
+    try {
+      return await until(why, async () => {
+        const value = await probe();
+        const now = await pages();
+        const where = `${now.page || '-'}@${now.left}`;
+        if (trail.at(-1) !== where && trail.length < 20) trail.push(where);
+        seen = {
+          ...now,
+          events: await browser.evaluate<number>("document.querySelectorAll('#agenda .event').length"),
+          hub: await browser.evaluate<string>("document.getElementById('hub-state')?.textContent ?? ''"),
+          url: await browser.evaluate<string>('location.pathname'),
+          // Anything but the pages that could take a sideways swipe itself.
+          sideways: await browser.evaluate<string[]>(`[...document.querySelectorAll('body *')].filter((n) => n.id !== 'pages' && n.scrollWidth > n.clientWidth && ['auto', 'scroll'].includes(getComputedStyle(n).overflowX)).map((n) => (n.id || n.className) + ':' + n.scrollLeft + '/' + (n.scrollWidth - n.clientWidth))`),
+        };
+        return value;
+      });
+    } catch (error) {
+      throw new Error(`${(error as Error).message}; last seen: ${JSON.stringify(seen)}; on the way: ${trail.join(' ')}`);
+    }
+  };
   /** Waits until the pages stand still on a page, snapped in place. */
   const restsOn = (page: string, why: string) =>
-    until(why, async () => {
+    seeing(why, async () => {
       const first = await pages();
       await pause(250);
       const now = await pages();
@@ -120,7 +151,7 @@ try {
 
   // ---------- two pages: the agents first ----------
   await openDisplay(browser, main.startFile);
-  let p = await until('the calendar page is there', async () => {
+  let p = await seeing('the calendar page is there', async () => {
     const now = await pages();
     return now.dots === 2 && (await rect('#agenda .event')) !== null && now.page === 'agents' ? now : null;
   });
@@ -129,7 +160,7 @@ try {
 
   // A finger drawn sideways over the agents goes to the calendar page, and it snaps in place.
   const agents = (await rect('#agents'))!;
-  await sideways(1000, 300, (agents.top + agents.bottom) / 2);
+  await sideways(1000, 100, (agents.top + agents.bottom) / 2);
   p = await restsOn('calendar', 'a swipe to the left goes to the calendar page');
   check(p.agentsInert && !p.calendarInert, `a swipe to the left goes to the calendar page and snaps in place (at ${p.left} of ${p.width})`);
   await screenshot(browser, shots, 'calendar');
@@ -150,7 +181,7 @@ try {
   check(opened[0] === 'https://github.com/example/shop-api/issues/57', `a tap on an issue opens it in the browser (${opened[0]})`);
 
   // A swipe to the right over a list that scrolls itself (the agenda) goes back: only up and down stay in it.
-  await sideways(300, 1000, (agenda.top + agenda.bottom) / 2);
+  await sideways(300, 1200, (agenda.top + agenda.bottom) / 2);
   await restsOn('agents', 'a swipe to the right over the agenda goes back to the agents');
   check(true, 'a swipe to the right over the agenda, a list that scrolls itself, goes back to the agents');
 
@@ -174,7 +205,7 @@ try {
   // Swiped away while it waits (over the waiting list, which scrolls itself), the first page's dot says so;
   // nothing new, so the page stays.
   const card = (await rect('.card'))!;
-  await sideways(1000, 300, (card.top + card.bottom) / 2 - 60);
+  await sideways(1000, 100, (card.top + card.bottom) / 2 - 60);
   p = await restsOn('calendar', 'a swipe away over the waiting list while a request waits');
   await pause(1500);
   p = await pages();
@@ -194,18 +225,18 @@ try {
 
   // ---------- going to rest takes it back to the agents; a waking swipe turns no page ----------
   await openDisplay(browser, resting.startFile);
-  await until('the second hub shows its calendar page', async () => (await pages()).dots === 2 && (await rect('#agenda .event')) !== null);
+  await seeing('the second hub shows its calendar page', async () => (await pages()).dots === 2 && (await rect('#agenda .event')) !== null);
   await press(browser, 'ArrowRight', 39);
   await restsOn('calendar', 'on the calendar page');
   await until('the display rests', () => browser.evaluate<boolean>("document.body.classList.contains('quiet')"), 10_000);
   p = await restsOn('agents', 'at rest it goes back to the agents');
   check(true, 'going to rest takes the display back to the agents');
-  await sideways(1000, 300, 360);
+  await sideways(1000, 100, 360);
   await pause(1000);
   p = await pages();
   const awake = !(await browser.evaluate<boolean>("document.body.classList.contains('quiet')"));
   check(awake && p.page === 'agents' && p.left === 0, `a swipe on the resting display wakes it and turns no page (${p.page}, ${p.left})`);
-  await sideways(1000, 300, 360);
+  await sideways(1000, 100, 360);
   await restsOn('calendar', 'awake, the next swipe turns the page');
   check(true, 'awake, the next swipe turns the page');
 
@@ -215,7 +246,7 @@ try {
   await pause(800);
   p = await pages();
   check(p.dots <= 1 && !p.dotsShown && p.scrollWidth === p.width, `without a calendar there is one page: no dots, nothing to swipe (${p.scrollWidth} of ${p.width})`);
-  await sideways(1000, 300, 360);
+  await sideways(1000, 100, 360);
   await pause(800);
   check((await pages()).left === 0, 'a swipe moves nothing');
 } finally {
