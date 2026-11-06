@@ -2,7 +2,8 @@
 // a read-only fine-grained token: the owner's repositories, their open pull requests, and for each the
 // Actions runs on its head commit and whether it can be merged. Lists come in pages; the hub follows
 // GitHub's "next" links, but only to api.github.com and only up to a limit, so a list is complete or the
-// round fails. Every answer is checked before it is used; a failed round keeps the last list and says why. Every few hours the same
+// round fails. Every answer is checked before it is used; a failed round keeps the last list and says why in
+// the log, naming the question that failed and its status, or why it got no answer. Every few hours the same
 // way: the newest release of Stellwerk itself, so the display can say when there is a newer one (nothing is
 // downloaded).
 //
@@ -81,11 +82,31 @@ export function summarizeRuns(list: Run[]): ChecksState {
 class GitHubFailure extends Error {
   readonly problem: GitHubProblem;
   readonly status: number | null;
-  constructor(problem: GitHubProblem, status: number | null = null) {
+  /** For the log: which question failed and how ("GET /orgs/acme/repos answered 502."); never the token. */
+  readonly detail: string;
+  constructor(problem: GitHubProblem, status: number | null = null, detail = '') {
     super(problem);
     this.problem = problem;
     this.status = status;
+    this.detail = detail;
   }
+}
+
+/** How a question got no answer: its time ran out, or the error code of the connection, if there is one. */
+function noAnswer(err: unknown): string {
+  // fetch ends with a DOMException when AbortSignal.timeout fires, and with "fetch failed" and the cause else.
+  if ((err as { name?: unknown } | null)?.name === 'TimeoutError') return `timed out after ${REQUEST_TIMEOUT_MS / 1000} s`;
+  const code = ((err as { cause?: unknown } | null)?.cause as { code?: unknown } | null | undefined)?.code;
+  return typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code) ? `got no answer (${code})` : 'got no answer';
+}
+
+/** What GitHub's headers say of its rate limits, after a refused question: used up, or when to ask again. */
+function limits(headers: Headers): string {
+  const said: string[] = [];
+  if (headers.get('x-ratelimit-remaining') === '0') said.push('rate limit used up');
+  const retry = headers.get('retry-after');
+  if (retry !== null && /^\d{1,6}$/.test(retry)) said.push(`retry after ${retry} s`);
+  return said.length > 0 ? ` (${said.join(', ')})` : '';
 }
 
 export interface GitHubWatcherOptions {
@@ -187,8 +208,9 @@ export class GitHubWatcher {
       if (before !== null) this.options.log?.('GitHub: reachable again.');
     } catch (err) {
       this.problem = err instanceof GitHubFailure ? err.problem : 'unreachable';
-      // Once per new problem, not every round.
-      if (this.problem !== before) this.options.log?.(`GitHub: ${describeProblem(this.problem)}`);
+      // Once per new problem, not every round, with the question that failed first.
+      const detail = err instanceof GitHubFailure && err.detail ? ` ${err.detail}` : '';
+      if (this.problem !== before) this.options.log?.(`GitHub: ${describeProblem(this.problem)}${detail}`);
     } finally {
       this.options.onChange?.();
     }
@@ -206,8 +228,8 @@ export class GitHubWatcher {
       this.releaseDue = this.now() + RELEASE_EVERY_MS;
     } catch (err) {
       const problem = err instanceof GitHubFailure ? err.problem : 'unreachable';
-      const why = err instanceof GitHubFailure && err.status !== null ? `${problem}, ${err.status}` : problem;
-      if (problem !== this.releaseProblem) this.options.log?.(`GitHub: the newest release of Stellwerk could not be asked (${why}).`);
+      const detail = err instanceof GitHubFailure && err.detail ? ` ${err.detail}` : '';
+      if (problem !== this.releaseProblem) this.options.log?.(`GitHub: the newest release of Stellwerk could not be asked (${problem}).${detail}`);
       this.releaseProblem = problem;
       this.releaseDue = this.now() + RELEASE_RETRY_MS;
     }
@@ -259,6 +281,8 @@ export class GitHubWatcher {
   }
 
   private async get<T>(url: string, schema: z.ZodType<T>): Promise<{ data: T; next: string | null }> {
+    // The path alone: the query holds nothing the log needs.
+    const question = `GET ${new URL(url).pathname}`;
     let response: Response;
     try {
       response = await this.fetch(url, {
@@ -271,19 +295,19 @@ export class GitHubWatcher {
         redirect: 'error',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-    } catch {
-      throw new GitHubFailure('unreachable');
+    } catch (err) {
+      throw new GitHubFailure('unreachable', null, `${question} ${noAnswer(err)}.`);
     }
     if (!response.ok) {
       const problem: GitHubProblem =
         response.status === 401 ? 'rejected' : response.status === 403 ? 'forbidden' : response.status === 404 ? 'not-found' : 'unexpected';
-      throw new GitHubFailure(problem, response.status);
+      throw new GitHubFailure(problem, response.status, `${question} answered ${response.status}${limits(response.headers)}.`);
     }
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
-    if (!parsed.success) throw new GitHubFailure('unexpected', response.status);
+    if (!parsed.success) throw new GitHubFailure('unexpected', response.status, `${question} answered ${response.status}, but not in the expected form.`);
     // A "next" link elsewhere than api.github.com is not followed: the token goes nowhere else.
     const next = nextPage(response.headers.get('link'));
-    if (next === undefined) throw new GitHubFailure('unexpected', response.status);
+    if (next === undefined) throw new GitHubFailure('unexpected', response.status, `${question} named a next page elsewhere than api.github.com.`);
     return { data: parsed.data, next };
   }
 }

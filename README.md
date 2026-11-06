@@ -85,10 +85,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.10.1.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.10.1.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.10.1.zip -DestinationPath .
-cd stellwerk-0.10.1
+(Get-FileHash stellwerk-0.10.2.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.10.2.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.10.2.zip -DestinationPath .
+cd stellwerk-0.10.2
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -142,7 +142,7 @@ Or step by step, without the start with Windows:
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.10.1.zip
+stellwerk update stellwerk-0.10.2.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -167,7 +167,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.1"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.10.2"
 npm link
 ```
 
@@ -259,6 +259,9 @@ so Dependabot's are not there.
 
 At the foot of the "Waiting for you" column, below the pull requests, the display says when the list was
 last brought up to date, or why that failed (token rejected, no access, not reachable) and how to fix it.
+The hub's log (`hub.log`, when it started with Windows) names the question that failed, such as
+`GET /repos/<owner>/<repo>/pulls/38 answered 502.`, with GitHub's status, or why it got no answer (timed
+out, or the connection's error code), and whether GitHub's rate limit is used up or when to ask again.
 The token is never logged and never sent to the display. With the same token the hub asks, at its start
 and every six hours, for the newest release of Stellwerk itself, so the status column can say when there
 is a newer one (see [Updating](#updating)). `stellwerk github remove` deletes it; the hub then opens no

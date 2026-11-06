@@ -192,6 +192,13 @@ request's title, so the title keeps its room.
 
 ---
 
+## 0.10.2 – GitHub's answer in the log ✅
+
+Done in 0.10.2 (see [CHANGELOG](CHANGELOG.md)): when the list of pull requests cannot be brought up to
+date, the log names the question that failed with GitHub's status, or why it got no answer.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime
