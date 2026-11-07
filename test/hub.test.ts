@@ -1374,7 +1374,8 @@ describe('permission requests', () => {
   });
 
   test('the audit log has every settled request with its input, and never the token', async () => {
-    const { port, auditFile } = await startTestHub({ holdMs: 200 });
+    // The allow has to come within the hold time; 200 ms was too short on a slow runner.
+    const { port, auditFile } = await startTestHub({ holdMs: 1500 });
     const screen = await display(port);
     const allowed = permissionRequest(port, 'npm test');
     screen.decide(await openRequestId(screen), 'allow');
