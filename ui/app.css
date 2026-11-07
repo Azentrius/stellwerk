@@ -42,7 +42,7 @@ button { font: inherit; }
 .col--status { grid-column: 2; grid-row: 1; }
 
 /* The pages side by side; a swipe goes from one to the next and they snap in place (pages.ts). It is the
-   browser's own scrolling, so up and down still scroll the lists. No scroll bar: the dots say where. */
+   browser's own scrolling, so up and down still scroll the lists. No scroll bar: the tabs say where. */
 .pages {
   grid-column: 1;
   grid-row: 1;
@@ -59,25 +59,6 @@ button { font: inherit; }
 .page--calendar { grid-template-columns: 3fr 2fr; }
 /* A tap that wakes the display at rest swipes no page either. */
 .waking .pages { overflow-x: hidden; }
-
-/* Which page shows, as dots at the foot of the pages; they take no taps. On another page the first one's
-   dot carries how much waits there, in the colour of attention. */
-.page-dots {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: end;
-  justify-self: center;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-sm);
-  margin-block-end: var(--sp-xs);
-  pointer-events: none;
-}
-.page-dots__dot { display: inline-flex; align-items: center; justify-content: center; min-inline-size: 0.5rem; block-size: 0.5rem; background: var(--line-control); border-radius: var(--radius-pill); }
-.page-dots__dot--current { background: var(--text-subtle); }
-.page-dots--waiting .page-dots__dot:first-child { block-size: auto; padding: 0 var(--sp-sm); color: var(--bg-page); background: var(--status-warning); }
-.page-dots__badge { font-size: 1rem; font-weight: 600; line-height: 1.35; font-variant-numeric: tabular-nums; }
 
 .col {
   display: flex;
@@ -356,8 +337,7 @@ button { font: inherit; }
 .col--waiting .github-state { grid-area: foot; margin-block-start: var(--sp-sm); }
 
 /* ---------- the calendar page: now and next, the days; the tasks (calendar.ts) ---------- */
-/* Room at the foot for the dots. */
-.col--calendar, .col--tasks { gap: var(--sp-md); padding-block-end: var(--sp-lg); }
+.col--calendar, .col--tasks { gap: var(--sp-md); }
 .col--calendar > .col__title, .col--tasks > .col__title { margin-block-end: 0; }
 /* The event running now beside the next one; the one now with a line in the colour of notes. */
 .now-next { display: grid; flex: none; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: var(--sp-lg); padding-block-end: var(--sp-md); border-block-end: 1px solid var(--line); }
@@ -404,6 +384,45 @@ button { font: inherit; }
 .clock { font-size: 3.4rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .col--status .az-label { white-space: normal; }
 .last-event, .github-state, .hardware-state { color: var(--text-subtle); }
+/* The pages' tabs below the hub's state, an icon for each page, as the design system draws tabs (az-tabs):
+   the one that shows in the text colour over a line in signature. Each 64 px wide and 56 px high, so five
+   fit and the hardware and the plans still do below; on another page the first one carries how much waits there, in the colour of attention. */
+.page-tabs { display: flex; flex: none; gap: var(--sp-xs); border-block-end: 1px solid var(--line); }
+.page-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 3.2rem;
+  block-size: 2.8rem;
+  margin-block-end: -1px;
+  padding: 0;
+  color: var(--text-subtle);
+  font-size: 1.5rem;
+  background: transparent;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.page-tab[aria-selected="true"] { color: var(--text); border-block-end-color: var(--signature); }
+.page-tab:focus-visible { outline-offset: -2px; }
+.page-tab__badge {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: calc(-1 * var(--sp-xs));
+  min-inline-size: 1.35rem;
+  padding: 0 var(--sp-xs);
+  color: var(--bg-page);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: var(--status-warning);
+  border-radius: var(--radius-pill);
+}
 /* An error says what happened and how to fix it (az-alert), in the display's text size; a little tighter
    than usual, so that two of them fit in the narrow column. */
 :is(.col--status, .col--waiting, .col--monitors, .col--calendar, .col--tasks) .az-alert { gap: var(--sp-xs) var(--sp-sm); padding: var(--sp-sm); }
@@ -430,14 +449,14 @@ button { font: inherit; }
 .gauge__percent { min-width: 2.6rem; }
 
 /* The Azentrius signature below everything, without a link: the display is a kiosk. */
-.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-md); padding-block-start: var(--sp-md); font-size: 1rem; }
+.col--status .az-signature { gap: var(--sp-xs) var(--sp-md); margin-block-start: var(--sp-sm); padding-block-start: var(--sp-md); font-size: 1rem; }
 .az-signature__mark { font-size: 1.3rem; }
 
 /* ---------- at rest: nothing new for a while and no open request (quiet.ts) ---------- */
 /* Dimmed to about a quarter; the status column with the clock a little less, so the time can still be
    read. Into rest slowly, out of it at once. */
 .col { transition: filter 0.2s; }
-.quiet .col, .quiet .page-dots { filter: brightness(0.25); transition: filter 2s; }
+.quiet .col { filter: brightness(0.25); transition: filter 2s; }
 .quiet .col--status { filter: brightness(0.4); }
 /* At night (the hours set up), at rest it goes darker than by day, but stays readable in a dark room: a
    fifth, the clock's column a little more. */

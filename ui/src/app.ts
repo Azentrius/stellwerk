@@ -119,7 +119,7 @@ const pullTaps = new TapList((key) => {
 });
 const pullsSection = byId('pulls-section');
 /** The pages a swipe goes between; something new that waits takes the display back to the first. */
-const pages = new Pages(byId('pages'), byId('page-dots'), { agents: byId('page-agents'), calendar: byId('page-calendar') });
+const pages = new Pages(byId('pages'), byId('page-tabs'), { agents: byId('page-agents'), calendar: byId('page-calendar') });
 const home = new Home();
 /** A tap on an issue assigned to me opens it in the default browser. */
 const issueTaps = new TapList((key) => {
@@ -295,8 +295,8 @@ function tick(): void {
   fadeWhileMore(waitingList, 'waiting--more');
   renderDecisions(decisionsParts, state?.decisions ?? [], decisionsLine.isOpen(now), now, texts);
 
-  // The pages: the first one's dot carries how much waits there; something new that waits goes back to it.
-  pages.show(pagesOf(state), texts.pages, queue.openCount() + due.length, texts.pages.waiting);
+  // The pages: the first one's tab carries how much waits there; something new that waits goes back to it.
+  pages.show(pagesOf(state), texts.pages, queue.openCount() + due.length);
   if (home.update(waitingKeys(state))) pages.home();
   renderCalendar(calendarParts, state?.calendar ?? null, state?.issues ?? null, state?.github?.issuesProblem ?? null, issueTaps, now, texts);
   markScrolling(calendarParts.agenda, 'agenda--more');
