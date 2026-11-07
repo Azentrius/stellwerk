@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.1 – 2026-11-07
+
+The pages' tabs in the status column instead of the dots below the pages.
+
+- **Tabs:** which page shows is a row of tabs in the status column, below the hub's state: an icon for
+  each page (a robot for the agents, a calendar), the one that shows marked as the design system marks a
+  tab. A tap on one goes there, besides a swipe and the arrow keys. Each is 64 px wide, so five fit, for
+  the pages still to come, and low enough that the hardware and the plans' usage still fit below; the
+  signature at the foot moved up a little for that. Swiped away while something waits, the agents' tab
+  carries how much, in the colour of attention. The dots at the foot of the pages, which looked like part
+  of the middle column, are gone. Screen readers hear tabs and their pages.
+- **Icons:** robot and calendar-alt from the same Font Awesome Free 5 set as the others.
+- **Checks:** `tools/check-screens.ts` taps both tabs and reads which one is selected.
+
 ## 0.11.0 – 2026-11-06
 
 A second page, a swipe away: the calendars' events and the open tasks, with the GitHub issues assigned to

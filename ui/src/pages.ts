@@ -1,25 +1,32 @@
 // The display's pages side by side, left of the status column: a swipe goes to the next one or the one
 // before, and they snap in place. It is the browser's own scrolling, so a swipe up or down still scrolls the
-// lists. The arrow keys left and right do the same. Dots at the foot say which page shows; on another page
-// the first one's dot carries how much waits there. A page out of view takes no focus and no taps.
+// lists. The arrow keys left and right do the same. A row of tabs in the status column, an icon for each
+// page, says which page shows, and a tap on one goes there; on another page the first one's tab carries how
+// much waits there. The row stays where it is however many pages there are. A page out of view takes no
+// focus and no taps.
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { el } from './dom.ts';
+import { el, icon } from './dom.ts';
+import type { Texts } from './i18n.ts';
+import type { IconName } from './icons.ts';
 import type { PageName } from './paging.ts';
+
+/** Each page's icon on its tab. */
+const PAGE_ICONS: Record<PageName, IconName> = { agents: 'robot', calendar: 'calendar-alt' };
 
 export class Pages {
   private readonly container: HTMLElement;
-  private readonly dots: HTMLElement;
+  private readonly tabs: HTMLElement;
   private readonly elements: Record<PageName, HTMLElement>;
   private shown: PageName[] = ['agents'];
   private current = 0;
-  private dotNodes: HTMLElement[] = [];
-  private badge = el('span', 'page-dots__badge');
+  private tabNodes: HTMLButtonElement[] = [];
+  private badge = el('span', 'page-tab__badge');
 
-  constructor(container: HTMLElement, dots: HTMLElement, elements: Record<PageName, HTMLElement>) {
+  constructor(container: HTMLElement, tabs: HTMLElement, elements: Record<PageName, HTMLElement>) {
     this.container = container;
-    this.dots = dots;
+    this.tabs = tabs;
     this.elements = elements;
     container.addEventListener('scrollend', () => this.settle());
     window.addEventListener('resize', () => this.place('instant'));
@@ -38,35 +45,50 @@ export class Pages {
   }
 
   /** Which pages there are, their names, and how much waits on the first one. */
-  show(names: PageName[], labels: Record<PageName, string>, waiting: number, waitingLabel: (n: number) => string): void {
+  show(names: PageName[], texts: Texts['pages'], waiting: number): void {
     if (names.join() !== this.shown.join()) {
       const was = this.page;
       this.shown = names;
-      for (const [name, page] of Object.entries(this.elements) as [PageName, HTMLElement][]) page.hidden = !names.includes(name);
+      // With tabs the pages are their panels; one page alone is a region.
+      for (const [name, page] of Object.entries(this.elements) as [PageName, HTMLElement][]) {
+        page.hidden = !names.includes(name);
+        page.setAttribute('role', names.length > 1 ? 'tabpanel' : 'region');
+      }
       this.current = Math.max(0, names.indexOf(was));
-      this.dotNodes = names.map(() => el('span', 'page-dots__dot'));
-      this.dots.replaceChildren(...this.dotNodes);
-      this.dots.hidden = names.length < 2;
+      this.tabNodes = names.map((name, i) => {
+        const tab = el('button', 'page-tab');
+        tab.type = 'button';
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-controls', this.elements[name].id);
+        tab.append(icon(PAGE_ICONS[name]));
+        tab.addEventListener('click', () => this.go(i));
+        return tab;
+      });
+      this.tabs.replaceChildren(...this.tabNodes);
+      this.tabs.hidden = names.length < 2;
       this.place('instant');
     }
-    for (const [name, page] of Object.entries(this.elements) as [PageName, HTMLElement][]) page.setAttribute('aria-label', labels[name]);
-    this.dotNodes.forEach((dot, i) => {
-      dot.classList.toggle('page-dots__dot--current', i === this.current);
-      dot.title = labels[this.shown[i]!];
-    });
+    this.tabs.setAttribute('aria-label', texts.title);
+    for (const [name, page] of Object.entries(this.elements) as [PageName, HTMLElement][]) page.setAttribute('aria-label', texts[name]);
     // Only on another page: on the first one, what waits is in view.
     const count = this.current !== 0 && waiting > 0 ? String(waiting) : '';
+    this.tabNodes.forEach((tab, i) => {
+      const name = texts[this.shown[i]!];
+      const label = i === 0 && count ? `${name}: ${texts.waiting(waiting)}` : name;
+      tab.title = label;
+      tab.setAttribute('aria-label', label);
+    });
     if (this.badge.textContent !== count) this.badge.textContent = count;
-    this.badge.title = count ? waitingLabel(waiting) : '';
-    const first = this.dotNodes[0];
+    const first = this.tabNodes[0];
     if (first && count && this.badge.parentElement !== first) first.append(this.badge);
     else if (!count) this.badge.remove();
-    this.dots.classList.toggle('page-dots--waiting', count !== '');
+    this.mark();
   }
 
   /** Goes to a page by its place, smoothly unless told otherwise. */
   go(index: number, behavior: ScrollBehavior = 'smooth'): void {
     this.current = Math.min(Math.max(0, index), this.shown.length - 1);
+    this.mark();
     this.place(matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : behavior);
   }
 
@@ -83,6 +105,14 @@ export class Pages {
     if (behavior === 'instant') this.settle();
   }
 
+  /** The tab of the page that shows is the selected one, and the only one the Tab key reaches. */
+  private mark(): void {
+    this.tabNodes.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === this.current));
+      tab.tabIndex = i === this.current ? 0 : -1;
+    });
+  }
+
   /** Where the scrolling came to rest is the page that shows; the others take no focus and no taps. */
   private settle(): void {
     const width = this.container.clientWidth;
@@ -90,7 +120,7 @@ export class Pages {
     this.shown.forEach((name, i) => {
       this.elements[name].inert = i !== this.current;
     });
-    this.dotNodes.forEach((dot, i) => dot.classList.toggle('page-dots__dot--current', i === this.current));
+    this.mark();
     if (this.current === 0) this.badge.remove();
     this.container.dataset.page = this.page;
   }

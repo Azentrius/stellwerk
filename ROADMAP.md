@@ -208,6 +208,14 @@ security review of its own (stage 4).
 
 ---
 
+## 0.11.1 – The pages' tabs in the status column ✅
+
+Done in 0.11.1 (see [CHANGELOG](CHANGELOG.md)): the dots below the pages, which looked like part of the
+middle column, are now a row of tabs in the status column, an icon for each page, and a tap on one goes
+there. Five fit, for the pages still to come.
+
+---
+
 ## Stage 2 – System values and alerts ✅
 
 CPU, memory and temperatures from LibreHardwareMonitor: done in 0.2.0. Server and app alerts from Uptime
@@ -229,7 +237,7 @@ ChatGPT, and Claude's limits for Claude Code in a terminal without the desktop a
 
 ## Stage 4 – Shortcuts
 
-A page of buttons, a swipe away like the calendar, that open links and apps and send key presses (chosen
+A page of buttons, a swipe or a tap on its tab away like the calendar, that open links and apps and send key presses (chosen
 on 2026-11-06: no scripts, no Home Assistant). The hub would then do things itself, so this stage begins
 with its own security review, and with a probe of how a key press reaches the app it is meant for while
 the display's window has the focus.

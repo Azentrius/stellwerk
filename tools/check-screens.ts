@@ -1,10 +1,10 @@
 // The pages in a real Edge at the display's 1920×720: a finger drawn sideways goes from the agents to the
 // calendar page and back, and the page snaps in place; the arrow keys do the same; a swipe up or down
-// still scrolls a list and turns no page; a page out of view takes no taps; a tap on an issue opens it in
-// the browser. A new request takes the display back to the first page at once, and while one waits, the
-// first page's dot on the calendar page says so. Going to rest takes it back too, and a swipe that wakes
-// it turns no page. Without a calendar and without the issues there is one page: no dots, nothing to
-// swipe. Isolated hubs with made-up tokens; the calendars and GitHub are made up here, nothing goes
+// still scrolls a list and turns no page; a tap on a page's tab in the status column goes there; a page
+// out of view takes no taps; a tap on an issue opens it in the browser. A new request takes the display
+// back to the first page at once, and while one waits, the first page's tab says so on the calendar page.
+// Going to rest takes it back too, and a swipe that wakes it turns no page. Without a calendar and without
+// the issues there is one page: no tabs, nothing to swipe. Isolated hubs with made-up tokens; the calendars and GitHub are made up here, nothing goes
 // online. Needs the display built (npm run build) and Edge.
 //
 // Usage: node tools/check-screens.ts [folder for screenshots]
@@ -88,13 +88,14 @@ try {
   edge = await openEdge(path.join(dir, 'profile'));
   const browser = edge;
   const pages = () =>
-    browser.evaluate<{ page: string; left: number; width: number; scrollWidth: number; agentsInert: boolean; calendarInert: boolean; dots: number; dotsShown: boolean; badge: string }>(`(() => {
+    browser.evaluate<{ page: string; left: number; width: number; scrollWidth: number; agentsInert: boolean; calendarInert: boolean; tabs: number; tabsShown: boolean; selected: number; badge: string }>(`(() => {
       const p = document.getElementById('pages');
       return {
         page: p.dataset.page ?? '', left: p.scrollLeft, width: p.clientWidth, scrollWidth: p.scrollWidth,
         agentsInert: document.getElementById('page-agents').inert, calendarInert: document.getElementById('page-calendar').inert,
-        dots: document.querySelectorAll('.page-dots__dot').length, dotsShown: !document.getElementById('page-dots').hidden,
-        badge: document.querySelector('.page-dots__badge')?.textContent ?? '',
+        tabs: document.querySelectorAll('#page-tabs .page-tab').length, tabsShown: !document.getElementById('page-tabs').hidden,
+        selected: [...document.querySelectorAll('#page-tabs .page-tab')].findIndex((t) => t.getAttribute('aria-selected') === 'true'),
+        badge: document.querySelector('.page-tab__badge')?.textContent ?? '',
       };
     })()`);
   const rect = (selector: string) =>
@@ -153,16 +154,16 @@ try {
   await openDisplay(browser, main.startFile);
   let p = await seeing('the calendar page is there', async () => {
     const now = await pages();
-    return now.dots === 2 && (await rect('#agenda .event')) !== null && now.page === 'agents' ? now : null;
+    return now.tabs === 2 && (await rect('#agenda .event')) !== null && now.page === 'agents' ? now : null;
   });
-  check(p.left === 0 && !p.agentsInert && p.calendarInert && p.dotsShown, 'at first the agents show; the calendar page, out of view, takes no taps');
+  check(p.left === 0 && !p.agentsInert && p.calendarInert && p.tabsShown && p.selected === 0, "at first the agents show, their tab selected; the calendar page, out of view, takes no taps");
   await screenshot(browser, shots, 'agents');
 
   // A finger drawn sideways over the agents goes to the calendar page, and it snaps in place.
   const agents = (await rect('#agents'))!;
   await sideways(1000, 100, (agents.top + agents.bottom) / 2);
   p = await restsOn('calendar', 'a swipe to the left goes to the calendar page');
-  check(p.agentsInert && !p.calendarInert, `a swipe to the left goes to the calendar page and snaps in place (at ${p.left} of ${p.width})`);
+  check(p.agentsInert && !p.calendarInert && p.selected === 1, `a swipe to the left goes to the calendar page and snaps in place (at ${p.left} of ${p.width}), its tab selected`);
   await screenshot(browser, shots, 'calendar');
 
   // Up and down still scroll the agenda, and turn no page.
@@ -194,6 +195,17 @@ try {
   await restsOn('calendar', 'the right arrow goes to the calendar page again');
   check(true, 'the arrow keys go to the next page and the one before');
 
+  // A tap on a page's tab in the status column goes there.
+  const tabOf = async (index: number) => (await rect(`#page-tabs .page-tab:nth-child(${index + 1})`))!;
+  let tab = await tabOf(0);
+  await tap(browser, (tab.left + tab.right) / 2, (tab.top + tab.bottom) / 2);
+  p = await restsOn('agents', "a tap on the agents' tab goes to the agents");
+  check(p.selected === 0, "a tap on the agents' tab goes to the agents, and their tab is the selected one");
+  tab = await tabOf(1);
+  await tap(browser, (tab.left + tab.right) / 2, (tab.top + tab.bottom) / 2);
+  p = await restsOn('calendar', "a tap on the calendar's tab goes to the calendar page");
+  check(p.selected === 1, "a tap on the calendar's tab goes to the calendar page, and its tab is the selected one");
+
   // A new request takes the display back to the agents at once, its card in view.
   const first = hook(main.hub.port, main.token, 'card-1', { hook_event_name: 'PermissionRequest', session_title: 'Deploy', tool_name: 'Bash', tool_input: { command: 'npm run deploy' } });
   p = await until('a new request goes back to the agents', async () => {
@@ -202,20 +214,20 @@ try {
   });
   check(!p.agentsInert && p.calendarInert, 'a new request takes the display back to the agents at once, its card in view');
 
-  // Swiped away while it waits (over the waiting list, which scrolls itself), the first page's dot says so;
+  // Swiped away while it waits (over the waiting list, which scrolls itself), the first page's tab says so;
   // nothing new, so the page stays.
   const card = (await rect('.card'))!;
   await sideways(1000, 100, (card.top + card.bottom) / 2 - 60);
   p = await restsOn('calendar', 'a swipe away over the waiting list while a request waits');
   await pause(1500);
   p = await pages();
-  check(p.page === 'calendar' && p.badge === '1', `on the calendar page the first page's dot says one waits ("${p.badge}"); the page stays`);
+  check(p.page === 'calendar' && p.badge === '1', `on the calendar page the first page's tab says one waits ("${p.badge}"); the page stays`);
   await screenshot(browser, shots, 'calendar-waiting');
 
-  // A second request takes it back again; on the agents the dot carries no number.
+  // A second request takes it back again; on the agents their tab carries no number.
   const second = hook(main.hub.port, main.token, 'card-2', { hook_event_name: 'PermissionRequest', session_title: 'Migrate', tool_name: 'Bash', tool_input: { command: 'npm run migrate' } });
   p = await restsOn('agents', 'a second request goes back to the agents');
-  check(p.badge === '', 'a second request takes it back again; on the agents the dot carries no number');
+  check(p.badge === '', 'a second request takes it back again; on the agents their tab carries no number');
 
   // A page out of view takes no taps: Allow is in view and still works.
   const allow = (await rect('.card [data-decision="allow"]'))!;
@@ -225,7 +237,7 @@ try {
 
   // ---------- going to rest takes it back to the agents; a waking swipe turns no page ----------
   await openDisplay(browser, resting.startFile);
-  await seeing('the second hub shows its calendar page', async () => (await pages()).dots === 2 && (await rect('#agenda .event')) !== null);
+  await seeing('the second hub shows its calendar page', async () => (await pages()).tabs === 2 && (await rect('#agenda .event')) !== null);
   await press(browser, 'ArrowRight', 39);
   await restsOn('calendar', 'on the calendar page');
   await until('the display rests', () => browser.evaluate<boolean>("document.body.classList.contains('quiet')"), 10_000);
@@ -245,7 +257,7 @@ try {
   await until('the third hub shows its display', async () => (await rect('#agents-title')) !== null && (await pages()).width > 0);
   await pause(800);
   p = await pages();
-  check(p.dots <= 1 && !p.dotsShown && p.scrollWidth === p.width, `without a calendar there is one page: no dots, nothing to swipe (${p.scrollWidth} of ${p.width})`);
+  check(p.tabs <= 1 && !p.tabsShown && p.scrollWidth === p.width, `without a calendar there is one page: no tabs, nothing to swipe (${p.scrollWidth} of ${p.width})`);
   await sideways(1000, 100, 360);
   await pause(800);
   check((await pages()).left === 0, 'a swipe moves nothing');

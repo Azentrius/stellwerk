@@ -157,8 +157,8 @@ export interface Texts {
   moreParameters: string;
   address: string;
   query: string;
-  /** The pages one swipes between, by name (for screen readers), and how much waits on the first. */
-  pages: { agents: string; calendar: string; waiting: (n: number) => string };
+  /** The pages one swipes between: the row of their tabs, each one's name (tooltip and screen readers), and how much waits on the first. */
+  pages: { title: string; agents: string; calendar: string; waiting: (n: number) => string };
   calendarTitle: string;
   tasksTitle: string;
   issuesTitle: string;
@@ -372,7 +372,7 @@ const en: Texts = {
   moreParameters: 'More parameters',
   address: 'Address',
   query: 'Search',
-  pages: { agents: 'Agents and approvals', calendar: 'Calendar and tasks', waiting: (n) => (n === 1 ? '1 waits for you' : `${n} wait for you`) },
+  pages: { title: 'Pages', agents: 'Agents and approvals', calendar: 'Calendar and tasks', waiting: (n) => (n === 1 ? '1 waits for you' : `${n} wait for you`) },
   calendarTitle: 'Calendar',
   tasksTitle: 'Tasks',
   issuesTitle: 'GitHub issues',
@@ -587,7 +587,7 @@ const de: Texts = {
   moreParameters: 'Weitere Parameter',
   address: 'Adresse',
   query: 'Suche',
-  pages: { agents: 'Agenten und Freigaben', calendar: 'Kalender und Aufgaben', waiting: (n) => (n === 1 ? '1 wartet auf dich' : `${n} warten auf dich`) },
+  pages: { title: 'Seiten', agents: 'Agenten und Freigaben', calendar: 'Kalender und Aufgaben', waiting: (n) => (n === 1 ? '1 wartet auf dich' : `${n} warten auf dich`) },
   calendarTitle: 'Kalender',
   tasksTitle: 'Aufgaben',
   issuesTitle: 'GitHub-Issues',

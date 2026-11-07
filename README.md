@@ -91,10 +91,10 @@ From a [release](https://github.com/Azentrius/stellwerk/releases): download `ste
 `SHA256SUMS`, then in PowerShell (replace the version):
 
 ```powershell
-(Get-FileHash stellwerk-0.11.0.zip).Hash    # must match the line in SHA256SUMS
-gh attestation verify stellwerk-0.11.0.zip --repo Azentrius/stellwerk    # optional, needs gh
-Expand-Archive stellwerk-0.11.0.zip -DestinationPath .
-cd stellwerk-0.11.0
+(Get-FileHash stellwerk-0.11.1.zip).Hash    # must match the line in SHA256SUMS
+gh attestation verify stellwerk-0.11.1.zip --repo Azentrius/stellwerk    # optional, needs gh
+Expand-Archive stellwerk-0.11.1.zip -DestinationPath .
+cd stellwerk-0.11.1
 npm ci --omit=dev
 npm link        # optional: makes the command `stellwerk` available everywhere
 ```
@@ -148,7 +148,7 @@ Or step by step, without the start with Windows:
 Download the new release's `stellwerk-VERSION.zip` and `SHA256SUMS` into one folder, then:
 
 ```powershell
-stellwerk update stellwerk-0.11.0.zip
+stellwerk update stellwerk-0.11.1.zip
 ```
 
 It checks the zip against `SHA256SUMS`, unpacks it into a folder of its own
@@ -173,7 +173,7 @@ If you made the command `stellwerk` available with `npm link`, it still runs the
 from. Run `npm link` in the new release's folder, so it runs the new one:
 
 ```powershell
-cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.11.0"
+cd "$env:LOCALAPPDATA\stellwerk\releases\stellwerk-0.11.1"
 npm link
 ```
 
@@ -364,11 +364,11 @@ the display. `stellwerk kuma remove` deletes it; the hub then opens no connectio
 ## Calendar and tasks
 
 Optional. With a calendar or the GitHub issues set up, the display has a second page left of the status
-column. Swipe sideways, or press the arrow keys, to get there and back; dots at the foot say which page
-shows. On the left the event running now and the next one, then today and the next six days with their
+column. Swipe sideways, press the arrow keys, or tap the page's tab to get there and back: a row of tabs
+in the status column, below the hub's state, has an icon for each page and marks the one that shows. On the left the event running now and the next one, then today and the next six days with their
 events; on the right the open tasks: the GitHub issues assigned to you first (a tap opens one in the
 browser), then each task list, overdue ones first. A new request, or a new answer due in the app, takes
-the display back to the first page at once; swiped away while something waits, the first page's dot
+the display back to the first page at once; swiped away while something waits, the first page's tab
 carries how much. Going to rest takes it back too, and a swipe that wakes it turns no page.
 
 ![The calendar page at 1920×720: the event running now and the next one, then today and the next days on the left, the GitHub issues assigned to you and a task list on the right, the status column as on the first page](docs/calendar.png)
